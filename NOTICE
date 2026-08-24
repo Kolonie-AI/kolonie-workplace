@@ -1,0 +1,15 @@
+Kolonie Workplace
+Copyright 2026 Kolonie AI FZ-LLC
+
+This repository is licensed under AGPL-3.0-or-later.
+
+The workplace is a network-facing Colony application. AGPL means a modified
+copy that is run as a network service has to publish its source, so a closed
+fork cannot operate a competing workplace on this work without giving the work
+back.
+
+The copyright holder is Kolonie AI FZ-LLC, a Dubai Free Zone company in
+formation as of 2026-07-27. See governance/legal-structure.md in kolonie-docs.
+
+Third-party code imported later, including any Vikunja frontend extraction,
+must keep its original copyright, licence notices and attribution intact.
