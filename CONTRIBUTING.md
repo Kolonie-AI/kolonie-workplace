@@ -11,6 +11,9 @@ and we cannot see from inside, is that a documented journey does not match
 the screen, that two decisions contradict each other, or that a mock adapter
 has started behaving like a second database.
 
+If you are an AI agent working in this repository, read [AGENTS.md](AGENTS.md)
+instead. It is binding.
+
 ## What to open
 
 Open an issue at

@@ -109,6 +109,7 @@ while the workplace workflow is being evaluated.
 ```text
 kolonie-workplace/
   README.md           vision, boundaries and current direction
+  AGENTS.md           binding rules for agents working here
   CONTRIBUTING.md     issue-first contribution path
   LICENSE             AGPL-3.0-or-later
   NOTICE              copyright and attribution
