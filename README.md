@@ -94,15 +94,73 @@ Can the useful Vikunja UI survive behind a Colony-owned adapter
 without retaining Vikunja's backend model?
 ```
 
+**The kill question is answered: No-Go.** The first spike read the Vikunja
+frontend and found that the components which look reusable reach past any
+adapter into Pinia stores, HTTP services, the router, i18n and a global icon
+registry, and that they mutate. No Vikunja code is imported here. The evidence
+and the full reasoning are in
+[`docs/spikes/0001-vikunja-ui-extraction.md`](docs/spikes/0001-vikunja-ui-extraction.md).
+
 ## Status
 
-This repository is a **bootstrap**. There is no application code here yet, and
-that is deliberate. The first implementation work will be specified as GitHub
-issues in this repository and carried by a coding agent.
+The first vertical slice exists: a Vue 3 + TypeScript application that renders
+one citizen's profession, mission, venture, milestone, work items and single
+recommended next action, entirely behind the typed `TaskGateway` and backed by
+a read-only mock adapter.
+
+It has no database, no local-storage task store, no writable mock backend and
+no live Colony or MCP call. The Colony remains the source of truth.
 
 Open work lives in [this repository's issues](https://github.com/Kolonie-AI/kolonie-workplace/issues).
 Those issues are **not** on the Colony-wide [project board](https://github.com/orgs/Kolonie-AI/projects/1)
 while the workplace workflow is being evaluated.
+
+## Running it
+
+Node 22 or later and npm 9 or later. Every command below is non-interactive and
+suitable for CI.
+
+| Step | Command |
+|---|---|
+| Install dependencies | `npm ci` |
+| Lint | `npm run lint` |
+| TypeScript type-check | `npm run typecheck` |
+| Unit and component tests | `npm test` |
+| Production build | `npm run build` |
+
+`npm ci` requires the committed `package-lock.json`; use `npm install` only when
+deliberately changing dependencies. `npm run dev` starts a local dev server and
+is the one command here that is *not* meant for CI.
+
+The whole chain, as CI would run it:
+
+```bash
+npm ci && npm run lint && npm run typecheck && npm test && npm run build
+```
+
+### What the tests prove
+
+- **The journey path** — the screen renders identity, profession, mission,
+  venture, milestone, the four work-item groups, exactly one recommended item
+  with its reason, and an item detail carrying blockers, the operator-needed
+  flag, the structured handover and the evidence.
+- **The rejection path** — when the recommendation is absent, or names a work
+  item that does not exist, the screen shows a visible unavailable state and
+  selects **no** fallback item. Both causes are asserted separately.
+- **The boundary** — a test reads every file under `src/components` and fails
+  if one imports a mock fixture or adapter, or imports anything outside
+  `@/domain` and `@/gateway`. The convention is enforced, not merely stated.
+
+### Architecture
+
+```text
+src/domain/      workplace types and the recommendation resolver — no I/O
+src/gateway/     the TaskGateway interface: the one boundary UI may read through
+src/mock/        read-only fixture and adapter — disposable, never imported by a component
+src/components/  the workplace screen and its parts
+src/main.ts      the composition root: the only file that knows a mock exists
+src/test/        the boundary-enforcement test
+```
 
 ## Layout
 
@@ -113,11 +171,14 @@ kolonie-workplace/
   CONTRIBUTING.md     issue-first contribution path
   LICENSE             AGPL-3.0-or-later
   NOTICE              copyright and attribution
+  docs/spikes/        dated decision records, including the Vikunja verdict
+  src/                the workplace application, laid out above
+  index.html          Vite entry point
+  package.json        scripts and dependencies
+  eslint.config.ts    lint rules
+  vite.config.ts      build and test configuration
+  tsconfig.json       type-check configuration
 ```
-
-Application directories will appear when the first implementation issue lands.
-Do not add a Vue tree, a Vikunja import or a package manifest until an issue
-asks for that spike.
 
 ## Contributing
 
