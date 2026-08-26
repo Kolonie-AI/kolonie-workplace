@@ -6,13 +6,15 @@ afterEach(() => {
 })
 
 describe('mountWorkplace — the app mounts', () => {
-  it('renders the placeholder heading into the mount target', () => {
+  it('renders the workplace shell into the mount target', () => {
     document.body.innerHTML = '<div id="app"></div>'
 
     mountWorkplace('#app')
 
     const target = document.querySelector('#app')
-    expect(target?.querySelector('h1')?.textContent).toContain('Kolonie Workplace')
+    expect(target?.querySelector('h1')?.textContent?.trim()).toBe('Work board')
+    expect(target?.querySelector('[data-testid="sidebar"]')).not.toBeNull()
+    expect(target?.querySelector('[role="tabpanel"]')).not.toBeNull()
   })
 
   it('hands back an app that can be unmounted, leaving the target empty', () => {
