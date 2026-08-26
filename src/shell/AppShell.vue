@@ -15,6 +15,7 @@ import { useBoardItems } from '@/items/use-board-items'
 import DetailPane from '@/detail/DetailPane.vue'
 import { useItemDetail } from '@/detail/use-item-detail'
 import { useTaskGateway } from '@/gateway/provide-gateway'
+import { isPreviewDataGateway } from '@/gateway/task-gateway'
 import SignedInHuman from '@/session/SignedInHuman.vue'
 import { useSignedInHuman } from '@/session/use-session'
 import '@/shell/app-shell.css'
@@ -30,6 +31,7 @@ const tabRefs = useTemplateRef<HTMLButtonElement[]>('tabs')
 const human = useSignedInHuman()
 const humanId = computed(() => human.value?.id ?? null)
 const gateway = useTaskGateway()
+const showsPreviewData = isPreviewDataGateway(gateway)
 const boardList = useBoardList(gateway, humanId)
 const activeBoardId = computed(() => boardList.activeBoard.value?.id ?? null)
 const items = useBoardItems(gateway, humanId, activeBoardId)
@@ -118,6 +120,11 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
         data-testid="topbar"
       >
         <span class="app-shell__workplace-name">Kolonie Workplace</span>
+        <span
+          v-if="showsPreviewData"
+          class="app-shell__preview-data"
+          data-testid="preview-data-indication"
+        >Example data</span>
         <SignedInHuman />
       </header>
 
