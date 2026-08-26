@@ -6,15 +6,16 @@ afterEach(() => {
 })
 
 describe('mountWorkplace — the app mounts', () => {
-  it('renders the workplace shell into the mount target', () => {
+  it('renders the signed-out workplace into the mount target', () => {
     document.body.innerHTML = '<div id="app"></div>'
 
     mountWorkplace('#app')
 
     const target = document.querySelector('#app')
-    expect(target?.querySelector('h1')?.textContent?.trim()).toBe('Work board')
-    expect(target?.querySelector('[data-testid="sidebar"]')).not.toBeNull()
-    expect(target?.querySelector('[role="tabpanel"]')).not.toBeNull()
+    expect(target?.querySelector('h1')?.textContent?.trim()).toBe('Kolonie Workplace')
+    expect(target?.querySelector('[data-testid="signed-out"]')).not.toBeNull()
+    expect(target?.querySelector('[data-testid="sidebar"]')).toBeNull()
+    expect(target?.querySelector('[role="tabpanel"]')).toBeNull()
   })
 
   it('hands back an app that can be unmounted, leaving the target empty', () => {
