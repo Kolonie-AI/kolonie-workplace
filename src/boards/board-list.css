@@ -62,6 +62,11 @@
   color: var(--color-text);
 }
 
+.board-list__board:focus-visible {
+  outline: var(--focus-ring-inverted);
+  outline-offset: var(--focus-offset);
+}
+
 .board-list__board[aria-current="page"] {
   background: var(--color-accent);
   color: var(--color-sidebar-text-strong);

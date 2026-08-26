@@ -42,6 +42,11 @@
   color: var(--color-text);
 }
 
+.detail-pane__close:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
 .detail-pane__title {
   margin: 0;
   font-size: var(--text-title);
@@ -70,8 +75,9 @@
 .detail-pane__section--blocked {
   padding: var(--space-4);
   border: 1px solid var(--color-border);
+  border-inline-start: var(--space-1) solid var(--color-blocked);
   border-radius: var(--radius-medium);
-  background: var(--color-canvas);
+  background: var(--color-blocked-soft);
 }
 
 .detail-pane__section-title {
@@ -124,4 +130,9 @@
 .detail-pane__reference {
   color: var(--color-accent);
   font-size: var(--text-small);
+}
+
+.detail-pane__reference:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
 }

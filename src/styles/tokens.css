@@ -10,6 +10,15 @@
   --color-accent: #2f6df6;
   --color-accent-soft: #eaf0fe;
 
+  /*
+   * Blocked is its own colour and not a second use of the accent. The accent
+   * says "this is where you are"; blocked says "this is not moving". Sharing
+   * one token made a selected card and a blocked card argue for the same
+   * attention, which is the thing a dense board can least afford.
+   */
+  --color-blocked: #b3411b;
+  --color-blocked-soft: #fdeee8;
+
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -27,6 +36,15 @@
 
   --sidebar-width: 15rem;
   --font-stack: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /*
+   * One focus treatment for the whole application. Every control draws the
+   * same ring at the same offset, so the keyboard path reads as one path
+   * rather than as five components each with their own idea of focus.
+   */
+  --focus-ring: 2px solid var(--color-accent);
+  --focus-offset: 2px;
+  --focus-ring-inverted: 2px solid var(--color-sidebar-text-strong);
 }
 
 html,

@@ -63,6 +63,11 @@
   background: var(--color-accent-soft);
 }
 
+.session-signed-out__candidate:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
 .session-signed-out__refusal {
   margin: var(--space-4) 0 0;
   color: var(--color-text-muted);
@@ -96,4 +101,9 @@
 .session-human__sign-out:hover {
   border-color: var(--color-accent);
   color: var(--color-accent);
+}
+
+.session-human__sign-out:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
 }

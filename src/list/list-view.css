@@ -11,13 +11,26 @@
   line-height: 1.5;
 }
 
+/*
+ * The same four-state treatment the Kanban uses, from the same tokens, so a
+ * human who has learned to read one view can read the other.
+ */
+.list-view__state--loading {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background: var(--color-surface);
+}
+
 .list-view__state--error {
   display: grid;
   gap: var(--space-1);
   padding: var(--space-3) var(--space-4);
-  border: 1px dashed var(--color-accent);
+  border: 1px solid var(--color-border);
+  border-inline-start: var(--space-1) solid var(--color-blocked);
   border-radius: var(--radius-medium);
-  background: var(--color-surface);
+  background: var(--color-blocked-soft);
+  color: var(--color-text);
 }
 
 .list-view__invalid-item {
@@ -67,13 +80,18 @@
   border-color: var(--color-accent);
 }
 
+.list-row:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
 .list-row[data-selected="true"] {
   border-color: var(--color-accent);
   box-shadow: inset 0 0 0 1px var(--color-accent);
 }
 
 .list-row[data-blocked="true"] {
-  border-inline-start: var(--space-1) solid var(--color-accent);
+  border-inline-start: var(--space-1) solid var(--color-blocked);
 }
 
 .list-row__title {
@@ -99,8 +117,8 @@
   flex: none;
   padding: 0 var(--space-2);
   border-radius: var(--radius-small);
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
+  background: var(--color-blocked-soft);
+  color: var(--color-blocked);
   font-size: var(--text-small);
   font-weight: 700;
 }

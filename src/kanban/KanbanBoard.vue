@@ -43,7 +43,7 @@ const emit = defineEmits<{
 
     <p
       v-else-if="status === 'loading'"
-      class="kanban__state"
+      class="kanban__state kanban__state--loading"
       data-testid="kanban-loading"
     >
       Loading this board's work items…
