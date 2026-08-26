@@ -169,6 +169,16 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
           {{ boardList.refusal.value }}
         </p>
 
+        <p
+          v-else-if="boardList.selectionFailure.value === 'unreadable'"
+          class="app-shell__read-error"
+          data-testid="board-unreadable"
+          role="alert"
+        >
+          That board could not be read. This is a read failure, not a statement
+          about whether this human may open it.
+        </p>
+
         <section
           v-if="boardList.activeBoard.value !== null"
           class="app-shell__active-board"

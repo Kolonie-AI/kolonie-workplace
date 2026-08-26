@@ -2,6 +2,7 @@ import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import type { BoardId, HumanId, VisibleBoard } from '@/domain/workplace'
 import { groupBoardsByAgent, type BoardGroup } from '@/boards/board-groups'
 import type { TaskGateway } from '@/gateway/task-gateway'
+import { BoardAccessRefused } from '@/gateway/refusals'
 
 /**
  * `loading` and `error` are kept distinct from `ready` with no boards on
@@ -10,12 +11,21 @@ import type { TaskGateway } from '@/gateway/task-gateway'
  */
 export type BoardListStatus = 'loading' | 'ready' | 'error'
 
+/**
+ * The two ways selecting a board can fail, kept apart for the same reason
+ * `useItemDetail` keeps `refused` apart from `error`: `refused` says this human
+ * may not open that board, and `unreadable` says the read failed and claims
+ * nothing about permission. Only a thrown `BoardAccessRefused` is the former.
+ */
+export type BoardSelectionFailure = 'refused' | 'unreadable'
+
 export interface BoardList {
   readonly status: Readonly<Ref<BoardListStatus>>
   readonly boards: ComputedRef<readonly VisibleBoard[]>
   readonly groups: ComputedRef<readonly BoardGroup[]>
   readonly isEmpty: ComputedRef<boolean>
   readonly activeBoard: ComputedRef<VisibleBoard | null>
+  readonly selectionFailure: Readonly<Ref<BoardSelectionFailure | null>>
   readonly refusal: Readonly<Ref<string | null>>
   refresh(): Promise<void>
   selectBoard(boardId: BoardId): Promise<void>
@@ -30,6 +40,7 @@ export function useBoardList(
   const status = ref<BoardListStatus>('loading')
   const loaded = ref<readonly VisibleBoard[]>([])
   const active = ref<VisibleBoard | null>(null)
+  const selectionFailure = ref<BoardSelectionFailure | null>(null)
   const refusal = ref<string | null>(null)
 
   async function refresh(): Promise<void> {
@@ -63,18 +74,22 @@ export function useBoardList(
 
     try {
       await gateway.getBoardItems(currentHumanId, boardId)
-    } catch {
-      refusal.value = REFUSED
+    } catch (error: unknown) {
+      selectionFailure.value =
+        error instanceof BoardAccessRefused ? 'refused' : 'unreadable'
+      refusal.value = selectionFailure.value === 'refused' ? REFUSED : null
       return
     }
 
     const board = loaded.value.find((candidate) => candidate.id === boardId)
 
     if (board === undefined) {
+      selectionFailure.value = 'refused'
       refusal.value = REFUSED
       return
     }
 
+    selectionFailure.value = null
     refusal.value = null
     active.value = board
   }
@@ -83,6 +98,7 @@ export function useBoardList(
     humanId,
     () => {
       active.value = null
+      selectionFailure.value = null
       refusal.value = null
       void refresh()
     },
@@ -95,6 +111,7 @@ export function useBoardList(
     groups: computed(() => groupBoardsByAgent(loaded.value)),
     isEmpty: computed(() => status.value === 'ready' && loaded.value.length === 0),
     activeBoard: computed(() => active.value),
+    selectionFailure,
     refusal,
     refresh,
     selectBoard,

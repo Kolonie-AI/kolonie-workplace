@@ -108,6 +108,28 @@ describe('visual integration — loading, empty and error are visibly distinct',
   })
 })
 
+describe('visual integration — a failed board read does not look like a refusal', () => {
+  const shell = sheets['src/shell/app-shell.css']
+
+  it('gives the read failure the same blocked-coloured edge as other read errors', () => {
+    expect(shell).toMatch(
+      /\.app-shell__read-error\s*\{[^}]*border-inline-start:[^;]*var\(--color-blocked\)/s,
+    )
+    expect(shell).toMatch(
+      /\.app-shell__read-error\s*\{[^}]*background:\s*var\(--color-blocked-soft\)/s,
+    )
+  })
+
+  it('keeps the permission refusal quiet and visually distinct', () => {
+    expect(shell).not.toMatch(
+      /\.app-shell__refusal\s*\{[^}]*border-inline-start:/s,
+    )
+    expect(shell).not.toMatch(
+      /\.app-shell__refusal\s*\{[^}]*var\(--color-blocked-soft\)/s,
+    )
+  })
+})
+
 describe('visual integration — the page does not overflow, only the board canvas', () => {
   it('scrolls the lanes horizontally and clips nothing above them', () => {
     expect(sheets['src/kanban/kanban-board.css']).toMatch(
