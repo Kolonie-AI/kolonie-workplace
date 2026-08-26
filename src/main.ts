@@ -1,3 +1,3 @@
-import { mountWorkplace } from '@/mount'
+import { startWorkplace } from '@/mount'
 
-mountWorkplace('#app')
+void startWorkplace('#app')
