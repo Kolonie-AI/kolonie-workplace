@@ -14,7 +14,7 @@ const ALL_TEXT = [
   ...fixtureWorkItems.map(
     (item) =>
       `${item.id} ${item.title} ${item.owner} ${item.blocker?.actor ?? ''} ` +
-      `${item.handover?.evidence.join(' ') ?? ''} ` +
+      `${(item.handover?.evidence ?? []).map((entry) => `${entry.label} ${entry.href}`).join(' ')} ` +
       item.externalReferences.map((reference) => `${reference.label} ${reference.href}`).join(' '),
   ),
 ].join('\n')

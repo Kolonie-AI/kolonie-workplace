@@ -241,6 +241,29 @@ describe('board kanban — selection', () => {
     expect(kanban.selectedItemId.value).toBe(FIXTURE_ITEMS.done)
   })
 
+  it('clears the selection on request, without reloading the board', async () => {
+    const gateway = createFixtureTaskGateway()
+    const spy = vi.spyOn(gateway, 'getBoardItems')
+    const kanban = useBoardItems(
+      gateway,
+      ref(FIXTURE_HUMANS.wren),
+      ref(FIXTURE_BOARDS.quillDelivery),
+    )
+    await settled()
+
+    kanban.selectItem(FIXTURE_ITEMS.ready)
+    expect(kanban.selectedItemId.value).toBe(FIXTURE_ITEMS.ready)
+
+    kanban.clearSelection()
+    await settled()
+
+    expect(kanban.selectedItemId.value).toBeNull()
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(kanban.columns.value.flatMap((c) => c.items).length).toBe(
+      WORKPLACE_LANES.length,
+    )
+  })
+
   it('clears the selection when the active board changes', async () => {
     const activeBoardId = ref<BoardId | null>(FIXTURE_BOARDS.quillDelivery)
     const kanban = useBoardItems(

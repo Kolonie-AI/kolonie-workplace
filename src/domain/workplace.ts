@@ -36,6 +36,11 @@ export interface VisibleBoard extends Board {
 
 export type WorkItemId = string
 
+export interface ExternalReference {
+  readonly label: string
+  readonly href: string
+}
+
 export interface Blocker {
   readonly actor: string
   readonly smallestUnblock: string
@@ -46,12 +51,7 @@ export interface Handover {
   readonly learned: string
   readonly next: string
   readonly blocked: string
-  readonly evidence: readonly string[]
-}
-
-export interface ExternalReference {
-  readonly label: string
-  readonly href: string
+  readonly evidence: readonly ExternalReference[]
 }
 
 export interface WorkItemSummary {

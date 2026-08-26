@@ -34,6 +34,7 @@ export interface BoardItems {
   readonly isBoardEmpty: ComputedRef<boolean>
   readonly selectedItemId: Readonly<Ref<WorkItemId | null>>
   selectItem(itemId: WorkItemId): void
+  clearSelection(): void
 }
 
 export function useBoardItems(
@@ -95,6 +96,9 @@ export function useBoardItems(
     selectedItemId,
     selectItem(itemId: WorkItemId): void {
       selectedItemId.value = itemId
+    },
+    clearSelection(): void {
+      selectedItemId.value = null
     },
   }
 }
