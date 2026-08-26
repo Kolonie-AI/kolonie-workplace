@@ -65,8 +65,9 @@ function selectView(view: WorkplaceView): void {
             class="app-shell__tab"
             type="button"
             role="tab"
-            :aria-controls="'board-canvas'"
+            aria-controls="board-canvas"
             :aria-selected="activeView === view"
+            :tabindex="activeView === view ? 0 : -1"
             @click="selectView(view)"
           >
             {{ WORKPLACE_VIEW_LABELS[view] }}

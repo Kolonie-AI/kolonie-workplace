@@ -59,6 +59,18 @@ describe('AppShell', () => {
     expect(listTab.getAttribute('aria-controls')).toBe(panel.id)
     expect(panel.getAttribute('aria-labelledby')).toBe(listTab.id)
   })
+
+  it('keeps only the active tab in the keyboard tab order', async () => {
+    render(AppShell)
+
+    expect(screen.getByRole('tab', { name: 'Kanban' }).getAttribute('tabindex')).toBe('0')
+    expect(screen.getByRole('tab', { name: 'List' }).getAttribute('tabindex')).toBe('-1')
+
+    await fireEvent.click(screen.getByRole('tab', { name: 'List' }))
+
+    expect(screen.getByRole('tab', { name: 'Kanban' }).getAttribute('tabindex')).toBe('-1')
+    expect(screen.getByRole('tab', { name: 'List' }).getAttribute('tabindex')).toBe('0')
+  })
 })
 
 describe('AppShell — rejection: an unknown requested view', () => {
