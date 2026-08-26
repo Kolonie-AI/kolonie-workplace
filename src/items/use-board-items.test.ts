@@ -6,7 +6,7 @@ import { BoardAccessRefused } from '@/gateway/refusals'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
 import { FIXTURE_BOARDS, FIXTURE_HUMANS, FIXTURE_ITEMS } from '@/fixtures/catalogue'
-import { useBoardKanban } from '@/kanban/use-board-kanban'
+import { useBoardItems } from '@/items/use-board-items'
 
 function summary(overrides: Partial<WorkItemSummary> & { id: string; boardId: string }) {
   return {
@@ -45,7 +45,7 @@ describe('board kanban — loading the active board', () => {
   it('reads the active board through the gateway the sidebar already uses', async () => {
     const gateway = createFixtureTaskGateway()
     const spy = vi.spyOn(gateway, 'getBoardItems')
-    const kanban = useBoardKanban(
+    const kanban = useBoardItems(
       gateway,
       ref(FIXTURE_HUMANS.wren),
       ref(FIXTURE_BOARDS.quillDelivery),
@@ -58,7 +58,7 @@ describe('board kanban — loading the active board', () => {
   })
 
   it('always exposes the six Colony lanes, in order, even before anything loads', () => {
-    const kanban = useBoardKanban(
+    const kanban = useBoardItems(
       gatewayReturning({}),
       ref(FIXTURE_HUMANS.wren),
       ref(null),
@@ -69,7 +69,7 @@ describe('board kanban — loading the active board', () => {
 
   it('asks for nothing while no board is active, and holds no items', async () => {
     const gateway = gatewayReturning({})
-    const kanban = useBoardKanban(gateway, ref(FIXTURE_HUMANS.wren), ref(null))
+    const kanban = useBoardItems(gateway, ref(FIXTURE_HUMANS.wren), ref(null))
 
     await settled()
 
@@ -78,7 +78,7 @@ describe('board kanban — loading the active board', () => {
   })
 
   it('distinguishes an empty board from a gateway failure', async () => {
-    const empty = useBoardKanban(
+    const empty = useBoardItems(
       createFixtureTaskGateway(),
       ref(FIXTURE_HUMANS.ash),
       ref(FIXTURE_BOARDS.marlowBacklog),
@@ -88,7 +88,7 @@ describe('board kanban — loading the active board', () => {
     expect(empty.status.value).toBe('ready')
     expect(empty.isBoardEmpty.value).toBe(true)
 
-    const broken = useBoardKanban(
+    const broken = useBoardItems(
       {
         listVisibleBoards: vi.fn(async () => []),
         getBoardItems: vi.fn(async () => {
@@ -115,7 +115,7 @@ describe('board kanban — one board never shows another board\'s items', () => 
       [second]: [summary({ id: 'second-item', boardId: second, lane: 'ready' })],
     })
     const activeBoardId = ref<BoardId | null>(first)
-    const kanban = useBoardKanban(gateway, ref(FIXTURE_HUMANS.wren), activeBoardId)
+    const kanban = useBoardItems(gateway, ref(FIXTURE_HUMANS.wren), activeBoardId)
 
     await settled()
     expect(kanban.columns.value.flatMap((c) => c.items.map((i) => i.id))).toEqual([
@@ -137,7 +137,7 @@ describe('board kanban — one board never shows another board\'s items', () => 
         summary({ id: 'belongs-elsewhere', boardId: 'board-second' }),
       ],
     })
-    const kanban = useBoardKanban(
+    const kanban = useBoardItems(
       gateway,
       ref(FIXTURE_HUMANS.wren),
       ref<BoardId | null>('board-first'),
@@ -153,7 +153,7 @@ describe('board kanban — one board never shows another board\'s items', () => 
 
   it('shows nothing from a board that is no longer active while the next one loads', async () => {
     const activeBoardId = ref<BoardId | null>(FIXTURE_BOARDS.quillDelivery)
-    const kanban = useBoardKanban(
+    const kanban = useBoardItems(
       createFixtureTaskGateway(),
       ref(FIXTURE_HUMANS.wren),
       activeBoardId,
@@ -180,7 +180,7 @@ describe('board kanban — rejection: an item in a lane the Colony does not defi
         summary({ id: 'sound', boardId: 'board-first', lane: 'ready' }),
       ],
     })
-    const kanban = useBoardKanban(
+    const kanban = useBoardItems(
       gateway,
       ref(FIXTURE_HUMANS.wren),
       ref<BoardId | null>('board-first'),
@@ -201,7 +201,7 @@ describe('board kanban — rejection: an item in a lane the Colony does not defi
         { ...summary({ id: 'stray', boardId: 'board-first' }), lane: 'archived' } as unknown as WorkItemSummary,
       ],
     })
-    const kanban = useBoardKanban(
+    const kanban = useBoardItems(
       gateway,
       ref(FIXTURE_HUMANS.wren),
       ref<BoardId | null>('board-first'),
@@ -216,7 +216,7 @@ describe('board kanban — rejection: an item in a lane the Colony does not defi
 
 describe('board kanban — selection', () => {
   it('holds no selection until a card is chosen', async () => {
-    const kanban = useBoardKanban(
+    const kanban = useBoardItems(
       createFixtureTaskGateway(),
       ref(FIXTURE_HUMANS.wren),
       ref(FIXTURE_BOARDS.quillDelivery),
@@ -227,7 +227,7 @@ describe('board kanban — selection', () => {
   })
 
   it('records the chosen item and replaces an earlier choice', async () => {
-    const kanban = useBoardKanban(
+    const kanban = useBoardItems(
       createFixtureTaskGateway(),
       ref(FIXTURE_HUMANS.wren),
       ref(FIXTURE_BOARDS.quillDelivery),
@@ -243,7 +243,7 @@ describe('board kanban — selection', () => {
 
   it('clears the selection when the active board changes', async () => {
     const activeBoardId = ref<BoardId | null>(FIXTURE_BOARDS.quillDelivery)
-    const kanban = useBoardKanban(
+    const kanban = useBoardItems(
       createFixtureTaskGateway(),
       ref(FIXTURE_HUMANS.wren),
       activeBoardId,
@@ -257,5 +257,68 @@ describe('board kanban — selection', () => {
     await settled()
 
     expect(kanban.selectedItemId.value).toBeNull()
+  })
+})
+
+describe('board items — one loaded state, two presentations', () => {
+  it('exposes the same items as lane columns and as list rows', async () => {
+    const items = useBoardItems(
+      createFixtureTaskGateway(),
+      ref(FIXTURE_HUMANS.wren),
+      ref(FIXTURE_BOARDS.quillDelivery),
+    )
+    await settled()
+
+    const fromColumns = items.columns.value.flatMap((column) =>
+      column.items.map((item) => item.id),
+    )
+    const fromRows = items.rows.value.map((row) => row.item.id)
+
+    expect([...fromRows].sort()).toEqual([...fromColumns].sort())
+  })
+
+  it('leaves an item filtered out of the columns out of the rows too', async () => {
+    const gateway = gatewayReturning({
+      'board-first': [
+        summary({ id: 'belongs-here', boardId: 'board-first' }),
+        summary({ id: 'belongs-elsewhere', boardId: 'board-second' }),
+      ],
+    })
+    const items = useBoardItems(
+      gateway,
+      ref(FIXTURE_HUMANS.wren),
+      ref<BoardId | null>('board-first'),
+    )
+
+    await settled()
+
+    expect(items.rows.value.map((row) => row.item.id)).toEqual(['belongs-here'])
+  })
+
+  it('keeps an item in a lane the Colony does not define out of the rows', async () => {
+    const gateway = gatewayReturning({
+      'board-first': [
+        { ...summary({ id: 'stray', boardId: 'board-first' }), lane: 'archived' } as unknown as WorkItemSummary,
+        summary({ id: 'sound', boardId: 'board-first', lane: 'ready' }),
+      ],
+    })
+    const items = useBoardItems(
+      gateway,
+      ref(FIXTURE_HUMANS.wren),
+      ref<BoardId | null>('board-first'),
+    )
+
+    await settled()
+
+    expect(items.rows.value.map((row) => row.item.id)).toEqual(['sound'])
+    expect(items.invalid.value.map((entry) => entry.item.id)).toEqual(['stray'])
+  })
+
+  it('holds no rows while no board is active', async () => {
+    const items = useBoardItems(gatewayReturning({}), ref(FIXTURE_HUMANS.wren), ref(null))
+
+    await settled()
+
+    expect(items.rows.value).toEqual([])
   })
 })

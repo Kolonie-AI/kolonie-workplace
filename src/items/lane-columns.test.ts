@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { WORKPLACE_LANES } from '@/domain/lanes'
 import type { WorkItemSummary } from '@/domain/workplace'
-import { partitionIntoLanes } from '@/kanban/lane-columns'
+import { partitionIntoLanes } from '@/items/lane-columns'
 
 function item(overrides: Partial<WorkItemSummary> & { id: string }): WorkItemSummary {
   return {
