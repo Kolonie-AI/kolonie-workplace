@@ -15,7 +15,13 @@ actions belong in [`kolonie-platform`](https://github.com/Kolonie-AI/kolonie-pla
 **This is not the public website.** Agents register through MCP, not here.
 
 Read `README.md` in this repository before writing code. It states the product
-boundary, the UI-first sequence, and the Vikunja extraction kill question.
+boundary and the UI-first sequence.
+
+**`README.md`'s Vikunja section is stale as of 2026-08-26** and still presents
+extraction as an open candidate with a kill question. That question is answered
+— see §5. The bootstrap issue
+([#3](https://github.com/Kolonie-AI/kolonie-workplace/issues/3)) rewrites that
+section; until it merges, §5 of this file wins over `README.md` on the point.
 
 ## 2. Where the work is
 
@@ -48,9 +54,14 @@ The writing standard is
 
 ## 3. Rules
 
-- **No application code until an issue asks for it.** This bootstrap is
-  documentation and process. A Vue tree, a Vikunja import or a package
-  manifest is implementation work.
+- **Application code lands only through an issue that asks for it.** A Vue
+  tree, a package manifest or a build config is implementation work and needs
+  its issue. The first-cut package
+  ([#12](https://github.com/Kolonie-AI/kolonie-workplace/issues/12)) is that
+  ask, and its bootstrap issue
+  ([#3](https://github.com/Kolonie-AI/kolonie-workplace/issues/3)) is what
+  rewrites this bullet — so a worker holding an issue from that package has
+  the permission and does not need to ask for it again.
 - **Do not create a second source of truth.** Mock data is allowed for the
   UI-first spike. A writable local board, a shadow database, or a
   bidirectional sync with GitHub/Trello is not.
@@ -58,14 +69,31 @@ The writing standard is
   different domains. Platform schema work belongs in `kolonie-platform`.
 - **No secrets, credentials, host names or IP addresses** in any file,
   including tests and comments.
-- **Preserve licence and attribution** on any imported third-party frontend.
-  Vikunja is AGPL-3.0-or-later; keep copyright notices intact.
+- **No Vikunja source in this repository.** Not a component, stylesheet, class
+  name, icon or asset — see §5. Vikunja is read for shape only. If a
+  third-party frontend tree is ever imported after a maintainer approves it
+  (§4), its licence and copyright notices are preserved intact; Vikunja is
+  AGPL-3.0-or-later. `NOTICE` stays accurate: today it covers our own code,
+  because nothing has been imported.
 - **English** in repository prose, issues, comments and commit messages.
 
 ## 4. Integration
 
-Commit and push to `main` unless a later `AGENTS.md` revision says otherwise.
-Use the configured Git identity for this checkout.
+**One issue, one branch, one pull request. Never commit to `main`.**
+
+Branch from `main` as `feat/<slug>-<issue>`, `fix/…` or `docs/…`, open a pull
+request that references the issue, and let the maintainer merge it. Use the
+configured Git identity for this checkout.
+
+This rule replaced *"commit and push to `main`"* on 2026-08-26, and the reason
+is worth keeping. That instruction was written while this repository was
+documentation only, where it was harmless. The first-cut package
+([#12](https://github.com/Kolonie-AI/kolonie-workplace/issues/12)) delivers a
+UI as a sequence of small issues whose whole value is that each one is
+separately reviewable — and an agent reading the old rule would have pushed
+the application bootstrap straight onto `main`, unreviewed, while believing it
+was following this file. A binding instruction that quietly stops matching the
+work is more dangerous than a missing one.
 
 Confirm with the maintainer before:
 
@@ -74,8 +102,24 @@ Confirm with the maintainer before:
 - importing a third-party frontend tree
 - spending money, or any DNS / live VPS write
 
-## 5. Confirm with the maintainer before
+## 5. Settled decisions, and what still needs the maintainer
 
-See `kolonie-docs/AGENTS.md` for the global list. For this repository
-specifically, also confirm before treating the Vikunja extraction as decided:
-the first spike still has to answer the kill question in `README.md`.
+See `kolonie-docs/AGENTS.md` for the global list of things that need a
+maintainer; §4 above adds this repository's own.
+
+**The Vikunja extraction question is settled and is not open to re-litigate.**
+The 2026-08-25 spike answered it **No-Go**: Vikunja's Kanban, list and detail
+components import Pinia stores, HTTP services, `vue-router`, `vue-i18n` and a
+35-field `ITask`, so they are not adapter-shaped and extracting them would add
+a permanent attribution obligation for no benefit. That spike is closed
+([#1](https://github.com/Kolonie-AI/kolonie-workplace/issues/1)).
+
+What the Colony builds instead is original Vue 3 + TypeScript code in this
+repository, informed by Vikunja's **information architecture and visual
+density** and by nothing else. Read Vikunja for shape; copy no source file,
+stylesheet, class name, icon or asset from it. Do not open another spike to
+"just copy the card".
+
+The decision record is
+[`human-workplace-form.md`](https://github.com/Kolonie-AI/kolonie-concept-lab/blob/main/concepts/human-workplace-form.md)
+in `kolonie-concept-lab`.
