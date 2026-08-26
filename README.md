@@ -119,6 +119,26 @@ npm run build    # type-check the app, then produce dist/
 `npm run dev` starts the Vite dev server, and `npm run preview` serves a
 finished build.
 
+## The container image
+
+The workplace builds into a two-stage image: Node 22 produces `dist/`, and
+`nginx:1.29-alpine` serves it on port 80. The runtime image contains the built
+bundle and `nginx.conf`, and no `node_modules` or build toolchain.
+
+```sh
+docker build -t kolonie-workplace:local .
+docker run --rm -p 8080:80 kolonie-workplace:local
+```
+
+- `/` serves the application.
+- `/health` returns 200 and the body `ok` — its own exact-match location, so a
+  broken bundle cannot make it look healthy.
+- Unknown paths, including `/sign-in/callback`, fall back to `index.html`, so
+  the single-page application can route them.
+
+TLS terminates at Traefik. Nothing in this image speaks HTTPS and no
+certificate is baked into it.
+
 ## Status
 
 The application is **bootstrapped**: Vite, Vue 3, TypeScript, ESLint and
@@ -142,6 +162,9 @@ kolonie-workplace/
   LICENSE             AGPL-3.0-or-later
   NOTICE              copyright and attribution
   index.html          Vite entry document
+  Dockerfile          two-stage build: Node 22 → nginx
+  nginx.conf          static serving, SPA fallback and /health
+  .dockerignore       what never enters the build context
   package.json        manifest and the four check commands
   vite.config.ts      build and Vitest configuration
   tsconfig.json       TypeScript for the app and its tests
