@@ -355,3 +355,86 @@ describe('sidebar board list — any implementation of the session port', () => 
     expect(listedBoardIds()).toEqual([])
   })
 })
+
+describe('sidebar board list — a read failure is not a permission refusal', () => {
+  it('renders a distinct unreadable state when a listed board cannot be read', async () => {
+    const gateway: TaskGateway = {
+      listVisibleBoards: vi.fn(async () => [
+        {
+          id: FIXTURE_BOARDS.quillDelivery,
+          agentId: 'fictional-agent-quill',
+          agentName: 'Fictional Agent Quill',
+          title: quillDelivery.title,
+        },
+      ]),
+      getBoardItems: vi.fn(async () => {
+        throw new Error('Kolonie Workplace: the board items could not be read.')
+      }),
+      getItemDetail: vi.fn(),
+    }
+
+    await renderForHuman(FIXTURE_HUMANS.wren, gateway, {
+      initialBoardId: FIXTURE_BOARDS.quillDelivery,
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('board-unreadable')).toBeTruthy()
+    })
+
+    const unreadable = screen.getByTestId('board-unreadable')
+
+    expect(unreadable.textContent).toMatch(/could not be read/i)
+    expect(unreadable.textContent).not.toMatch(/not available/i)
+    expect(unreadable.getAttribute('role')).toBe('alert')
+    expect(screen.queryByTestId('board-refused')).toBeNull()
+    expect(screen.queryByTestId('active-board')).toBeNull()
+  })
+
+  it('keeps the permission refusal visually distinct from a read failure', async () => {
+    const gateway = createFixtureTaskGateway()
+
+    await renderForHuman(FIXTURE_HUMANS.wren, gateway, {
+      initialBoardId: FIXTURE_BOARDS.marlowOutreach,
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('board-refused')).toBeTruthy()
+    })
+
+    const refused = screen.getByTestId('board-refused')
+
+    expect(refused.textContent).toMatch(/not available/i)
+    expect(refused.classList.contains('app-shell__refusal')).toBe(true)
+    expect(screen.queryByTestId('board-unreadable')).toBeNull()
+    expect(screen.queryByTestId('active-board')).toBeNull()
+  })
+
+  it('shows no stale board content in either case', async () => {
+    const gateway: TaskGateway = {
+      listVisibleBoards: vi.fn(async () => [
+        {
+          id: FIXTURE_BOARDS.quillDelivery,
+          agentId: 'fictional-agent-quill',
+          agentName: 'Fictional Agent Quill',
+          title: quillDelivery.title,
+        },
+      ]),
+      getBoardItems: vi.fn(async () => {
+        throw new Error('Kolonie Workplace: the board items could not be read.')
+      }),
+      getItemDetail: vi.fn(),
+    }
+
+    await renderForHuman(FIXTURE_HUMANS.wren, gateway, {
+      initialBoardId: FIXTURE_BOARDS.quillDelivery,
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('board-unreadable')).toBeTruthy()
+    })
+
+    expect(screen.queryByTestId('active-board')).toBeNull()
+    expect(screen.queryByTestId('kanban-card')).toBeNull()
+    expect(screen.queryByTestId('list-row')).toBeNull()
+  })
+})

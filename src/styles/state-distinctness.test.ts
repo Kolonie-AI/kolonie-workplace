@@ -90,9 +90,13 @@ describe('the four states are four different answers', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByTestId('board-refused')).toBeTruthy()
+      expect(screen.getByTestId('board-unreadable')).toBeTruthy()
     })
 
+    expect(screen.getByTestId('board-unreadable').textContent).not.toMatch(
+      /not available/i,
+    )
+    expect(screen.queryByTestId('board-refused')).toBeNull()
     expect(screen.queryAllByTestId('kanban-card')).toEqual([])
     expect(screen.queryByTestId('kanban-board-empty')).toBeNull()
     expect(screen.queryByTestId('active-board')).toBeNull()
