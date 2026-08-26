@@ -6,6 +6,7 @@ import {
   resolveWorkplaceView,
   type WorkplaceView,
 } from '@/shell/views'
+import SignedInHuman from '@/session/SignedInHuman.vue'
 import '@/shell/app-shell.css'
 
 const props = defineProps<{
@@ -84,7 +85,7 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
         data-testid="topbar"
       >
         <span class="app-shell__workplace-name">Kolonie Workplace</span>
-        <span class="app-shell__human-menu">Human menu</span>
+        <SignedInHuman />
       </header>
 
       <header

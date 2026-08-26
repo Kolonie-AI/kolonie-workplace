@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import AppShell from '@/shell/AppShell.vue'
+import SessionGate from '@/session/SessionGate.vue'
+import { provideWorkplaceSession } from '@/session/provide-session'
 import '@/styles/tokens.css'
+
+provideWorkplaceSession()
 </script>
 
 <template>
-  <AppShell />
+  <SessionGate />
 </template>
