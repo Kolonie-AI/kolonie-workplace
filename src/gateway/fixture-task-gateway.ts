@@ -1,7 +1,7 @@
 import type {
-  Board,
   BoardId,
   HumanId,
+  VisibleBoard,
   WorkItemDetail,
   WorkItemId,
   WorkItemSummary,
@@ -30,10 +30,17 @@ function visibleBoardIdsFor(humanId: HumanId): ReadonlySet<BoardId> {
 }
 
 export class FixtureTaskGateway implements TaskGateway {
-  async listVisibleBoards(humanId: HumanId): Promise<readonly Board[]> {
+  async listVisibleBoards(humanId: HumanId): Promise<readonly VisibleBoard[]> {
     const visible = visibleBoardIdsFor(humanId)
 
-    return fixtureBoards.filter((board) => visible.has(board.id))
+    return fixtureBoards
+      .filter((board) => visible.has(board.id))
+      .map((board) => ({
+        ...board,
+        agentName:
+          fixtureAgents.find((candidate) => candidate.id === board.agentId)?.name ??
+          'Unknown agent',
+      }))
   }
 
   async getBoardItems(

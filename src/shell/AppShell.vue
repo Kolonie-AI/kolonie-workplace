@@ -1,21 +1,45 @@
 <script setup lang="ts">
-import { computed, ref, useTemplateRef } from 'vue'
+import { computed, ref, useTemplateRef, watch } from 'vue'
 import {
   WORKPLACE_VIEWS,
   WORKPLACE_VIEW_LABELS,
   resolveWorkplaceView,
   type WorkplaceView,
 } from '@/shell/views'
+import type { BoardId } from '@/domain/workplace'
+import BoardList from '@/boards/BoardList.vue'
+import { useBoardList } from '@/boards/use-board-list'
+import { useTaskGateway } from '@/gateway/provide-gateway'
 import SignedInHuman from '@/session/SignedInHuman.vue'
+import { useSignedInHuman } from '@/session/use-session'
 import '@/shell/app-shell.css'
 
 const props = defineProps<{
   initialView?: unknown
+  initialBoardId?: BoardId
 }>()
 
 const activeView = ref<WorkplaceView>(resolveWorkplaceView(props.initialView))
 const activeLabel = computed(() => WORKPLACE_VIEW_LABELS[activeView.value])
 const tabRefs = useTemplateRef<HTMLButtonElement[]>('tabs')
+
+const human = useSignedInHuman()
+const humanId = computed(() => human.value?.id ?? null)
+const boardList = useBoardList(useTaskGateway(), humanId)
+
+watch(
+  () => boardList.status.value,
+  (status) => {
+    if (status === 'ready' && props.initialBoardId !== undefined) {
+      void boardList.selectBoard(props.initialBoardId)
+    }
+  },
+  { immediate: true },
+)
+
+function selectBoard(boardId: BoardId): void {
+  void boardList.selectBoard(boardId)
+}
 
 function selectView(view: WorkplaceView): void {
   activeView.value = view
@@ -71,12 +95,13 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
       <p class="app-shell__brand">
         Kolonie
       </p>
-      <nav aria-label="Boards">
-        <p class="app-shell__nav-title">
-          Boards
-        </p>
-        <span class="app-shell__board-link">Work board</span>
-      </nav>
+      <BoardList
+        :status="boardList.status.value"
+        :groups="boardList.groups.value"
+        :is-empty="boardList.isEmpty.value"
+        :active-board-id="boardList.activeBoard.value?.id ?? null"
+        @select="selectBoard"
+      />
     </aside>
 
     <div class="app-shell__workspace">
@@ -120,6 +145,29 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
       </header>
 
       <main class="app-shell__main">
+        <p
+          v-if="boardList.refusal.value !== null"
+          class="app-shell__refusal"
+          data-testid="board-refused"
+          role="alert"
+        >
+          {{ boardList.refusal.value }}
+        </p>
+
+        <section
+          v-if="boardList.activeBoard.value !== null"
+          class="app-shell__active-board"
+          data-testid="active-board"
+          :data-board-id="boardList.activeBoard.value.id"
+        >
+          <h2 class="app-shell__active-board-title">
+            {{ boardList.activeBoard.value.title }}
+          </h2>
+          <p class="app-shell__active-board-agent">
+            {{ boardList.activeBoard.value.agentName }}
+          </p>
+        </section>
+
         <section
           id="board-canvas"
           class="app-shell__canvas"

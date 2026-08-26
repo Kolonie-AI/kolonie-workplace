@@ -1,7 +1,7 @@
 import type {
-  Board,
   BoardId,
   HumanId,
+  VisibleBoard,
   WorkItemDetail,
   WorkItemId,
   WorkItemSummary,
@@ -13,7 +13,7 @@ import type {
  * create, update, delete or persistence method.
  */
 export interface TaskGateway {
-  listVisibleBoards(humanId: HumanId): Promise<readonly Board[]>
+  listVisibleBoards(humanId: HumanId): Promise<readonly VisibleBoard[]>
   getBoardItems(humanId: HumanId, boardId: BoardId): Promise<readonly WorkItemSummary[]>
   getItemDetail(humanId: HumanId, itemId: WorkItemId): Promise<WorkItemDetail>
 }

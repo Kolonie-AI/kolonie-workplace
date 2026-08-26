@@ -1,0 +1,217 @@
+import { describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
+import type { HumanId, VisibleBoard } from '@/domain/workplace'
+import { BoardAccessRefused } from '@/gateway/refusals'
+import type { TaskGateway } from '@/gateway/task-gateway'
+import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
+import { FIXTURE_BOARDS, FIXTURE_HUMANS } from '@/fixtures/catalogue'
+import { useBoardList } from '@/boards/use-board-list'
+
+function fixtureList(humanId: HumanId | null, gateway: TaskGateway = createFixtureTaskGateway()) {
+  return useBoardList(gateway, ref(humanId))
+}
+
+async function settled(humanId: HumanId | null, gateway?: TaskGateway) {
+  const list = fixtureList(humanId, gateway)
+  await list.refresh()
+  return list
+}
+
+describe('useBoardList — reading the visible boards', () => {
+  it('starts in the loading state and asks the gateway for this human', async () => {
+    const gateway = createFixtureTaskGateway()
+    const spy = vi.spyOn(gateway, 'listVisibleBoards')
+    const list = fixtureList(FIXTURE_HUMANS.wren, gateway)
+
+    expect(list.status.value).toBe('loading')
+
+    await list.refresh()
+
+    expect(spy).toHaveBeenCalledWith(FIXTURE_HUMANS.wren)
+    expect(list.status.value).toBe('ready')
+  })
+
+  it('journey 1: two agents with one board each produce two attributed boards', async () => {
+    const list = await settled(FIXTURE_HUMANS.wren)
+
+    expect(list.boards.value.map((board) => board.id).sort()).toEqual(
+      [FIXTURE_BOARDS.quillDelivery, FIXTURE_BOARDS.birchResearch].sort(),
+    )
+    expect(list.groups.value).toHaveLength(2)
+    expect(list.groups.value.every((group) => group.agentName.length > 0)).toBe(true)
+  })
+
+  it('journey 2: one agent with two boards produces one group of two', async () => {
+    const list = await settled(FIXTURE_HUMANS.ash)
+
+    expect(list.groups.value).toHaveLength(1)
+    expect(list.groups.value[0]?.boards.map((board) => board.id).sort()).toEqual(
+      [FIXTURE_BOARDS.marlowOutreach, FIXTURE_BOARDS.marlowBacklog].sort(),
+    )
+  })
+
+  it('journey 3: a human with no agents is ready with no boards, and is not an error', async () => {
+    const list = await settled(FIXTURE_HUMANS.rook)
+
+    expect(list.status.value).toBe('ready')
+    expect(list.boards.value).toEqual([])
+    expect(list.groups.value).toEqual([])
+    expect(list.isEmpty.value).toBe(true)
+  })
+
+  it('journey 4: a foreign board is absent from the visible list', async () => {
+    const list = await settled(FIXTURE_HUMANS.wren)
+
+    expect(list.boards.value.map((board) => board.id)).not.toContain(
+      FIXTURE_BOARDS.marlowOutreach,
+    )
+  })
+
+  it('journey 5: a board with no items is listed exactly like any other board', async () => {
+    const list = await settled(FIXTURE_HUMANS.ash)
+
+    expect(list.boards.value.map((board) => board.id)).toContain(FIXTURE_BOARDS.marlowBacklog)
+    expect(list.isEmpty.value).toBe(false)
+  })
+
+  it('separates journey 3 from journey 5: no boards is not the same state as an empty board', async () => {
+    const noBoards = await settled(FIXTURE_HUMANS.rook)
+    const emptyBoard = await settled(FIXTURE_HUMANS.ash)
+
+    expect(noBoards.isEmpty.value).toBe(true)
+    expect(emptyBoard.isEmpty.value).toBe(false)
+
+    await emptyBoard.selectBoard(FIXTURE_BOARDS.marlowBacklog)
+
+    expect(emptyBoard.activeBoard.value?.id).toBe(FIXTURE_BOARDS.marlowBacklog)
+    expect(emptyBoard.isEmpty.value).toBe(false)
+    expect(noBoards.activeBoard.value).toBeNull()
+  })
+
+  it('asks for nothing at all while no human is signed in', async () => {
+    const gateway: TaskGateway = {
+      listVisibleBoards: vi.fn(),
+      getBoardItems: vi.fn(),
+      getItemDetail: vi.fn(),
+    }
+
+    await settled(null, gateway)
+
+    expect(gateway.listVisibleBoards).not.toHaveBeenCalled()
+  })
+})
+
+describe('useBoardList — failure is not emptiness', () => {
+  it('enters the error state when the gateway fails, and lists no board', async () => {
+    const gateway: TaskGateway = {
+      listVisibleBoards: vi.fn(async () => {
+        throw new Error('Kolonie Workplace: the board catalogue could not be read.')
+      }),
+      getBoardItems: vi.fn(),
+      getItemDetail: vi.fn(),
+    }
+
+    const list = await settled(FIXTURE_HUMANS.wren, gateway)
+
+    expect(list.status.value).toBe('error')
+    expect(list.boards.value).toEqual([])
+    expect(list.isEmpty.value).toBe(false)
+  })
+})
+
+describe('useBoardList — selecting a board', () => {
+  it('makes the chosen board active', async () => {
+    const list = await settled(FIXTURE_HUMANS.wren)
+
+    await list.selectBoard(FIXTURE_BOARDS.birchResearch)
+
+    expect(list.activeBoard.value?.id).toBe(FIXTURE_BOARDS.birchResearch)
+    expect(list.refusal.value).toBeNull()
+  })
+
+  it('rejection case: a foreign board addressed directly is refused, not opened', async () => {
+    const gateway = createFixtureTaskGateway()
+    const spy = vi.spyOn(gateway, 'getBoardItems')
+    const list = await settled(FIXTURE_HUMANS.wren, gateway)
+
+    await list.selectBoard(FIXTURE_BOARDS.marlowOutreach)
+
+    expect(spy).toHaveBeenCalledWith(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.marlowOutreach)
+    expect(list.activeBoard.value).toBeNull()
+    expect(list.refusal.value).toMatch(/not available/i)
+  })
+
+  it('refuses a board id nobody holds in exactly the same way', async () => {
+    const list = await settled(FIXTURE_HUMANS.wren)
+
+    await list.selectBoard('fictional-board-nobody-holds')
+
+    expect(list.activeBoard.value).toBeNull()
+    expect(list.refusal.value).toMatch(/not available/i)
+  })
+
+  it('keeps the previously active board rather than replacing it with a refused one', async () => {
+    const list = await settled(FIXTURE_HUMANS.wren)
+
+    await list.selectBoard(FIXTURE_BOARDS.quillDelivery)
+    await list.selectBoard(FIXTURE_BOARDS.marlowOutreach)
+
+    expect(list.activeBoard.value?.id).toBe(FIXTURE_BOARDS.quillDelivery)
+    expect(list.refusal.value).toMatch(/not available/i)
+  })
+
+  it('clears an earlier refusal once a board the human may open is selected', async () => {
+    const list = await settled(FIXTURE_HUMANS.wren)
+
+    await list.selectBoard(FIXTURE_BOARDS.marlowOutreach)
+    expect(list.refusal.value).not.toBeNull()
+
+    await list.selectBoard(FIXTURE_BOARDS.quillDelivery)
+
+    expect(list.refusal.value).toBeNull()
+    expect(list.activeBoard.value?.id).toBe(FIXTURE_BOARDS.quillDelivery)
+  })
+
+  it('refuses by asking the gateway, not by consulting the list it already holds', async () => {
+    const smuggled: VisibleBoard = {
+      id: FIXTURE_BOARDS.marlowOutreach,
+      agentId: 'fictional-agent-marlow',
+      agentName: 'Fictional Agent Marlow',
+      title: 'Fictional Marlow Outreach',
+    }
+    const gateway: TaskGateway = {
+      listVisibleBoards: vi.fn(async () => [smuggled]),
+      getBoardItems: vi.fn(async () => {
+        throw new BoardAccessRefused(FIXTURE_BOARDS.marlowOutreach)
+      }),
+      getItemDetail: vi.fn(),
+    }
+
+    const list = await settled(FIXTURE_HUMANS.wren, gateway)
+
+    await list.selectBoard(FIXTURE_BOARDS.marlowOutreach)
+
+    expect(gateway.getBoardItems).toHaveBeenCalledWith(
+      FIXTURE_HUMANS.wren,
+      FIXTURE_BOARDS.marlowOutreach,
+    )
+    expect(list.activeBoard.value).toBeNull()
+    expect(list.refusal.value).toMatch(/not available/i)
+  })
+
+  it('names no foreign board title in the refusal it reports', async () => {
+    const list = await settled(FIXTURE_HUMANS.wren)
+
+    await list.selectBoard(FIXTURE_BOARDS.marlowOutreach)
+
+    expect(list.refusal.value).not.toMatch(/outreach/i)
+  })
+
+  it('selects nothing while no human is signed in', async () => {
+    const list = await settled(null)
+
+    await list.selectBoard(FIXTURE_BOARDS.quillDelivery)
+
+    expect(list.activeBoard.value).toBeNull()
+  })
+})

@@ -30,6 +30,10 @@ export interface Board {
   readonly title: string
 }
 
+export interface VisibleBoard extends Board {
+  readonly agentName: string
+}
+
 export type WorkItemId = string
 
 export interface Blocker {
