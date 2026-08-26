@@ -139,6 +139,18 @@ docker run --rm -p 8080:80 kolonie-workplace:local
 TLS terminates at Traefik. Nothing in this image speaks HTTPS and no
 certificate is baked into it.
 
+Every push to `main` publishes the image to
+`ghcr.io/kolonie-ai/kolonie-workplace` with both `latest` and the immutable
+commit SHA:
+
+```sh
+docker pull ghcr.io/kolonie-ai/kolonie-workplace:<commit-sha>
+```
+
+Consumers should pin the digest resolved from the commit tag rather than
+`latest`, so the selected build cannot move underneath them. Publishing the
+image does not deploy it; deployment remains a separate infrastructure change.
+
 ## Status
 
 The application is **bootstrapped**: Vite, Vue 3, TypeScript, ESLint and
