@@ -1,0 +1,23 @@
+# The build stage runs `npm ci` and `npm run build` itself, so a local install
+# or a local `dist/` in the context is at best wasted upload and at worst a
+# stale bundle copied over a fresh one.
+node_modules
+dist
+coverage
+.git
+.github
+*.tsbuildinfo
+
+# Environment files carry tenant configuration and must never enter an image
+# layer. `.env.example` names the variables and holds no values, but nothing in
+# the build reads it either.
+.env
+.env.*
+
+Dockerfile
+.dockerignore
+*.log
+npm-debug.log*
+.DS_Store
+.claude/
+.opencode/
