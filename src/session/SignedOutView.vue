@@ -26,6 +26,25 @@ async function chooseHuman(humanId: string): Promise<void> {
         : 'Kolonie Workplace: that sign-in could not be completed.'
   }
 }
+
+/**
+ * With a real login there is nobody to list: who you are is what the hosted
+ * login establishes. This control starts the redirect and asks for nothing,
+ * which is why the picker below it renders only for a development session.
+ */
+async function signIn(): Promise<void> {
+  if (session === null) {
+    return
+  }
+
+  refusal.value = null
+
+  try {
+    await session.signIn()
+  } catch {
+    refusal.value = 'Kolonie Workplace: that sign-in could not be started.'
+  }
+}
 </script>
 
 <template>
@@ -48,7 +67,21 @@ async function chooseHuman(humanId: string): Promise<void> {
       </p>
 
       <div
-        v-if="candidates.length > 0"
+        v-if="developmentSignIn === null"
+        data-testid="hosted-sign-in-panel"
+      >
+        <button
+          class="session-signed-out__candidate"
+          type="button"
+          data-testid="hosted-sign-in"
+          @click="signIn()"
+        >
+          Sign in
+        </button>
+      </div>
+
+      <div
+        v-else-if="candidates.length > 0"
         data-testid="fixture-sign-in"
       >
         <p class="session-signed-out__development-note">

@@ -6,6 +6,25 @@ export const FIXTURE_HUMANS = {
   rook: 'fictional-human-rook',
 } as const
 
+/**
+ * Federated identities for the fixture humans, keyed exactly as the Colony
+ * keys them: `(provider, subject)`, where the provider is the Colony's own
+ * name for the door and the subject is the provider's stable identifier.
+ *
+ * `wren` appears twice on purpose. One person who signs in with Google today
+ * and GitHub tomorrow is one human, which is why the Colony holds identities in
+ * their own table rather than as two columns on the human — and it is the case
+ * a workplace login is most likely to get wrong by minting a second account.
+ *
+ * These are fictional subjects, not values from any tenant.
+ */
+export const FIXTURE_IDENTITIES = {
+  wren: { provider: 'google', subject: 'fictional-subject-wren' },
+  wrenSecondDoor: { provider: 'github', subject: 'fictional-subject-wren-github' },
+  ash: { provider: 'github', subject: 'fictional-subject-ash' },
+  rook: { provider: 'password', subject: 'fictional-subject-rook' },
+} as const
+
 export const FIXTURE_AGENTS = {
   quill: 'fictional-agent-quill',
   birch: 'fictional-agent-birch',

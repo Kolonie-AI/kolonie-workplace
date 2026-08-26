@@ -25,7 +25,13 @@ export class FixtureWorkplaceSession implements WorkplaceSession, DevelopmentSig
     return fixtureSignInCandidates
   }
 
-  async signIn({ humanId }: SignInRequest): Promise<void> {
+  async signIn(request?: SignInRequest): Promise<void> {
+    const humanId = request?.humanId
+
+    if (humanId === undefined) {
+      throw new SignInRefused('')
+    }
+
     const human = fixtureSignInCandidates.find((candidate) => candidate.id === humanId)
 
     if (human === undefined) {

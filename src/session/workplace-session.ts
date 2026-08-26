@@ -12,9 +12,20 @@ export interface SignInRequest {
   readonly humanId: HumanId
 }
 
+/**
+ * `signIn` takes an optional request because the two implementations of this
+ * port are asked for different things. The development picker is told *which*
+ * human to become, since it has no credential to go on. A federated login is
+ * told nothing: who you are is what the hosted login establishes, and a
+ * workplace that could name the human to sign in would be a workplace that
+ * could sign in as anybody.
+ *
+ * The port itself stays free of authentication machinery — no token, no
+ * provider, no subject appears here. Those belong to the implementation.
+ */
 export interface WorkplaceSession {
   readonly currentHuman: Readonly<Ref<Human | null>>
-  signIn(request: SignInRequest): Promise<void>
+  signIn(request?: SignInRequest): Promise<void>
   signOut(): Promise<void>
 }
 

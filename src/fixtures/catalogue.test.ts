@@ -4,11 +4,13 @@ import {
   fixtureBoards,
   fixtureHumans,
   fixtureWorkItems,
+  FIXTURE_IDENTITIES,
 } from '@/fixtures/catalogue'
 import { isLane } from '@/domain/lanes'
 
 const ALL_TEXT = [
   ...fixtureHumans.map((human) => human.name),
+  ...Object.values(FIXTURE_IDENTITIES).map((identity) => identity.subject),
   ...fixtureAgents.map((agent) => agent.name),
   ...fixtureBoards.map((board) => `${board.id} ${board.title}`),
   ...fixtureWorkItems.map(
@@ -31,6 +33,26 @@ describe('fixture hygiene', () => {
     expect(ALL_TEXT).not.toMatch(/@/)
     expect(ALL_TEXT).not.toMatch(/\b[a-z0-9-]+\.(ai|com|org|net|io|dev|sh)\b/i)
     expect(ALL_TEXT).not.toMatch(/\b(token|secret|password|api[-_]?key|bearer)\b/i)
+  })
+
+  it('names every fixture federated subject obviously fictional', () => {
+    for (const identity of Object.values(FIXTURE_IDENTITIES)) {
+      expect(identity.subject.startsWith('fictional-subject-')).toBe(true)
+    }
+  })
+
+  /**
+   * The provider is the Colony's own name for a door, and one of them is
+   * literally `password` — which is why the providers are checked against the
+   * known set here rather than swept for token-shaped words above. A door name
+   * is not a credential, and the set is what a wrong one would break.
+   */
+  it('names each door with a provider the Colony already uses', () => {
+    const doors = new Set(['google', 'github', 'x', 'password'])
+
+    for (const identity of Object.values(FIXTURE_IDENTITIES)) {
+      expect(doors.has(identity.provider)).toBe(true)
+    }
   })
 
   it('places every fixture item in one of the six fixed lanes and on a known board', () => {

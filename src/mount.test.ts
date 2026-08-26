@@ -1,5 +1,16 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { mountWorkplace } from '@/mount'
+import { createFixtureWorkplaceSession } from '@/session/fixture-workplace-session'
+
+/**
+ * `mountWorkplace` takes the session it should mount with. #2 made application
+ * composition require Auth0 configuration, so these tests hand in a fixture
+ * session rather than letting the mount build one — the entry point that does
+ * build one is `startWorkplace`, and what it composes is asserted separately.
+ */
+function mount(selector: string) {
+  return mountWorkplace(selector, createFixtureWorkplaceSession())
+}
 
 afterEach(() => {
   document.body.innerHTML = ''
@@ -9,7 +20,7 @@ describe('mountWorkplace — the app mounts', () => {
   it('renders the signed-out workplace into the mount target', () => {
     document.body.innerHTML = '<div id="app"></div>'
 
-    mountWorkplace('#app')
+    mount('#app')
 
     const target = document.querySelector('#app')
     expect(target?.querySelector('h1')?.textContent?.trim()).toBe('Kolonie Workplace')
@@ -21,7 +32,7 @@ describe('mountWorkplace — the app mounts', () => {
   it('hands back an app that can be unmounted, leaving the target empty', () => {
     document.body.innerHTML = '<div id="app"></div>'
 
-    mountWorkplace('#app').unmount()
+    mount('#app').unmount()
 
     expect(document.querySelector('#app')?.innerHTML).toBe('')
   })
