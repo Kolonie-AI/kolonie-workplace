@@ -7,14 +7,16 @@ import {
   fixtureWorkItems,
 } from '@/fixtures/catalogue'
 import type { TaskGateway } from '@/gateway/task-gateway'
+import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
+import { TASK_GATEWAY } from '@/gateway/provide-gateway'
 import SessionGate from '@/session/SessionGate.vue'
 import SignedInHuman from '@/session/SignedInHuman.vue'
 import { createFixtureWorkplaceSession } from '@/session/fixture-workplace-session'
 import { WORKPLACE_SESSION, type WorkplaceSession } from '@/session/workplace-session'
 
-function renderGate(session: WorkplaceSession) {
+function renderGate(session: WorkplaceSession, gateway: TaskGateway = createFixtureTaskGateway()) {
   return render(SessionGate, {
-    global: { provide: { [WORKPLACE_SESSION]: session } },
+    global: { provide: { [WORKPLACE_SESSION]: session, [TASK_GATEWAY]: gateway } },
   })
 }
 
@@ -123,7 +125,7 @@ describe('SessionGate — rejection: no session at all', () => {
       global: {
         provide: {
           [WORKPLACE_SESSION]: createFixtureWorkplaceSession(),
-          taskGateway: gateway,
+          [TASK_GATEWAY]: gateway,
         },
       },
     })

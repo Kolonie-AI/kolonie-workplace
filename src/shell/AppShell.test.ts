@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/vue'
+import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
+import { TASK_GATEWAY } from '@/gateway/provide-gateway'
 import AppShell from '@/shell/AppShell.vue'
+
+function renderShell(props: { initialView?: unknown } = {}) {
+  return render(AppShell, {
+    props,
+    global: { provide: { [TASK_GATEWAY]: createFixtureTaskGateway() } },
+  })
+}
 
 describe('AppShell', () => {
   it('renders a persistent sidebar, top bar, board header and canvas', () => {
-    render(AppShell)
+    renderShell()
 
     expect(screen.getByTestId('sidebar').tagName).toBe('ASIDE')
     expect(screen.getByTestId('topbar').tagName).toBe('HEADER')
@@ -13,7 +22,7 @@ describe('AppShell', () => {
   })
 
   it('renders exactly the two requested view tabs', () => {
-    render(AppShell)
+    renderShell()
 
     const tabs = within(screen.getByRole('tablist')).getAllByRole('tab')
 
@@ -24,7 +33,7 @@ describe('AppShell', () => {
   })
 
   it('opens with Kanban active and its placeholder canvas visible', () => {
-    render(AppShell)
+    renderShell()
 
     expect(screen.getByRole('tab', { name: 'Kanban' }).getAttribute('aria-selected')).toBe('true')
     expect(screen.getByRole('tab', { name: 'List' }).getAttribute('aria-selected')).toBe('false')
@@ -33,7 +42,7 @@ describe('AppShell', () => {
   })
 
   it('activates List and replaces the canvas when its tab is selected', async () => {
-    render(AppShell)
+    renderShell()
 
     await fireEvent.click(screen.getByRole('tab', { name: 'List' }))
 
@@ -45,7 +54,7 @@ describe('AppShell', () => {
   })
 
   it('jumps to the first and last tab with Home and End', async () => {
-    render(AppShell)
+    renderShell()
 
     const kanbanTab = screen.getByRole('tab', { name: 'Kanban' })
     const listTab = screen.getByRole('tab', { name: 'List' })
@@ -65,7 +74,7 @@ describe('AppShell', () => {
   })
 
   it('leaves the tablist alone on a key it does not handle', async () => {
-    render(AppShell)
+    renderShell()
 
     const kanbanTab = screen.getByRole('tab', { name: 'Kanban' })
     kanbanTab.focus()
@@ -80,7 +89,7 @@ describe('AppShell', () => {
   })
 
   it('links the active tab to its panel for assistive technology', async () => {
-    render(AppShell)
+    renderShell()
 
     const kanbanTab = screen.getByRole('tab', { name: 'Kanban' })
     const panel = screen.getByRole('tabpanel')
@@ -96,7 +105,7 @@ describe('AppShell', () => {
   })
 
   it('moves right to List, focusing and selecting it while updating the panel', async () => {
-    render(AppShell)
+    renderShell()
 
     const kanbanTab = screen.getByRole('tab', { name: 'Kanban' })
     kanbanTab.focus()
@@ -114,7 +123,7 @@ describe('AppShell', () => {
   })
 
   it('moves left to Kanban and wraps in both directions', async () => {
-    render(AppShell)
+    renderShell()
 
     const kanbanTab = screen.getByRole('tab', { name: 'Kanban' })
     const listTab = screen.getByRole('tab', { name: 'List' })
@@ -141,7 +150,7 @@ describe('AppShell', () => {
 
 describe('AppShell — rejection: an unknown requested view', () => {
   it('falls back to Kanban without rendering a third canvas or crashing', () => {
-    render(AppShell, { props: { initialView: 'gantt' } })
+    renderShell({ initialView: 'gantt' })
 
     expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
     expect(screen.getByRole('tabpanel').getAttribute('data-view')).toBe('kanban')
@@ -153,7 +162,7 @@ describe('AppShell — rejection: an unknown requested view', () => {
 
 describe('AppShell — responsive contract', () => {
   it('marks the sidebar as collapsible and gives the canvas its own region', () => {
-    render(AppShell)
+    renderShell()
 
     expect(screen.getByTestId('sidebar').classList.contains('app-shell__sidebar')).toBe(true)
     expect(screen.getByRole('main').classList.contains('app-shell__main')).toBe(true)

@@ -4,6 +4,8 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { ref } from 'vue'
 import type { Human } from '@/domain/workplace'
+import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
+import { TASK_GATEWAY } from '@/gateway/provide-gateway'
 import AppShell from '@/shell/AppShell.vue'
 import {
   createFixtureWorkplaceSession,
@@ -100,7 +102,14 @@ describe('port boundary — the shell renders against any implementation of the 
       },
     }
 
-    render(AppShell, { global: { provide: { [WORKPLACE_SESSION]: stub } } })
+    render(AppShell, {
+      global: {
+        provide: {
+          [WORKPLACE_SESSION]: stub,
+          [TASK_GATEWAY]: createFixtureTaskGateway(),
+        },
+      },
+    })
 
     expect(screen.getByTestId('signed-in-human').textContent).toContain(
       'Stub Human From Another Implementation',
