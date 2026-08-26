@@ -49,8 +49,8 @@ describe('AppShell', () => {
     expect(screen.getByRole('tab', { name: 'Kanban' }).getAttribute('aria-selected')).toBe('false')
     expect(screen.getByRole('tab', { name: 'List' }).getAttribute('aria-selected')).toBe('true')
     expect(screen.getByRole('tabpanel').getAttribute('data-view')).toBe('list')
-    expect(screen.getByRole('tabpanel').textContent).toContain('List canvas')
-    expect(screen.getByRole('tabpanel').textContent).not.toContain('Kanban canvas')
+    expect(within(screen.getByRole('tabpanel')).getByTestId('list-view')).toBeTruthy()
+    expect(within(screen.getByRole('tabpanel')).queryByTestId('kanban-board')).toBeNull()
   })
 
   it('jumps to the first and last tab with Home and End', async () => {
@@ -119,7 +119,7 @@ describe('AppShell', () => {
     expect(listTab.getAttribute('aria-selected')).toBe('true')
     expect(listTab.getAttribute('tabindex')).toBe('0')
     expect(screen.getByRole('tabpanel').getAttribute('data-view')).toBe('list')
-    expect(screen.getByRole('tabpanel').textContent).toContain('List canvas')
+    expect(within(screen.getByRole('tabpanel')).getByTestId('list-view')).toBeTruthy()
   })
 
   it('moves left to Kanban and wraps in both directions', async () => {

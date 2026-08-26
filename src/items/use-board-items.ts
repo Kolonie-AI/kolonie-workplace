@@ -5,18 +5,30 @@ import {
   partitionIntoLanes,
   type InvalidLaneItem,
   type LaneColumn,
-} from '@/kanban/lane-columns'
+} from '@/items/lane-columns'
+import { orderForList, type ListRow } from '@/items/list-rows'
 
 /**
  * `loading` and `error` are kept distinct from `ready` with no items on
  * purpose, exactly as the board list keeps them: a board that holds nothing and
  * a read that failed must not render the same way.
  */
-export type BoardKanbanStatus = 'idle' | 'loading' | 'ready' | 'error'
+export type BoardItemsStatus = 'idle' | 'loading' | 'ready' | 'error'
 
-export interface BoardKanban {
-  readonly status: Readonly<Ref<BoardKanbanStatus>>
+/**
+ * The single loaded state behind every presentation of a board.
+ *
+ * Kanban and List are two shapes over one `useBoardItems`, not two data paths.
+ * One gateway read, one foreign-board filter, one lane partition and one
+ * selection ref serve both, which is what makes the tabs honest: a view cannot
+ * fetch differently, filter differently or sort into a different set than its
+ * sibling, because there is only one set. `columns` and `rows` are two orderings
+ * of the same partitioned items and never of two different reads.
+ */
+export interface BoardItems {
+  readonly status: Readonly<Ref<BoardItemsStatus>>
   readonly columns: ComputedRef<readonly LaneColumn[]>
+  readonly rows: ComputedRef<readonly ListRow[]>
   readonly invalid: ComputedRef<readonly InvalidLaneItem[]>
   readonly foreign: ComputedRef<readonly WorkItemSummary[]>
   readonly isBoardEmpty: ComputedRef<boolean>
@@ -24,12 +36,12 @@ export interface BoardKanban {
   selectItem(itemId: WorkItemId): void
 }
 
-export function useBoardKanban(
+export function useBoardItems(
   gateway: TaskGateway,
   humanId: Readonly<Ref<HumanId | null>>,
   activeBoardId: Readonly<Ref<BoardId | null>>,
-): BoardKanban {
-  const status = ref<BoardKanbanStatus>('idle')
+): BoardItems {
+  const status = ref<BoardItemsStatus>('idle')
   const loaded = ref<readonly WorkItemSummary[]>([])
   const foreign = ref<readonly WorkItemSummary[]>([])
   const selectedItemId = ref<WorkItemId | null>(null)
@@ -74,6 +86,7 @@ export function useBoardKanban(
   return {
     status,
     columns: computed(() => partition.value.columns),
+    rows: computed(() => orderForList(partition.value.columns)),
     invalid: computed(() => partition.value.invalid),
     foreign: computed(() => foreign.value),
     isBoardEmpty: computed(

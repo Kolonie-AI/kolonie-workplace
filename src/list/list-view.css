@@ -1,0 +1,112 @@
+.list-view {
+  display: grid;
+  gap: var(--space-4);
+  min-inline-size: 0;
+}
+
+.list-view__state {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+
+.list-view__state--error {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--color-accent);
+  border-radius: var(--radius-medium);
+  background: var(--color-surface);
+}
+
+.list-view__invalid-item {
+  display: block;
+}
+
+.list-view__rows {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list-view__entry {
+  display: grid;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.list-view__lane-heading {
+  margin: var(--space-3) 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.list-row {
+  display: grid;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  grid-template-columns: minmax(0, 1fr) 7rem minmax(0, 11rem) auto;
+  inline-size: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  text-align: start;
+}
+
+.list-row:hover {
+  border-color: var(--color-accent);
+}
+
+.list-row[data-selected="true"] {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+.list-row[data-blocked="true"] {
+  border-inline-start: var(--space-1) solid var(--color-accent);
+}
+
+.list-row__title {
+  min-inline-size: 0;
+  overflow: hidden;
+  font-weight: 600;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-row__lane,
+.list-row__owner {
+  min-inline-size: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-row__flag {
+  flex: none;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-small);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: var(--text-small);
+  font-weight: 700;
+}
+
+@media (max-width: 48rem) {
+  .list-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}

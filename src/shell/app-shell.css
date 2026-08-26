@@ -135,17 +135,6 @@
   background: var(--color-surface);
 }
 
-.app-shell__placeholder-title {
-  margin: 0 0 var(--space-2);
-  font-size: var(--text-body);
-}
-
-.app-shell__placeholder-note {
-  margin: 0;
-  color: var(--color-text-muted);
-  line-height: 1.5;
-}
-
 @media (max-width: 48rem) {
   .app-shell {
     grid-template-columns: minmax(0, 1fr);

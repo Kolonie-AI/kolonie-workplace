@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { WORKPLACE_LANE_LABELS } from '@/domain/lanes'
 import type { WorkItemId } from '@/domain/workplace'
-import type { InvalidLaneItem, LaneColumn } from '@/kanban/lane-columns'
-import type { BoardKanbanStatus } from '@/kanban/use-board-kanban'
+import type { InvalidLaneItem, LaneColumn } from '@/items/lane-columns'
+import type { BoardItemsStatus } from '@/items/use-board-items'
 import KanbanCard from '@/kanban/KanbanCard.vue'
 import '@/kanban/kanban-board.css'
 
@@ -16,7 +16,7 @@ import '@/kanban/kanban-board.css'
  * id and writes nothing.
  */
 defineProps<{
-  status: BoardKanbanStatus
+  status: BoardItemsStatus
   columns: readonly LaneColumn[]
   invalid: readonly InvalidLaneItem[]
   isBoardEmpty: boolean
