@@ -13,7 +13,7 @@ import {
   fixtureWorkItems,
 } from '@/fixtures/catalogue'
 import { BoardAccessRefused, WorkItemAccessRefused } from '@/gateway/refusals'
-import type { TaskGateway } from '@/gateway/task-gateway'
+import { PREVIEW_DATA_GATEWAY, type TaskGateway } from '@/gateway/task-gateway'
 
 function visibleBoardIdsFor(humanId: HumanId): ReadonlySet<BoardId> {
   const human = fixtureHumans.find((candidate) => candidate.id === humanId)
@@ -30,6 +30,8 @@ function visibleBoardIdsFor(humanId: HumanId): ReadonlySet<BoardId> {
 }
 
 export class FixtureTaskGateway implements TaskGateway {
+  readonly [PREVIEW_DATA_GATEWAY] = true as const
+
   async listVisibleBoards(humanId: HumanId): Promise<readonly VisibleBoard[]> {
     const visible = visibleBoardIdsFor(humanId)
 

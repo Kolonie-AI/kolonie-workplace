@@ -167,6 +167,25 @@ describe('visual integration — the narrow viewport keeps the whole journey rea
   })
 })
 
+describe('visual integration — the preview-data indication is chrome, not a banner', () => {
+  const shell = sheets['src/shell/app-shell.css']
+
+  it('draws from the accent tokens rather than a warning colour of its own', () => {
+    expect(shell).toMatch(
+      /\.app-shell__preview-data\s*\{[^}]*var\(--color-accent-soft\)/s,
+    )
+    expect(shell).not.toMatch(
+      /\.app-shell__preview-data\s*\{[^}]*var\(--color-blocked\)/s,
+    )
+  })
+
+  it('stays inside the top bar row rather than adding a strip of its own', () => {
+    expect(shell).not.toMatch(
+      /\.app-shell__preview-data\s*\{[^}]*(position:\s*(fixed|sticky|absolute)|inline-size:\s*100%|display:\s*block)/s,
+    )
+  })
+})
+
 describe('visual integration — a calm board product, not a dashboard', () => {
   it('uses no gradient, glass blur or oversized radius anywhere', () => {
     for (const sheet of Object.values(sheets)) {

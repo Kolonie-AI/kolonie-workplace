@@ -73,6 +73,18 @@
   font-weight: 700;
 }
 
+.app-shell__preview-data {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-small);
+  margin-inline-end: auto;
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  font-size: var(--text-small);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .app-shell__board-header {
   padding: var(--space-5) var(--space-5) 0;
   border-block-end: 1px solid var(--color-border);

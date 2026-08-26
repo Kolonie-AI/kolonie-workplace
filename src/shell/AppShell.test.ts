@@ -1,14 +1,27 @@
 import { describe, expect, it } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
+import type { TaskGateway } from '@/gateway/task-gateway'
 import { TASK_GATEWAY } from '@/gateway/provide-gateway'
+import { FIXTURE_HUMANS } from '@/fixtures/catalogue'
+import { createFixtureWorkplaceSession } from '@/session/fixture-workplace-session'
+import { WORKPLACE_SESSION } from '@/session/workplace-session'
 import AppShell from '@/shell/AppShell.vue'
 
-function renderShell(props: { initialView?: unknown } = {}) {
+function renderShell(
+  props: { initialView?: unknown } = {},
+  gateway: TaskGateway = createFixtureTaskGateway(),
+) {
   return render(AppShell, {
     props,
-    global: { provide: { [TASK_GATEWAY]: createFixtureTaskGateway() } },
+    global: { provide: { [TASK_GATEWAY]: gateway } },
   })
+}
+
+const nonFixtureGateway: TaskGateway = {
+  listVisibleBoards: async () => [],
+  getBoardItems: async () => [],
+  getItemDetail: async () => Promise.reject(new Error('No item requested in this test.')),
 }
 
 describe('AppShell', () => {
@@ -145,6 +158,65 @@ describe('AppShell', () => {
     expect(listTab.getAttribute('tabindex')).toBe('-1')
     expect(screen.getByRole('tabpanel').getAttribute('data-view')).toBe('kanban')
     expect(within(screen.getByRole('tabpanel')).getByTestId('kanban-board')).toBeTruthy()
+  })
+})
+
+describe('AppShell — preview data derives from the active gateway', () => {
+  it('shows a quiet, persistent indication for the fixture gateway', async () => {
+    renderShell()
+
+    const indication = screen.getByTestId('preview-data-indication')
+
+    expect(indication.textContent?.trim()).toBe('Example data')
+    expect(screen.getByTestId('topbar').contains(indication)).toBe(true)
+    expect(indication.getAttribute('role')).toBeNull()
+    expect(indication.getAttribute('aria-live')).toBeNull()
+    expect(indication.querySelector('button')).toBeNull()
+
+    await fireEvent.click(screen.getByRole('tab', { name: 'List' }))
+
+    expect(screen.getByTestId('preview-data-indication')).toBe(indication)
+    expect(screen.getByRole('tabpanel').getAttribute('data-view')).toBe('list')
+  })
+
+  it('does not render the indication for a non-fixture gateway', () => {
+    renderShell({}, nonFixtureGateway)
+
+    expect(screen.queryByTestId('preview-data-indication')).toBeNull()
+    expect(screen.queryByText('Example data')).toBeNull()
+  })
+
+  it('stays put across a board change and an opened detail pane', async () => {
+    const session = createFixtureWorkplaceSession()
+    await session.signIn({ humanId: FIXTURE_HUMANS.wren })
+
+    render(AppShell, {
+      global: {
+        provide: {
+          [WORKPLACE_SESSION]: session,
+          [TASK_GATEWAY]: createFixtureTaskGateway(),
+        },
+      },
+    })
+
+    const indication = await screen.findByTestId('preview-data-indication')
+    const boards = await screen.findAllByTestId('board-link')
+
+    for (const board of boards.slice(0, 2).reverse()) {
+      await fireEvent.click(board)
+      expect(screen.getByTestId('preview-data-indication')).toBe(indication)
+    }
+
+    const card = (await screen.findAllByTestId('kanban-card'))[0]
+
+    if (card === undefined) {
+      throw new Error('Expected a fixture card for the persistence check.')
+    }
+
+    await fireEvent.click(card)
+
+    expect(await screen.findByTestId('detail-pane')).toBeTruthy()
+    expect(screen.getByTestId('preview-data-indication')).toBe(indication)
   })
 })
 

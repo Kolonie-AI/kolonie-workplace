@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { FixtureTaskGateway, createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
+import { PREVIEW_DATA_GATEWAY } from '@/gateway/task-gateway'
 import { fixtureBoards, fixtureWorkItems, FIXTURE_BOARDS, FIXTURE_HUMANS } from '@/fixtures/catalogue'
 
 const WRITE_LIKE = /^(create|update|delete|remove|save|persist|write|set|move|add|patch|put|sync)/
@@ -9,9 +10,11 @@ describe('the gateway is read-only', () => {
     const methods = Object.getOwnPropertyNames(FixtureTaskGateway.prototype).filter(
       (name) => name !== 'constructor',
     )
+    const symbols = Object.getOwnPropertySymbols(createFixtureTaskGateway())
 
     expect(methods.sort()).toEqual(['getBoardItems', 'getItemDetail', 'listVisibleBoards'])
     expect(methods.filter((name) => WRITE_LIKE.test(name))).toEqual([])
+    expect(symbols).toEqual([PREVIEW_DATA_GATEWAY])
   })
 
   it('leaves the fixture catalogue unchanged after reads', async () => {
