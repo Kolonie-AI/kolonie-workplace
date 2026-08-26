@@ -1,0 +1,127 @@
+.detail-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-inline-size: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-large);
+  background: var(--color-surface);
+}
+
+.detail-pane__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.detail-pane__eyebrow {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.detail-pane__close {
+  min-block-size: 2rem;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-small);
+}
+
+.detail-pane__close:hover {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+.detail-pane__title {
+  margin: 0;
+  font-size: var(--text-title);
+  line-height: 1.3;
+}
+
+.detail-pane__state {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+
+.detail-pane__state--error {
+  color: var(--color-text);
+}
+
+.detail-pane__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--color-border);
+}
+
+.detail-pane__section--blocked {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background: var(--color-canvas);
+}
+
+.detail-pane__section-title {
+  margin: 0;
+  font-size: var(--text-small);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.detail-pane__facts,
+.detail-pane__handover {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.detail-pane__fact > dt {
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  font-weight: 600;
+}
+
+.detail-pane__fact > dd {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--text-body);
+  line-height: 1.5;
+}
+
+.detail-pane__empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+
+.detail-pane__references {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.detail-pane__reference {
+  color: var(--color-accent);
+  font-size: var(--text-small);
+}

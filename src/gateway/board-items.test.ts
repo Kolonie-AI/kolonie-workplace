@@ -44,7 +44,10 @@ describe('board items', () => {
       learned: 'The narrow fixture path is sufficient',
       next: 'Review the typed summaries',
       blocked: 'Nothing blocks the next step',
-      evidence: ['Fictional typecheck evidence', 'Fictional unit-test evidence'],
+      evidence: [
+        { label: 'Fictional typecheck evidence', href: '/fictional-evidence/typecheck' },
+        { label: 'Fictional unit-test evidence', href: '/fictional-evidence/unit-test' },
+      ],
     })
     expect(review.externalReferences).toEqual([
       { label: 'Fictional review reference', href: '/fictional-reference/review' },

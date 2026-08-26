@@ -12,6 +12,8 @@ import { useBoardList } from '@/boards/use-board-list'
 import KanbanBoard from '@/kanban/KanbanBoard.vue'
 import ListView from '@/list/ListView.vue'
 import { useBoardItems } from '@/items/use-board-items'
+import DetailPane from '@/detail/DetailPane.vue'
+import { useItemDetail } from '@/detail/use-item-detail'
 import { useTaskGateway } from '@/gateway/provide-gateway'
 import SignedInHuman from '@/session/SignedInHuman.vue'
 import { useSignedInHuman } from '@/session/use-session'
@@ -31,6 +33,7 @@ const gateway = useTaskGateway()
 const boardList = useBoardList(gateway, humanId)
 const activeBoardId = computed(() => boardList.activeBoard.value?.id ?? null)
 const items = useBoardItems(gateway, humanId, activeBoardId)
+const detail = useItemDetail(gateway, humanId, items.selectedItemId)
 
 watch(
   () => boardList.status.value,
@@ -173,33 +176,45 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
           </p>
         </section>
 
-        <section
-          id="board-canvas"
-          class="app-shell__canvas"
-          role="tabpanel"
-          :aria-labelledby="`view-tab-${activeView}`"
-          :data-view="activeView"
+        <div
+          class="app-shell__board-area"
+          :data-detail-open="items.selectedItemId.value === null ? 'false' : 'true'"
         >
-          <KanbanBoard
-            v-if="activeView === 'kanban'"
-            :status="items.status.value"
-            :columns="items.columns.value"
-            :invalid="items.invalid.value"
-            :is-board-empty="items.isBoardEmpty.value"
-            :selected-item-id="items.selectedItemId.value"
-            @select="items.selectItem"
-          />
+          <section
+            id="board-canvas"
+            class="app-shell__canvas"
+            role="tabpanel"
+            :aria-labelledby="`view-tab-${activeView}`"
+            :data-view="activeView"
+          >
+            <KanbanBoard
+              v-if="activeView === 'kanban'"
+              :status="items.status.value"
+              :columns="items.columns.value"
+              :invalid="items.invalid.value"
+              :is-board-empty="items.isBoardEmpty.value"
+              :selected-item-id="items.selectedItemId.value"
+              @select="items.selectItem"
+            />
 
-          <ListView
-            v-else-if="activeView === 'list'"
-            :status="items.status.value"
-            :rows="items.rows.value"
-            :invalid="items.invalid.value"
-            :is-board-empty="items.isBoardEmpty.value"
-            :selected-item-id="items.selectedItemId.value"
-            @select="items.selectItem"
+            <ListView
+              v-else-if="activeView === 'list'"
+              :status="items.status.value"
+              :rows="items.rows.value"
+              :invalid="items.invalid.value"
+              :is-board-empty="items.isBoardEmpty.value"
+              :selected-item-id="items.selectedItemId.value"
+              @select="items.selectItem"
+            />
+          </section>
+
+          <DetailPane
+            v-if="items.selectedItemId.value !== null"
+            :status="detail.status.value"
+            :item="detail.item.value"
+            @close="items.clearSelection"
           />
-        </section>
+        </div>
       </main>
     </div>
   </div>

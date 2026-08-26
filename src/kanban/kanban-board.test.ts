@@ -543,7 +543,15 @@ describe('kanban board — selecting a card', () => {
     expect(cardFor(FIXTURE_ITEMS.ready).getAttribute('data-selected')).toBe('false')
   })
 
-  it('selects without reading detail, editing or changing the lane', async () => {
+  /**
+   * Until #10 this asserted that selecting read no detail at all, because no
+   * detail surface existed and any detail read from the board would have been
+   * a prefetch. #10 introduces the pane, and its contract is the opposite of a
+   * prefetch: detail is read once, for the card that was opened. What this
+   * test protects is unchanged — the board must not read detail for cards
+   * nobody opened, and selecting must still write nothing and move nothing.
+   */
+  it('reads detail once for the opened card, never for the board', async () => {
     const gateway = createFixtureTaskGateway()
     const detail = vi.spyOn(gateway, 'getItemDetail')
 
@@ -553,13 +561,18 @@ describe('kanban board — selecting a card', () => {
       expect(allCardIds()).toHaveLength(6)
     })
 
+    expect(detail).not.toHaveBeenCalled()
+
     const card = screen
       .getAllByTestId('kanban-card')
       .find((candidate) => candidate.getAttribute('data-item-id') === FIXTURE_ITEMS.ready)
 
     await fireEvent.click(card as HTMLElement)
 
-    expect(detail).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(detail).toHaveBeenCalledTimes(1)
+    })
+    expect(detail).toHaveBeenCalledWith(FIXTURE_HUMANS.wren, FIXTURE_ITEMS.ready)
     expect(cardIdsInLane('ready')).toEqual([FIXTURE_ITEMS.ready])
   })
 
