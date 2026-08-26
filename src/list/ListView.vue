@@ -47,7 +47,7 @@ const emit = defineEmits<{
 
     <p
       v-else-if="status === 'loading'"
-      class="list-view__state"
+      class="list-view__state list-view__state--loading"
       data-testid="list-loading"
     >
       Loading this board's work items…

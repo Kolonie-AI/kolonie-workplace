@@ -11,13 +11,28 @@
   line-height: 1.5;
 }
 
+/*
+ * The four states have to be four things at a glance. Loading is quiet and
+ * inset; empty is quiet and plain; error carries a blocked-coloured edge; and
+ * a lane that is merely empty says so inside the lane. Nothing here is a
+ * skeleton, so no state can survive as a shimmer after the read has finished.
+ */
+.kanban__state--loading {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background: var(--color-surface);
+}
+
 .kanban__state--error {
   display: grid;
   gap: var(--space-1);
   padding: var(--space-3) var(--space-4);
-  border: 1px dashed var(--color-accent);
+  border: 1px solid var(--color-border);
+  border-inline-start: var(--space-1) solid var(--color-blocked);
   border-radius: var(--radius-medium);
-  background: var(--color-surface);
+  background: var(--color-blocked-soft);
+  color: var(--color-text);
 }
 
 .kanban__invalid-item {
@@ -102,13 +117,18 @@
   border-color: var(--color-accent);
 }
 
+.kanban-card:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
 .kanban-card[data-selected="true"] {
   border-color: var(--color-accent);
   box-shadow: inset 0 0 0 1px var(--color-accent);
 }
 
 .kanban-card[data-blocked="true"] {
-  border-inline-start: var(--space-1) solid var(--color-accent);
+  border-inline-start: var(--space-1) solid var(--color-blocked);
 }
 
 .kanban-card__title {
@@ -136,8 +156,8 @@
   flex: none;
   padding: 0 var(--space-2);
   border-radius: var(--radius-small);
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
+  background: var(--color-blocked-soft);
+  color: var(--color-blocked);
   font-weight: 700;
 }
 

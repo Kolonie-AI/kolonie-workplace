@@ -2,6 +2,7 @@
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   min-block-size: 100vh;
+  overflow-x: hidden;
   background: var(--color-canvas);
 }
 
@@ -108,6 +109,11 @@
   color: var(--color-text);
 }
 
+.app-shell__tab:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: calc(var(--focus-offset) * -1);
+}
+
 .app-shell__tab[aria-selected="true"] {
   color: var(--color-accent);
 }
@@ -124,6 +130,7 @@
 .app-shell__main {
   min-inline-size: 0;
   overflow: auto;
+  overflow-x: hidden;
   padding: var(--space-5);
 }
 
@@ -132,6 +139,7 @@
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
+  min-inline-size: 0;
 }
 
 .app-shell__board-area[data-detail-open="true"] {
@@ -140,19 +148,35 @@
 
 .app-shell__canvas {
   min-block-size: 24rem;
+  min-inline-size: 0;
   padding: var(--space-5);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-large);
   background: var(--color-surface);
 }
 
+/*
+ * Narrow viewport: the sidebar stacks above the workspace rather than being
+ * hidden. It was `display: none` after #7, which was defensible while there
+ * was nothing to select into — but the core journey starts by choosing a
+ * board, and hiding the only control that does so put the first step of the
+ * journey outside the viewport. Stacking keeps every control reachable
+ * without introducing a drawer, which would be new behaviour and belongs to
+ * an issue of its own.
+ */
 @media (max-width: 48rem) {
   .app-shell {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .app-shell__sidebar {
-    display: none;
+    grid-row: auto;
+    padding: var(--space-4);
+  }
+
+  .app-shell__brand {
+    margin-block-end: var(--space-4);
   }
 
   .app-shell__topbar,
@@ -163,5 +187,9 @@
 
   .app-shell__board-area[data-detail-open="true"] {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-shell__board-area[data-detail-open="true"] > .detail-pane {
+    order: -1;
   }
 }
