@@ -32,12 +32,12 @@ describe('AppShell', () => {
     expect(screen.queryByRole('tab', { name: /gantt/i })).toBeNull()
   })
 
-  it('opens with Kanban active and its placeholder canvas visible', () => {
+  it('opens with Kanban active and the Kanban board in the canvas', () => {
     renderShell()
 
     expect(screen.getByRole('tab', { name: 'Kanban' }).getAttribute('aria-selected')).toBe('true')
     expect(screen.getByRole('tab', { name: 'List' }).getAttribute('aria-selected')).toBe('false')
-    expect(screen.getByRole('tabpanel').textContent).toContain('Kanban canvas')
+    expect(within(screen.getByRole('tabpanel')).getByTestId('kanban-board')).toBeTruthy()
     expect(screen.getByRole('tabpanel').textContent).not.toContain('List canvas')
   })
 
@@ -144,7 +144,7 @@ describe('AppShell', () => {
     expect(listTab.getAttribute('aria-selected')).toBe('false')
     expect(listTab.getAttribute('tabindex')).toBe('-1')
     expect(screen.getByRole('tabpanel').getAttribute('data-view')).toBe('kanban')
-    expect(screen.getByRole('tabpanel').textContent).toContain('Kanban canvas')
+    expect(within(screen.getByRole('tabpanel')).getByTestId('kanban-board')).toBeTruthy()
   })
 })
 
@@ -154,7 +154,7 @@ describe('AppShell — rejection: an unknown requested view', () => {
 
     expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
     expect(screen.getByRole('tabpanel').getAttribute('data-view')).toBe('kanban')
-    expect(screen.getByRole('tabpanel').textContent).toContain('Kanban canvas')
+    expect(within(screen.getByRole('tabpanel')).getByTestId('kanban-board')).toBeTruthy()
     expect(screen.queryByText(/gantt canvas/i)).toBeNull()
     expect(screen.getAllByRole('tab')).toHaveLength(2)
   })
