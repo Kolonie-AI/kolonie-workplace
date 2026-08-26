@@ -21,3 +21,12 @@ export type Lane = (typeof WORKPLACE_LANES)[number]
 export function isLane(candidate: string): candidate is Lane {
   return (WORKPLACE_LANES as readonly string[]).includes(candidate)
 }
+
+export const WORKPLACE_LANE_LABELS: Readonly<Record<Lane, string>> = {
+  inbox: 'Inbox',
+  ready: 'Ready',
+  in_progress: 'In progress',
+  blocked: 'Blocked',
+  review: 'Review',
+  done: 'Done',
+}

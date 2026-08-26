@@ -9,6 +9,8 @@ import {
 import type { BoardId } from '@/domain/workplace'
 import BoardList from '@/boards/BoardList.vue'
 import { useBoardList } from '@/boards/use-board-list'
+import KanbanBoard from '@/kanban/KanbanBoard.vue'
+import { useBoardKanban } from '@/kanban/use-board-kanban'
 import { useTaskGateway } from '@/gateway/provide-gateway'
 import SignedInHuman from '@/session/SignedInHuman.vue'
 import { useSignedInHuman } from '@/session/use-session'
@@ -25,7 +27,10 @@ const tabRefs = useTemplateRef<HTMLButtonElement[]>('tabs')
 
 const human = useSignedInHuman()
 const humanId = computed(() => human.value?.id ?? null)
-const boardList = useBoardList(useTaskGateway(), humanId)
+const gateway = useTaskGateway()
+const boardList = useBoardList(gateway, humanId)
+const activeBoardId = computed(() => boardList.activeBoard.value?.id ?? null)
+const kanban = useBoardKanban(gateway, humanId, activeBoardId)
 
 watch(
   () => boardList.status.value,
@@ -175,12 +180,24 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
           :aria-labelledby="`view-tab-${activeView}`"
           :data-view="activeView"
         >
-          <h2 class="app-shell__placeholder-title">
-            {{ activeLabel }} canvas
-          </h2>
-          <p class="app-shell__placeholder-note">
-            Placeholder content for the {{ activeLabel.toLowerCase() }} view.
-          </p>
+          <KanbanBoard
+            v-if="activeView === 'kanban'"
+            :status="kanban.status.value"
+            :columns="kanban.columns.value"
+            :invalid="kanban.invalid.value"
+            :is-board-empty="kanban.isBoardEmpty.value"
+            :selected-item-id="kanban.selectedItemId.value"
+            @select="kanban.selectItem"
+          />
+
+          <template v-else>
+            <h2 class="app-shell__placeholder-title">
+              {{ activeLabel }} canvas
+            </h2>
+            <p class="app-shell__placeholder-note">
+              Placeholder content for the {{ activeLabel.toLowerCase() }} view.
+            </p>
+          </template>
         </section>
       </main>
     </div>
