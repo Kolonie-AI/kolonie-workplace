@@ -44,6 +44,41 @@ describe('AppShell', () => {
     expect(screen.getByRole('tabpanel').textContent).not.toContain('Kanban canvas')
   })
 
+  it('jumps to the first and last tab with Home and End', async () => {
+    render(AppShell)
+
+    const kanbanTab = screen.getByRole('tab', { name: 'Kanban' })
+    const listTab = screen.getByRole('tab', { name: 'List' })
+
+    kanbanTab.focus()
+    await fireEvent.keyDown(kanbanTab, { key: 'End' })
+
+    expect(document.activeElement).toBe(listTab)
+    expect(listTab.getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('tabpanel').getAttribute('data-view')).toBe('list')
+
+    await fireEvent.keyDown(listTab, { key: 'Home' })
+
+    expect(document.activeElement).toBe(kanbanTab)
+    expect(kanbanTab.getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('tabpanel').getAttribute('data-view')).toBe('kanban')
+  })
+
+  it('leaves the tablist alone on a key it does not handle', async () => {
+    render(AppShell)
+
+    const kanbanTab = screen.getByRole('tab', { name: 'Kanban' })
+    kanbanTab.focus()
+
+    await fireEvent.keyDown(kanbanTab, { key: 'ArrowDown' })
+    await fireEvent.keyDown(kanbanTab, { key: 'a' })
+
+    expect(document.activeElement).toBe(kanbanTab)
+    expect(kanbanTab.getAttribute('aria-selected')).toBe('true')
+    expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
+    expect(screen.getByRole('tabpanel').getAttribute('data-view')).toBe('kanban')
+  })
+
   it('links the active tab to its panel for assistive technology', async () => {
     render(AppShell)
 
@@ -60,16 +95,47 @@ describe('AppShell', () => {
     expect(panel.getAttribute('aria-labelledby')).toBe(listTab.id)
   })
 
-  it('keeps only the active tab in the keyboard tab order', async () => {
+  it('moves right to List, focusing and selecting it while updating the panel', async () => {
     render(AppShell)
 
-    expect(screen.getByRole('tab', { name: 'Kanban' }).getAttribute('tabindex')).toBe('0')
-    expect(screen.getByRole('tab', { name: 'List' }).getAttribute('tabindex')).toBe('-1')
+    const kanbanTab = screen.getByRole('tab', { name: 'Kanban' })
+    kanbanTab.focus()
 
-    await fireEvent.click(screen.getByRole('tab', { name: 'List' }))
+    await fireEvent.keyDown(kanbanTab, { key: 'ArrowRight' })
 
-    expect(screen.getByRole('tab', { name: 'Kanban' }).getAttribute('tabindex')).toBe('-1')
-    expect(screen.getByRole('tab', { name: 'List' }).getAttribute('tabindex')).toBe('0')
+    const listTab = screen.getByRole('tab', { name: 'List' })
+    expect(document.activeElement).toBe(listTab)
+    expect(kanbanTab.getAttribute('aria-selected')).toBe('false')
+    expect(kanbanTab.getAttribute('tabindex')).toBe('-1')
+    expect(listTab.getAttribute('aria-selected')).toBe('true')
+    expect(listTab.getAttribute('tabindex')).toBe('0')
+    expect(screen.getByRole('tabpanel').getAttribute('data-view')).toBe('list')
+    expect(screen.getByRole('tabpanel').textContent).toContain('List canvas')
+  })
+
+  it('moves left to Kanban and wraps in both directions', async () => {
+    render(AppShell)
+
+    const kanbanTab = screen.getByRole('tab', { name: 'Kanban' })
+    const listTab = screen.getByRole('tab', { name: 'List' })
+
+    kanbanTab.focus()
+    await fireEvent.keyDown(kanbanTab, { key: 'ArrowLeft' })
+
+    expect(document.activeElement).toBe(listTab)
+    expect(listTab.getAttribute('aria-selected')).toBe('true')
+    expect(listTab.getAttribute('tabindex')).toBe('0')
+    expect(screen.getByRole('tabpanel').getAttribute('data-view')).toBe('list')
+
+    await fireEvent.keyDown(listTab, { key: 'ArrowRight' })
+
+    expect(document.activeElement).toBe(kanbanTab)
+    expect(kanbanTab.getAttribute('aria-selected')).toBe('true')
+    expect(kanbanTab.getAttribute('tabindex')).toBe('0')
+    expect(listTab.getAttribute('aria-selected')).toBe('false')
+    expect(listTab.getAttribute('tabindex')).toBe('-1')
+    expect(screen.getByRole('tabpanel').getAttribute('data-view')).toBe('kanban')
+    expect(screen.getByRole('tabpanel').textContent).toContain('Kanban canvas')
   })
 })
 

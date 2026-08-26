@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 import {
   WORKPLACE_VIEWS,
   WORKPLACE_VIEW_LABELS,
@@ -14,9 +14,50 @@ const props = defineProps<{
 
 const activeView = ref<WorkplaceView>(resolveWorkplaceView(props.initialView))
 const activeLabel = computed(() => WORKPLACE_VIEW_LABELS[activeView.value])
+const tabRefs = useTemplateRef<HTMLButtonElement[]>('tabs')
 
 function selectView(view: WorkplaceView): void {
   activeView.value = view
+}
+
+function focusTab(index: number): void {
+  tabRefs.value?.[index]?.focus()
+}
+
+function moveToTab(index: number): void {
+  const view = WORKPLACE_VIEWS[index]
+
+  if (view === undefined) {
+    return
+  }
+
+  selectView(view)
+  focusTab(index)
+}
+
+function onTabKeydown(event: KeyboardEvent, index: number): void {
+  const last = WORKPLACE_VIEWS.length - 1
+
+  switch (event.key) {
+    case 'ArrowRight':
+      event.preventDefault()
+      moveToTab(index === last ? 0 : index + 1)
+      break
+    case 'ArrowLeft':
+      event.preventDefault()
+      moveToTab(index === 0 ? last : index - 1)
+      break
+    case 'Home':
+      event.preventDefault()
+      moveToTab(0)
+      break
+    case 'End':
+      event.preventDefault()
+      moveToTab(last)
+      break
+    default:
+      break
+  }
 }
 </script>
 
@@ -59,9 +100,10 @@ function selectView(view: WorkplaceView): void {
           aria-label="Board views"
         >
           <button
-            v-for="view in WORKPLACE_VIEWS"
+            v-for="(view, index) in WORKPLACE_VIEWS"
             :id="`view-tab-${view}`"
             :key="view"
+            ref="tabs"
             class="app-shell__tab"
             type="button"
             role="tab"
@@ -69,6 +111,7 @@ function selectView(view: WorkplaceView): void {
             :aria-selected="activeView === view"
             :tabindex="activeView === view ? 0 : -1"
             @click="selectView(view)"
+            @keydown="onTabKeydown($event, index)"
           >
             {{ WORKPLACE_VIEW_LABELS[view] }}
           </button>
