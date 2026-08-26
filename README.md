@@ -82,23 +82,51 @@ platform; this repository must not invent a second source of truth.
 Work is **UI-first**. The useful surface is proven against realistic mock
 Colony data before the PostgreSQL model and HTTP contract are frozen.
 
-[Vikunja](https://github.com/go-vikunja/vikunja) is the current frontend
-extraction candidate: Kanban, list and detail already exist, and it is
-AGPL-3.0-or-later. The Colony will **not** adopt Vikunja's Go backend or its
-data model. Inherited data access will sit behind `TaskGateway`. If that
-extraction fails the kill question below, the validated journeys stay and only
-the thin workplace surface is rebuilt.
+The workplace is **original Vue 3 + TypeScript code**, written in this
+repository. It is informed by [Vikunja](https://github.com/go-vikunja/vikunja)'s
+**information architecture and visual density** — how much work state one
+screen carries, and how list, board and detail relate — and by nothing else.
+Vikunja is read for shape; **no Vikunja source file, stylesheet, class name,
+icon or asset is copied into this repository.**
 
-```text
-Can the useful Vikunja UI survive behind a Colony-owned adapter
-without retaining Vikunja's backend model?
+Extracting Vikunja's frontend was considered and answered **No-Go** on
+2026-08-25. Its Kanban, list and detail components import Pinia stores, HTTP
+services, `vue-router`, `vue-i18n` and a 35-field `ITask`; they are not
+adapter-shaped, and extracting them would carry a permanent attribution
+obligation for no benefit. That spike is closed
+([#1](https://github.com/Kolonie-AI/kolonie-workplace/issues/1)), the question
+is settled, and it is not reopened by copying "just one card component". The
+decision record is
+[`human-workplace-form.md`](https://github.com/Kolonie-AI/kolonie-concept-lab/blob/main/concepts/human-workplace-form.md)
+in `kolonie-concept-lab`; `AGENTS.md` §5 is the binding statement.
+
+Colony data still reaches the UI through a typed `TaskGateway` anti-corruption
+layer, backed by a mock adapter first and a generated API client once the
+platform contract exists.
+
+## Running it
+
+Node 22 or newer.
+
+```sh
+npm ci           # install exactly what package-lock.json pins
+npm run lint     # ESLint over TypeScript and Vue single-file components
+npm run typecheck # vue-tsc, no emit
+npm test         # Vitest, single run
+npm run build    # type-check the app, then produce dist/
 ```
+
+`npm run dev` starts the Vite dev server, and `npm run preview` serves a
+finished build.
 
 ## Status
 
-This repository is a **bootstrap**. There is no application code here yet, and
-that is deliberate. The first implementation work will be specified as GitHub
-issues in this repository and carried by a coding agent.
+The application is **bootstrapped**: Vite, Vue 3, TypeScript, ESLint and
+Vitest are wired up, and one route renders a placeholder heading. Nothing is
+designed yet. Sidebar, board, list, detail pane and login each arrive as their
+own issue in the first-cut package
+([#12](https://github.com/Kolonie-AI/kolonie-workplace/issues/12)), so every
+one of them is a small, separately reviewable diff.
 
 Open work lives in [this repository's issues](https://github.com/Kolonie-AI/kolonie-workplace/issues).
 Those issues are **not** on the Colony-wide [project board](https://github.com/orgs/Kolonie-AI/projects/1)
@@ -113,11 +141,22 @@ kolonie-workplace/
   CONTRIBUTING.md     issue-first contribution path
   LICENSE             AGPL-3.0-or-later
   NOTICE              copyright and attribution
+  index.html          Vite entry document
+  package.json        manifest and the four check commands
+  vite.config.ts      build and Vitest configuration
+  tsconfig.json       TypeScript for the app and its tests
+  tsconfig.build.json the build's stricter view, without test files
+  eslint.config.ts    flat ESLint config
+  src/
+    main.ts           browser entry; mounts into #app
+    mount.ts          the mount function, which refuses a missing target
+    App.vue           the placeholder route
+    *.test.ts         Vitest specs beside what they cover
 ```
 
-Application directories will appear when the first implementation issue lands.
-Do not add a Vue tree, a Vikunja import or a package manifest until an issue
-asks for that spike.
+Directories for components, domain types and the gateway appear as the issues
+that need them land. Application code arrives only through an issue that asks
+for it, and **no Vikunja source is ever imported** — see `AGENTS.md` §3 and §5.
 
 ## Contributing
 
