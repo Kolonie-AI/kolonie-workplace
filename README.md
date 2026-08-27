@@ -82,21 +82,24 @@ platform; this repository must not invent a second source of truth.
 Work is **UI-first**. The useful surface is proven against realistic mock
 Colony data before the PostgreSQL model and HTTP contract are frozen.
 
-The workplace is **original Vue 3 + TypeScript code**, written in this
-repository. It is informed by [Vikunja](https://github.com/go-vikunja/vikunja)'s
-**information architecture and visual density** — how much work state one
-screen carries, and how list, board and detail relate — and by nothing else.
-Vikunja is read for shape; **no Vikunja source file, stylesheet, class name,
-icon or asset is copied into this repository.**
+The workplace is a **Vue 3 + TypeScript** application. Most of it is written
+here, and since 2026-08-27 some of it may come from
+[Vikunja](https://github.com/go-vikunja/vikunja): this repository is
+AGPL-3.0-or-later and so is Vikunja, so **its source may be copied or adapted
+with attribution** where that is cheaper and clearer than rebuilding it. Every
+imported or adapted file keeps its upstream copyright and licence header, and
+[NOTICE](NOTICE) records the pinned upstream release, commit and paths.
 
-Extracting Vikunja's frontend was considered and answered **No-Go** on
-2026-08-25. Its Kanban, list and detail components import Pinia stores, HTTP
-services, `vue-router`, `vue-i18n` and a 35-field `ITask`; they are not
-adapter-shaped, and extracting them would carry a permanent attribution
-obligation for no benefit. That spike is closed
-([#1](https://github.com/Kolonie-AI/kolonie-workplace/issues/1)), the question
-is settled, and it is not reopened by copying "just one card component". The
-decision record is
+What that permission does *not* cover is a fork. A 2026-08-25 read of
+Vikunja's frontend found its Kanban, list and detail components importing
+Pinia stores, HTTP services, `vue-router`, `vue-i18n` and a 35-field `ITask`,
+and that measurement still holds. Copying the tree wholesale would drag that
+architecture across the `TaskGateway` seam this repository exists to keep, so
+reuse is per surface and named by the issue that asks for it: take the
+presentation, leave the store, and adapt against Colony types where the two
+cannot be separated. The Colony domain never comes from `ITask`.
+
+The decision record is
 [`human-workplace-form.md`](https://github.com/Kolonie-AI/kolonie-concept-lab/blob/main/concepts/human-workplace-form.md)
 in `kolonie-concept-lab`; `AGENTS.md` §5 is the binding statement.
 
@@ -221,7 +224,8 @@ kolonie-workplace/
 
 Directories for components, domain types and the gateway appear as the issues
 that need them land. Application code arrives only through an issue that asks
-for it, and **no Vikunja source is ever imported** — see `AGENTS.md` §3 and §5.
+for it, and imported or adapted Vikunja source keeps its upstream notices and
+is listed in `NOTICE` — see `AGENTS.md` §3 and §5.
 
 ## Contributing
 
