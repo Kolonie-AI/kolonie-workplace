@@ -13,7 +13,28 @@ COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
 COPY . .
-RUN npm run build
+
+# The Auth0 SPA configuration from #2 is read by Vite while this stage runs, so
+# it has to arrive here and nowhere else. The three `ARG`s are declared inside
+# the build stage rather than before the first `FROM`, because an argument
+# declared there would be global and reachable from the runtime stage.
+#
+# There is deliberately no default. Without them `npm run build` still succeeds
+# and produces a bundle carrying the `MissingAuth0Configuration` refusal, which
+# throws before the application mounts — a green build and a dead page, which is
+# the failure #38 exists to remove.
+ARG VITE_AUTH0_DOMAIN
+ARG VITE_AUTH0_CLIENT_ID
+ARG VITE_AUTH0_CALLBACK
+
+# `${NAME:?message}` is what moves that refusal from the browser to here: an
+# unset or empty argument fails this `RUN` before `npm run build` is reached,
+# and a failed stage produces no image to tag or push. `:` expands its operands
+# and prints nothing, so a configured value never enters the build log.
+RUN : "${VITE_AUTH0_DOMAIN:?VITE_AUTH0_DOMAIN is required to build the workplace}" \
+    && : "${VITE_AUTH0_CLIENT_ID:?VITE_AUTH0_CLIENT_ID is required to build the workplace}" \
+    && : "${VITE_AUTH0_CALLBACK:?VITE_AUTH0_CALLBACK is required to build the workplace}" \
+    && npm run build
 
 FROM nginx:1.29-alpine AS runtime
 

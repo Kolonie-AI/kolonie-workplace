@@ -126,9 +126,21 @@ The workplace builds into a two-stage image: Node 22 produces `dist/`, and
 bundle and `nginx.conf`, and no `node_modules` or build toolchain.
 
 ```sh
-docker build -t kolonie-workplace:local .
+# The values are deployment configuration; source them privately rather than
+# putting them in shell history.
+docker build \
+  --build-arg VITE_AUTH0_DOMAIN \
+  --build-arg VITE_AUTH0_CLIENT_ID \
+  --build-arg VITE_AUTH0_CALLBACK \
+  -t kolonie-workplace:local .
 docker run --rm -p 8080:80 kolonie-workplace:local
 ```
+
+All three build arguments are required and are consumed by Vite in the build
+stage. An unset or empty value stops the build before the application bundle is
+created. They are not runtime environment variables or image labels, and the
+nginx stage receives only the finished bundle. The workplace is a public PKCE
+client, so there is no Auth0 client secret.
 
 - `/` serves the application.
 - `/health` returns 200 and the body `ok` — its own exact-match location, so a
