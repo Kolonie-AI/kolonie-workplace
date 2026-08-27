@@ -150,6 +150,77 @@
   content: "";
 }
 
+.app-shell__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-block-end: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.app-shell__filter-lanes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.app-shell__filter-lane,
+.app-shell__filter-clear {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-small);
+}
+
+.app-shell__filter-lane:hover,
+.app-shell__filter-clear:hover,
+.app-shell__filter-lane[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.app-shell__filter-lane:focus-visible,
+.app-shell__filter-clear:focus-visible,
+.app-shell__filter-owner:focus-visible,
+.app-shell__filter-search:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.app-shell__filter-field {
+  display: grid;
+  gap: var(--space-1);
+  min-inline-size: 10rem;
+}
+
+.app-shell__filter-label {
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  font-weight: 600;
+}
+
+.app-shell__filter-owner,
+.app-shell__filter-search {
+  min-block-size: 2.25rem;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  background: var(--color-canvas);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.app-shell__filter-clear {
+  margin-inline-start: auto;
+}
+
 .app-shell__main {
   min-inline-size: 0;
   overflow: auto;
@@ -204,8 +275,13 @@
 
   .app-shell__topbar,
   .app-shell__board-header,
+  .app-shell__filters,
   .app-shell__main {
     padding-inline: var(--space-4);
+  }
+
+  .app-shell__filter-clear {
+    margin-inline-start: 0;
   }
 
   .app-shell__board-area[data-detail-open="true"] {

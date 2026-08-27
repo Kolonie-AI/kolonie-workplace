@@ -2,6 +2,7 @@ import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import type { Lane } from '@/domain/lanes'
 import type { BoardId, HumanId, WorkItemId, WorkItemSummary } from '@/domain/workplace'
 import type { TaskGateway } from '@/gateway/task-gateway'
+import { applyBoardFilter, EMPTY_BOARD_FILTER, type BoardFilter } from '@/items/board-filter'
 import {
   partitionIntoLanes,
   type InvalidLaneItem,
@@ -37,7 +38,9 @@ export interface BoardItems {
   readonly rows: ComputedRef<readonly ListRow[]>
   readonly invalid: ComputedRef<readonly InvalidLaneItem[]>
   readonly foreign: ComputedRef<readonly WorkItemSummary[]>
+  readonly loadedItems: ComputedRef<readonly WorkItemSummary[]>
   readonly isBoardEmpty: ComputedRef<boolean>
+  readonly isFilterEmpty: ComputedRef<boolean>
   readonly selectedItemId: Readonly<Ref<WorkItemId | null>>
   readonly movingItemId: Readonly<Ref<WorkItemId | null>>
   readonly moveError: Readonly<Ref<string | null>>
@@ -50,6 +53,7 @@ export function useBoardItems(
   gateway: TaskGateway,
   humanId: Readonly<Ref<HumanId | null>>,
   activeBoardId: Readonly<Ref<BoardId | null>>,
+  boardFilter: Readonly<Ref<BoardFilter>> = ref(EMPTY_BOARD_FILTER),
 ): BoardItems {
   const status = ref<BoardItemsStatus>('idle')
   const loaded = ref<readonly WorkItemSummary[]>([])
@@ -95,7 +99,8 @@ export function useBoardItems(
 
   watch([humanId, activeBoardId], () => void load(), { immediate: true })
 
-  const partition = computed(() => partitionIntoLanes(loaded.value))
+  const filtered = computed(() => applyBoardFilter(loaded.value, boardFilter.value))
+  const partition = computed(() => partitionIntoLanes(filtered.value))
 
   return {
     status,
@@ -103,8 +108,15 @@ export function useBoardItems(
     rows: computed(() => orderForList(partition.value.columns)),
     invalid: computed(() => partition.value.invalid),
     foreign: computed(() => foreign.value),
+    loadedItems: computed(() => loaded.value),
     isBoardEmpty: computed(
       () => status.value === 'ready' && loaded.value.length === 0,
+    ),
+    isFilterEmpty: computed(
+      () =>
+        status.value === 'ready' &&
+        loaded.value.length > 0 &&
+        filtered.value.length === 0,
     ),
     selectedItemId,
     movingItemId,

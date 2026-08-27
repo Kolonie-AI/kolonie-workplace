@@ -7,11 +7,20 @@ import {
   type WorkplaceView,
 } from '@/shell/views'
 import type { BoardId } from '@/domain/workplace'
+import { WORKPLACE_LANES, WORKPLACE_LANE_LABELS, type Lane } from '@/domain/lanes'
 import BoardList from '@/boards/BoardList.vue'
 import { useBoardList } from '@/boards/use-board-list'
 import KanbanBoard from '@/kanban/KanbanBoard.vue'
 import ListView from '@/list/ListView.vue'
 import { useBoardItems } from '@/items/use-board-items'
+import {
+  EMPTY_BOARD_FILTER,
+  isBoardFilterActive,
+  ownersOf,
+  parseBoardFilter,
+  withBoardFilterInQuery,
+  type BoardFilter,
+} from '@/items/board-filter'
 import DetailPane from '@/detail/DetailPane.vue'
 import { useItemDetail } from '@/detail/use-item-detail'
 import { useTaskGateway } from '@/gateway/provide-gateway'
@@ -23,6 +32,7 @@ import '@/shell/app-shell.css'
 const props = defineProps<{
   initialView?: unknown
   initialBoardId?: BoardId
+  initialQuery?: string
 }>()
 
 const activeView = ref<WorkplaceView>(resolveWorkplaceView(props.initialView))
@@ -34,8 +44,72 @@ const gateway = useTaskGateway()
 const showsPreviewData = isPreviewDataGateway(gateway)
 const boardList = useBoardList(gateway, humanId)
 const activeBoardId = computed(() => boardList.activeBoard.value?.id ?? null)
-const items = useBoardItems(gateway, humanId, activeBoardId)
+
+/**
+ * The filter is read from the URL once and written back to it as it changes,
+ * so a filtered board can be shared or bookmarked. It is browser state over one
+ * already-loaded board: nothing about it reaches the gateway, and nothing about
+ * it is saved anywhere.
+ */
+const boardFilter = ref<BoardFilter>(
+  parseBoardFilter(props.initialQuery ?? window.location.search),
+)
+const items = useBoardItems(gateway, humanId, activeBoardId, boardFilter)
 const detail = useItemDetail(gateway, humanId, items.selectedItemId)
+
+const filterOwners = computed(() => ownersOf(items.loadedItems.value))
+const isFiltered = computed(() => isBoardFilterActive(boardFilter.value))
+
+watch(
+  [activeBoardId, items.status, filterOwners],
+  ([boardId, status, owners]) => {
+    if (
+      boardId !== null &&
+      status === 'ready' &&
+      boardFilter.value.owner !== '' &&
+      !owners.includes(boardFilter.value.owner)
+    ) {
+      setOwner('')
+    }
+  },
+)
+
+watch(
+  boardFilter,
+  (filter) => {
+    const query = withBoardFilterInQuery(window.location.search, filter)
+
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `${window.location.pathname}${query}${window.location.hash}`,
+    )
+  },
+  { deep: true, immediate: true },
+)
+
+function toggleLane(lane: Lane): void {
+  const lanes = boardFilter.value.lanes
+
+  boardFilter.value = {
+    ...boardFilter.value,
+    lanes: lanes.includes(lane)
+      ? lanes.filter((candidate) => candidate !== lane)
+      : [...lanes, lane],
+  }
+}
+
+function setOwner(owner: string): void {
+  boardFilter.value = { ...boardFilter.value, owner }
+}
+
+function setSearch(search: string): void {
+  boardFilter.value = { ...boardFilter.value, search }
+}
+
+function clearFilter(): void {
+  boardFilter.value = EMPTY_BOARD_FILTER
+}
 
 watch(
   () => boardList.status.value,
@@ -159,6 +233,71 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
         </div>
       </header>
 
+      <section
+        v-if="boardList.activeBoard.value !== null"
+        class="app-shell__filters"
+        data-testid="board-filters"
+        aria-label="Filter this board"
+      >
+        <div
+          class="app-shell__filter-lanes"
+          role="group"
+          aria-label="Filter by lane"
+        >
+          <button
+            v-for="lane in WORKPLACE_LANES"
+            :key="lane"
+            class="app-shell__filter-lane"
+            type="button"
+            :data-testid="`filter-lane-${lane}`"
+            :aria-pressed="boardFilter.lanes.includes(lane)"
+            @click="toggleLane(lane)"
+          >
+            {{ WORKPLACE_LANE_LABELS[lane] }}
+          </button>
+        </div>
+
+        <label class="app-shell__filter-field">
+          <span class="app-shell__filter-label">Owner</span>
+          <select
+            class="app-shell__filter-owner"
+            data-testid="filter-owner"
+            :value="boardFilter.owner"
+            @change="setOwner(($event.target as HTMLSelectElement).value)"
+          >
+            <option value="">Every owner</option>
+            <option
+              v-for="owner in filterOwners"
+              :key="owner"
+              :value="owner"
+            >
+              {{ owner }}
+            </option>
+          </select>
+        </label>
+
+        <label class="app-shell__filter-field">
+          <span class="app-shell__filter-label">Search titles</span>
+          <input
+            class="app-shell__filter-search"
+            data-testid="filter-search"
+            type="search"
+            :value="boardFilter.search"
+            @input="setSearch(($event.target as HTMLInputElement).value)"
+          >
+        </label>
+
+        <button
+          v-if="isFiltered"
+          class="app-shell__filter-clear"
+          type="button"
+          data-testid="filter-clear"
+          @click="clearFilter"
+        >
+          Clear all filters
+        </button>
+      </section>
+
       <main class="app-shell__main">
         <p
           v-if="boardList.refusal.value !== null"
@@ -210,6 +349,7 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
               :columns="items.columns.value"
               :invalid="items.invalid.value"
               :is-board-empty="items.isBoardEmpty.value"
+              :is-filter-empty="items.isFilterEmpty.value"
               :selected-item-id="items.selectedItemId.value"
               :moving-item-id="items.movingItemId.value"
               :move-error="items.moveError.value"
@@ -223,6 +363,7 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
               :rows="items.rows.value"
               :invalid="items.invalid.value"
               :is-board-empty="items.isBoardEmpty.value"
+              :is-filter-empty="items.isFilterEmpty.value"
               :selected-item-id="items.selectedItemId.value"
               :moving-item-id="items.movingItemId.value"
               :move-error="items.moveError.value"

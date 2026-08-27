@@ -146,14 +146,14 @@ describe('list view — read-only, with no controls', () => {
     })
 
     expect(screen.queryByRole('button', { name: /sort/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /filter/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /column/i })).toBeNull()
-    expect(screen.queryByRole('searchbox')).toBeNull()
+    const view = screen.getByTestId('list-view')
+    expect(within(view).queryByRole('searchbox')).toBeNull()
     expect(screen.getAllByLabelText('Move to lane')).toHaveLength(6)
   })
 
   it('offers no inline edit, completion checkbox or create-row affordance', async () => {
-    const { container } = await renderList(
+    await renderList(
       FIXTURE_HUMANS.wren,
       FIXTURE_BOARDS.quillDelivery,
     )
@@ -162,13 +162,14 @@ describe('list view — read-only, with no controls', () => {
       expect(rowIds()).toHaveLength(6)
     })
 
-    expect(screen.queryByRole('checkbox')).toBeNull()
-    expect(screen.queryByRole('button', { name: /add (a )?(row|task|item)/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /create|new/i })).toBeNull()
-    expect(container.querySelector('input')).toBeNull()
-    expect(container.querySelector('textarea')).toBeNull()
-    expect(container.querySelector('[contenteditable]')).toBeNull()
-    expect(container.querySelector('[draggable]')).toBeNull()
+    const view = screen.getByTestId('list-view')
+    expect(within(view).queryByRole('checkbox')).toBeNull()
+    expect(within(view).queryByRole('button', { name: /add (a )?(row|task|item)/i })).toBeNull()
+    expect(within(view).queryByRole('button', { name: /create|new/i })).toBeNull()
+    expect(view.querySelector('input')).toBeNull()
+    expect(view.querySelector('textarea')).toBeNull()
+    expect(view.querySelector('[contenteditable]')).toBeNull()
+    expect(view.querySelector('[draggable]')).toBeNull()
   })
 })
 

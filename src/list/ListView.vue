@@ -24,6 +24,7 @@ defineProps<{
   rows: readonly ListRowModel[]
   invalid: readonly InvalidLaneItem[]
   isBoardEmpty: boolean
+  isFilterEmpty: boolean
   selectedItemId: WorkItemId | null
   movingItemId: WorkItemId | null
   moveError: string | null
@@ -104,6 +105,15 @@ function onRowMove(itemId: WorkItemId, lane: Lane): void {
       >
         This board holds no work items yet. The list is empty because the board
         is empty, not because something was filtered out of it.
+      </p>
+
+      <p
+        v-else-if="isFilterEmpty"
+        class="list-view__state"
+        data-testid="list-no-match"
+      >
+        No work item matches this filter. The board holds work — the filter is
+        hiding it, so widening or clearing the filter brings it back.
       </p>
 
       <ol
