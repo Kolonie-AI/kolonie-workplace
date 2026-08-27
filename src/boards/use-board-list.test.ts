@@ -150,13 +150,16 @@ describe('useBoardList — selecting a board', () => {
     expect(list.refusal.value).toMatch(/not available/i)
   })
 
-  it('keeps the previously active board rather than replacing it with a refused one', async () => {
+  it('rejection case: a refused selection clears the board that was active', async () => {
     const list = await settled(FIXTURE_HUMANS.wren)
 
     await list.selectBoard(FIXTURE_BOARDS.quillDelivery)
+    expect(list.activeBoard.value?.id).toBe(FIXTURE_BOARDS.quillDelivery)
+
     await list.selectBoard(FIXTURE_BOARDS.marlowOutreach)
 
-    expect(list.activeBoard.value?.id).toBe(FIXTURE_BOARDS.quillDelivery)
+    expect(list.activeBoard.value).toBeNull()
+    expect(list.selectionFailure.value).toBe('refused')
     expect(list.refusal.value).toMatch(/not available/i)
   })
 
@@ -311,8 +314,7 @@ describe('useBoardList — a read failure is not a permission refusal', () => {
     await list.selectBoard(FIXTURE_BOARDS.birchResearch)
 
     expect(list.selectionFailure.value).toBe('unreadable')
-    expect(list.activeBoard.value?.id).toBe(FIXTURE_BOARDS.quillDelivery)
-    expect(list.activeBoard.value?.id).not.toBe(FIXTURE_BOARDS.birchResearch)
+    expect(list.activeBoard.value).toBeNull()
   })
 
   it('clears an earlier read failure once a board reads successfully', async () => {
@@ -351,5 +353,134 @@ describe('useBoardList — a read failure is not a permission refusal', () => {
 
     expect(list.selectionFailure.value).toBe('refused')
     expect(list.refusal.value).toMatch(/not available/i)
+  })
+})
+
+describe('useBoardList — a failed selection leaves no board active', () => {
+  function twoBoards(secondCall: Error): TaskGateway {
+    return {
+      listVisibleBoards: vi.fn(async () => [
+        {
+          id: FIXTURE_BOARDS.quillDelivery,
+          agentId: 'fictional-agent-quill',
+          agentName: 'Fictional Agent Quill',
+          title: 'Fictional Quill Delivery',
+        },
+        {
+          id: FIXTURE_BOARDS.birchResearch,
+          agentId: 'fictional-agent-birch',
+          agentName: 'Fictional Agent Birch',
+          title: 'Fictional Birch Research',
+        },
+      ]),
+      getBoardItems: vi.fn().mockResolvedValueOnce([]).mockRejectedValue(secondCall),
+      getItemDetail: vi.fn(),
+    }
+  }
+
+  it('rejection case: a refusal after a successful board clears the active one', async () => {
+    const list = await settled(
+      FIXTURE_HUMANS.wren,
+      twoBoards(new BoardAccessRefused(FIXTURE_BOARDS.birchResearch)),
+    )
+
+    await list.selectBoard(FIXTURE_BOARDS.quillDelivery)
+    expect(list.activeBoard.value?.id).toBe(FIXTURE_BOARDS.quillDelivery)
+
+    await list.selectBoard(FIXTURE_BOARDS.birchResearch)
+
+    expect(list.activeBoard.value).toBeNull()
+    expect(list.selectionFailure.value).toBe('refused')
+    expect(list.refusal.value).toMatch(/not available/i)
+  })
+
+  it('rejection case: a plain read failure after a successful board clears it too', async () => {
+    const list = await settled(
+      FIXTURE_HUMANS.wren,
+      twoBoards(new Error('Kolonie Workplace: the board items could not be read.')),
+    )
+
+    await list.selectBoard(FIXTURE_BOARDS.quillDelivery)
+    expect(list.activeBoard.value?.id).toBe(FIXTURE_BOARDS.quillDelivery)
+
+    await list.selectBoard(FIXTURE_BOARDS.birchResearch)
+
+    expect(list.activeBoard.value).toBeNull()
+    expect(list.selectionFailure.value).toBe('unreadable')
+    expect(list.refusal.value).toBeNull()
+  })
+
+  it('recovers fully when a later selection succeeds after a refusal', async () => {
+    const gateway: TaskGateway = {
+      listVisibleBoards: vi.fn(async () => [
+        {
+          id: FIXTURE_BOARDS.quillDelivery,
+          agentId: 'fictional-agent-quill',
+          agentName: 'Fictional Agent Quill',
+          title: 'Fictional Quill Delivery',
+        },
+        {
+          id: FIXTURE_BOARDS.birchResearch,
+          agentId: 'fictional-agent-birch',
+          agentName: 'Fictional Agent Birch',
+          title: 'Fictional Birch Research',
+        },
+      ]),
+      getBoardItems: vi
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockRejectedValueOnce(new BoardAccessRefused(FIXTURE_BOARDS.birchResearch))
+        .mockResolvedValue([]),
+      getItemDetail: vi.fn(),
+    }
+
+    const list = await settled(FIXTURE_HUMANS.wren, gateway)
+
+    await list.selectBoard(FIXTURE_BOARDS.quillDelivery)
+    await list.selectBoard(FIXTURE_BOARDS.birchResearch)
+    expect(list.activeBoard.value).toBeNull()
+
+    await list.selectBoard(FIXTURE_BOARDS.birchResearch)
+
+    expect(list.activeBoard.value?.id).toBe(FIXTURE_BOARDS.birchResearch)
+    expect(list.selectionFailure.value).toBeNull()
+    expect(list.refusal.value).toBeNull()
+  })
+
+  it('recovers fully when a later selection succeeds after a read failure', async () => {
+    const gateway: TaskGateway = {
+      listVisibleBoards: vi.fn(async () => [
+        {
+          id: FIXTURE_BOARDS.quillDelivery,
+          agentId: 'fictional-agent-quill',
+          agentName: 'Fictional Agent Quill',
+          title: 'Fictional Quill Delivery',
+        },
+        {
+          id: FIXTURE_BOARDS.birchResearch,
+          agentId: 'fictional-agent-birch',
+          agentName: 'Fictional Agent Birch',
+          title: 'Fictional Birch Research',
+        },
+      ]),
+      getBoardItems: vi
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockRejectedValueOnce(new Error('Kolonie Workplace: the read failed.'))
+        .mockResolvedValue([]),
+      getItemDetail: vi.fn(),
+    }
+
+    const list = await settled(FIXTURE_HUMANS.wren, gateway)
+
+    await list.selectBoard(FIXTURE_BOARDS.quillDelivery)
+    await list.selectBoard(FIXTURE_BOARDS.birchResearch)
+    expect(list.activeBoard.value).toBeNull()
+
+    await list.selectBoard(FIXTURE_BOARDS.quillDelivery)
+
+    expect(list.activeBoard.value?.id).toBe(FIXTURE_BOARDS.quillDelivery)
+    expect(list.selectionFailure.value).toBeNull()
+    expect(list.refusal.value).toBeNull()
   })
 })
