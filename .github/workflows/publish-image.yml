@@ -47,6 +47,38 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Before the registry login and before any build, so that a repository
+      # missing one of the three values fails while nothing has been
+      # authenticated and nothing can be pushed. Without this the build would
+      # still refuse (the Dockerfile's `${NAME:?}` guards see to that), but it
+      # would refuse after logging in and after uploading a build context, and
+      # the reason would be buried in a Docker layer log rather than named by a
+      # step whose title says what is wrong.
+      #
+      # The values arrive as `env:` on this step alone. They are tested with
+      # `-z` and never echoed, expanded into a message or written to
+      # `$GITHUB_OUTPUT`: the refusal names the *variable*, which is public, and
+      # never its value. `vars` and not `secrets` because the workplace is a
+      # public PKCE client — there is no client secret for it, on the tenant or
+      # anywhere else — but a tenant host name and a client id are still
+      # deployment configuration that `AGENTS.md` §3 keeps out of the tree.
+      - name: Validate Auth0 build configuration
+        env:
+          VITE_AUTH0_DOMAIN: ${{ vars.VITE_AUTH0_DOMAIN }}
+          VITE_AUTH0_CLIENT_ID: ${{ vars.VITE_AUTH0_CLIENT_ID }}
+          VITE_AUTH0_CALLBACK: ${{ vars.VITE_AUTH0_CALLBACK }}
+        run: |
+          missing=""
+          [ -z "${VITE_AUTH0_DOMAIN}" ] && missing="${missing} VITE_AUTH0_DOMAIN"
+          [ -z "${VITE_AUTH0_CLIENT_ID}" ] && missing="${missing} VITE_AUTH0_CLIENT_ID"
+          [ -z "${VITE_AUTH0_CALLBACK}" ] && missing="${missing} VITE_AUTH0_CALLBACK"
+          if [ -n "${missing}" ]; then
+            echo "::error::Refusing to publish: missing repository variables:${missing}"
+            echo "Set them as Actions repository variables. Values are never printed here."
+            exit 1
+          fi
+          echo "All three Auth0 build variables are configured."
+
       - uses: docker/setup-buildx-action@v4
 
       - uses: docker/login-action@v4
@@ -66,6 +98,18 @@ jobs:
         with:
           context: .
           push: true
+          # The Auth0 SPA configuration, read by Vite while the build stage
+          # runs. `build-args` reach the build stage only; they are not `env:`
+          # on the job, not labels on the image, and nothing writes them into
+          # the nginx runtime — the Dockerfile declares the three `ARG`s inside
+          # the build stage for exactly that reason.
+          #
+          # Buildx does not print a build argument's value, and none of these
+          # is passed to a `RUN` that echoes it.
+          build-args: |
+            VITE_AUTH0_DOMAIN=${{ vars.VITE_AUTH0_DOMAIN }}
+            VITE_AUTH0_CLIENT_ID=${{ vars.VITE_AUTH0_CLIENT_ID }}
+            VITE_AUTH0_CALLBACK=${{ vars.VITE_AUTH0_CALLBACK }}
           # Both tags, and the commit SHA is the one that matters. `latest`
           # moves under whoever pulls it, so infra pins the SHA — or the digest
           # it resolves to — and gets a build that cannot change beneath it.

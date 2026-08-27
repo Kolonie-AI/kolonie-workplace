@@ -13,6 +13,16 @@ const buildStep = workflow.match(
   /uses: docker\/build-push-action@v\d+[\s\S]*?(?=\n {6}- |\n {2}\S|$)/,
 )?.[0]
 
+const validationStep = workflow.match(
+  /- name: Validate Auth0 build configuration[\s\S]*?(?=\n {6}- |\n {2}\S|$)/,
+)?.[0]
+
+const AUTH0_VARIABLES = [
+  'VITE_AUTH0_DOMAIN',
+  'VITE_AUTH0_CLIENT_ID',
+  'VITE_AUTH0_CALLBACK',
+] as const
+
 describe('publish workflow — when it runs', () => {
   it('runs on a push to main and on nothing else', () => {
     expect(workflow).toMatch(/on:\s*\n\s+push:\s*\n\s+branches:\s*\[main\]/)
@@ -60,6 +70,40 @@ describe('publish workflow — what it publishes', () => {
   it('reuses build layers so a content-only commit does not rebuild the toolchain', () => {
     expect(buildStep).toContain('cache-from: type=gha')
     expect(buildStep).toContain('cache-to: type=gha,mode=max')
+  })
+})
+
+describe('publish workflow — Auth0 build configuration', () => {
+  it('passes all required repository variables as build arguments', () => {
+    expect(buildStep).toBeDefined()
+
+    for (const name of AUTH0_VARIABLES) {
+      expect(buildStep).toContain(`${name}=\${{ vars.${name} }}`)
+    }
+  })
+
+  it('validates every required variable before login and push', () => {
+    expect(validationStep).toBeDefined()
+
+    const validation = workflow.indexOf('- name: Validate Auth0 build configuration')
+    const login = workflow.indexOf('uses: docker/login-action')
+    const build = workflow.indexOf('uses: docker/build-push-action')
+
+    expect(validation).toBeGreaterThan(-1)
+    expect(validation).toBeLessThan(login)
+    expect(validation).toBeLessThan(build)
+
+    for (const name of AUTH0_VARIABLES) {
+      expect(validationStep).toContain(`${name}: \${{ vars.${name} }}`)
+      expect(validationStep).toContain(`-z "\${${name}}"`)
+    }
+  })
+
+  it('does not copy build configuration into workflow-wide or runtime environment', () => {
+    const globalEnvironment = workflow.match(/\nenv:\s*\n[\s\S]*?(?=\n\S)/)?.[0] ?? ''
+
+    expect(globalEnvironment).not.toContain('VITE_AUTH0_')
+    expect(workflow).not.toMatch(/labels:[\s\S]*VITE_AUTH0_/)
   })
 })
 

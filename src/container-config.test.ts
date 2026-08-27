@@ -44,6 +44,30 @@ describe('container configuration — the runtime image carries no toolchain', (
     expect(sources).toBeGreaterThan(manifests)
   })
 
+  it('requires every Auth0 value before building the application', () => {
+    const buildStage = dockerfile.slice(0, dockerfile.indexOf('FROM nginx:1.29-alpine AS runtime'))
+    const buildCommand = buildStage.slice(buildStage.indexOf('\nRUN :'))
+
+    for (const name of [
+      'VITE_AUTH0_DOMAIN',
+      'VITE_AUTH0_CLIENT_ID',
+      'VITE_AUTH0_CALLBACK',
+    ]) {
+      expect(buildStage).toContain(`ARG ${name}`)
+
+      const guard = buildCommand.indexOf(`${name}:?${name} is required`)
+
+      expect(guard).toBeGreaterThan(-1)
+      expect(guard).toBeLessThan(buildCommand.indexOf('npm run build'))
+    }
+  })
+
+  it('keeps Auth0 build arguments out of the runtime stage', () => {
+    const runtimeStage = dockerfile.slice(dockerfile.indexOf('FROM nginx:1.29-alpine AS runtime'))
+
+    expect(runtimeStage).not.toMatch(/VITE_AUTH0_|\bARG\b|\bENV\b/)
+  })
+
   it('carries only the built bundle and the config into the runtime stage', () => {
     expect(dockerfile).toContain('COPY --from=build /app/dist /usr/share/nginx/html')
     expect(dockerfile).toContain('COPY nginx.conf /etc/nginx/conf.d/default.conf')
