@@ -45,4 +45,18 @@ Imported or adapted from Vikunja:
       frontend/src/components/home/MenuButton.vue
       frontend/src/components/home/AppHeader.vue
 
+  src/kanban/KanbanCard.vue
+    adapted from
+      frontend/src/components/tasks/partials/KanbanCard.vue
+      frontend/src/components/tasks/partials/Labels.vue
+      frontend/src/components/tasks/partials/Label.vue
+      frontend/src/components/tasks/partials/AssigneeList.vue
+      frontend/src/components/tasks/partials/PriorityLabel.vue
+      frontend/src/components/tasks/partials/ChecklistSummary.vue
+      frontend/src/components/tasks/partials/DateTableCell.vue
+
+  src/kanban/card-facets.ts
+    adapted from
+      frontend/src/helpers/color/colorIsDark.ts
+
 An import that does not add its row here is incomplete, not merely undocumented.

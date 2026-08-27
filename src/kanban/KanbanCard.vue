@@ -1,22 +1,40 @@
 <script setup lang="ts">
+/*
+ * Copyright 2018-present Vikunja and contributors. All rights reserved.
+ * Copyright 2026 Kolonie AI FZ-LLC.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * The card surface — colour stripe, label chips, assignee initials, priority
+ * marker, due-date chip, checklist progress and attachment/comment counts — is
+ * adapted for Kolonie Workplace on 2026-08-27 from Vikunja 2.5.0
+ * (ef2200e9429c5cc42f5c1811433418bfcc72b3aa):
+ *   frontend/src/components/tasks/partials/KanbanCard.vue
+ *   frontend/src/components/tasks/partials/Labels.vue
+ *   frontend/src/components/tasks/partials/Label.vue
+ *   frontend/src/components/tasks/partials/AssigneeList.vue
+ *   frontend/src/components/tasks/partials/PriorityLabel.vue
+ *   frontend/src/components/tasks/partials/ChecklistSummary.vue
+ *   frontend/src/components/tasks/partials/DateTableCell.vue
+ * No Vikunja store, router, i18n or task model is used; data reaches this
+ * component only through TaskGateway.
+ */
 import { computed } from 'vue'
 import { isLane, WORKPLACE_LANE_LABELS, WORKPLACE_LANES, type Lane } from '@/domain/lanes'
 import type { WorkItemSummary } from '@/domain/workplace'
+import {
+  WORK_ITEM_PRIORITY_LABELS,
+  checklistProgress,
+  dueDateState,
+  initialsOf,
+  readableTextOn,
+} from '@/kanban/card-facets'
 
-/**
- * The compact card. It carries a title, an owner and one status marker; a
- * description body, comments, attachments and every other field of a work item
- * belong to the detail pane, which is a separate surface.
- *
- * Clicking the card selects it and writes nothing. The card also has exactly
- * one write: it can be dragged onto another lane, and the labelled lane control
- * beside it does the same thing for anyone not using a pointer. Neither
- * reorders a lane, renames one, or edits any other field of the item.
- */
 const props = defineProps<{
   item: WorkItemSummary
   selected: boolean
   moving: boolean
+  now?: Date
 }>()
 
 const emit = defineEmits<{
@@ -26,6 +44,27 @@ const emit = defineEmits<{
 
 const isBlocked = computed(() => props.item.lane === 'blocked')
 const moveControlId = computed(() => `kanban-move-${props.item.id}`)
+const clock = computed(() => props.now ?? new Date())
+const labels = computed(() => props.item.labels ?? [])
+const assignees = computed(() => props.item.assignees ?? [])
+const checklist = computed(() => props.item.checklist ?? [])
+const comments = computed(() => props.item.comments ?? [])
+const attachments = computed(() => props.item.attachments ?? [])
+const dueState = computed(() => dueDateState(props.item.dueDate ?? null, clock.value))
+const progress = computed(() => checklistProgress(checklist.value))
+const showsPriority = computed(
+  () => props.item.priority !== undefined && props.item.priority !== 'unset',
+)
+const showsCounts = computed(
+  () => comments.value.length > 0 || attachments.value.length > 0,
+)
+
+function labelStyle(colour: string): { background: string; color: string } {
+  return {
+    background: colour,
+    color: readableTextOn(colour),
+  }
+}
 
 function onDragStart(event: DragEvent): void {
   event.dataTransfer?.setData('text/plain', props.item.id)
@@ -54,12 +93,31 @@ function onLaneChange(event: Event): void {
       :data-item-id="item.id"
       :data-blocked="isBlocked ? 'true' : 'false'"
       :data-selected="selected ? 'true' : 'false'"
+      :data-cover-colour="item.coverColour ?? undefined"
       :aria-pressed="selected"
       :aria-busy="moving"
       @click="emit('select', item.id)"
       @dragstart="onDragStart"
     >
+      <span
+        v-if="item.coverColour"
+        class="kanban-card__cover"
+        data-testid="kanban-card-cover"
+        :style="{ background: item.coverColour }"
+      />
       <span class="kanban-card__title">{{ item.title }}</span>
+      <span
+        v-if="labels.length > 0"
+        class="kanban-card__labels"
+      >
+        <span
+          v-for="label in labels"
+          :key="label.id"
+          class="kanban-card__label"
+          data-testid="kanban-card-label"
+          :style="labelStyle(label.colour)"
+        >{{ label.title }}</span>
+      </span>
       <span class="kanban-card__meta">
         <span class="kanban-card__owner">{{ item.owner }}</span>
         <span
@@ -67,6 +125,55 @@ function onLaneChange(event: Event): void {
           class="kanban-card__flag"
           data-testid="kanban-card-blocked"
         >Blocked</span>
+      </span>
+      <span
+        v-if="assignees.length > 0 || showsPriority || dueState !== null || progress !== null || showsCounts"
+        class="kanban-card__footer"
+      >
+        <span
+          v-if="assignees.length > 0"
+          class="kanban-card__assignees"
+        >
+          <span
+            v-for="assignee in assignees"
+            :key="assignee.id"
+            class="kanban-card__assignee"
+            data-testid="kanban-card-assignee"
+            :title="assignee.name"
+          >{{ initialsOf(assignee.name) }}</span>
+        </span>
+        <span
+          v-if="showsPriority"
+          class="kanban-card__priority"
+          data-testid="kanban-card-priority"
+          :data-priority="item.priority"
+        >{{ WORK_ITEM_PRIORITY_LABELS[item.priority] }}</span>
+        <time
+          v-if="dueState !== null && item.dueDate !== null"
+          class="kanban-card__due"
+          data-testid="kanban-card-due"
+          :data-due-state="dueState"
+          :datetime="item.dueDate"
+        >{{ item.dueDate }}</time>
+        <span
+          v-if="progress !== null"
+          class="kanban-card__checklist"
+          data-testid="kanban-card-checklist"
+        >{{ progress.done }}/{{ progress.total }}</span>
+        <span
+          v-if="showsCounts"
+          class="kanban-card__counts"
+          data-testid="kanban-card-counts"
+        >
+          <span
+            v-if="comments.length > 0"
+            class="kanban-card__count"
+          >{{ comments.length }}</span>
+          <span
+            v-if="attachments.length > 0"
+            class="kanban-card__count"
+          >{{ attachments.length }}</span>
+        </span>
       </span>
     </button>
 
