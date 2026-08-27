@@ -32,4 +32,17 @@ Imported or adapted from Vikunja:
       frontend/src/styles/theme/scrollbars.scss
       frontend/src/styles/common-imports.scss
 
+  src/shell/app-shell.css
+    adapted from
+      frontend/src/styles/theme/navigation.scss
+      frontend/src/components/home/Navigation.vue
+      frontend/src/components/home/MenuButton.vue
+      frontend/src/components/home/AppHeader.vue
+
+  src/shell/AppShell.vue
+    adapted from
+      frontend/src/components/home/Navigation.vue
+      frontend/src/components/home/MenuButton.vue
+      frontend/src/components/home/AppHeader.vue
+
 An import that does not add its row here is incomplete, not merely undocumented.
