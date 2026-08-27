@@ -132,14 +132,19 @@ docker buildx build \
   --secret id=auth0_domain,src="$SECRETS_DIR/auth0_domain" \
   --secret id=auth0_client_id,src="$SECRETS_DIR/auth0_client_id" \
   --secret id=auth0_callback,src="$SECRETS_DIR/auth0_callback" \
+  --secret id=preview_identity_provider,src="$SECRETS_DIR/preview_identity_provider" \
+  --secret id=preview_identity_subject,src="$SECRETS_DIR/preview_identity_subject" \
   --provenance=false \
   -t kolonie-workplace:local --load .
 docker run --rm -p 8080:80 kolonie-workplace:local
 ```
 
-All three are required and are read by Vite in the build stage. A missing or
+All five are required and are read by Vite in the build stage. A missing or
 empty value stops the build before any bundle is produced, so an image that
-exists is an image that was configured.
+exists is an image that was configured. Three carry the Auth0 tenant
+configuration (#2); two carry the preview identity mapping (#39), which lets one
+designated account resolve to a fixture human — the boards it then sees stay
+labelled `Example data`.
 
 They are passed as **secret mounts and never as build arguments**. A build
 argument is recorded in the SLSA provenance attached to a published image and is
@@ -148,8 +153,9 @@ the one `RUN` that reads it. They are not runtime environment variables or image
 labels, and the nginx stage receives only the finished bundle. The workplace is a
 public PKCE client, so there is no Auth0 client secret.
 
-In CI the same three values come from Actions **repository secrets** named
-`VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID` and `VITE_AUTH0_CALLBACK`. Secrets
+In CI the same five values come from Actions **repository secrets** named
+`VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_CALLBACK`,
+`VITE_PREVIEW_IDENTITY_PROVIDER` and `VITE_PREVIEW_IDENTITY_SUBJECT`. Secrets
 rather than variables because the runner masks a secret in the public log and
 does not mask a variable — the masking is what is wanted, not a claim that these
 are credentials.

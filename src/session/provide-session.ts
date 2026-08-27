@@ -28,6 +28,12 @@ export interface SessionChoice {
  * The fixture session survives for tests and for the visual work of #11, which
  * inject it directly. What it no longer has is a route into a running
  * application: nothing this function can return lists a human to become.
+ *
+ * The same environment carries the preview identity mapping (#39), which is why
+ * `env` reaches the directory as well as the tenant configuration. Both refuse
+ * loudly and for the same reason: a missing mapping would otherwise mean a
+ * deployed preview that refuses the one account meant to reach it, and a
+ * half-present one would mean a login matching on half a key.
  */
 export function chooseWorkplaceSession({ env }: SessionChoice): WorkplaceSession {
   const config = readAuth0Config(env)
@@ -43,7 +49,7 @@ export function chooseWorkplaceSession({ env }: SessionChoice): WorkplaceSession
       config.callback,
       new URL(config.callback).origin,
     ),
-    createColonyHumanDirectory(),
+    createColonyHumanDirectory(env),
   )
 }
 
