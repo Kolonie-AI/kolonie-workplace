@@ -1,4 +1,5 @@
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
+import type { Lane } from '@/domain/lanes'
 import type { BoardId, HumanId, WorkItemId, WorkItemSummary } from '@/domain/workplace'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import {
@@ -24,6 +25,11 @@ export type BoardItemsStatus = 'idle' | 'loading' | 'ready' | 'error'
  * fetch differently, filter differently or sort into a different set than its
  * sibling, because there is only one set. `columns` and `rows` are two orderings
  * of the same partitioned items and never of two different reads.
+ *
+ * A lane move updates that same set, so both views agree without a second
+ * write path. The update is optimistic: a gateway refusal restores the
+ * previous lane and surfaces the refusal rather than keeping a move the
+ * gateway did not accept.
  */
 export interface BoardItems {
   readonly status: Readonly<Ref<BoardItemsStatus>>
@@ -33,7 +39,10 @@ export interface BoardItems {
   readonly foreign: ComputedRef<readonly WorkItemSummary[]>
   readonly isBoardEmpty: ComputedRef<boolean>
   readonly selectedItemId: Readonly<Ref<WorkItemId | null>>
+  readonly movingItemId: Readonly<Ref<WorkItemId | null>>
+  readonly moveError: Readonly<Ref<string | null>>
   selectItem(itemId: WorkItemId): void
+  moveItem(itemId: WorkItemId, lane: Lane): Promise<void>
   clearSelection(): void
 }
 
@@ -46,6 +55,8 @@ export function useBoardItems(
   const loaded = ref<readonly WorkItemSummary[]>([])
   const foreign = ref<readonly WorkItemSummary[]>([])
   const selectedItemId = ref<WorkItemId | null>(null)
+  const movingItemId = ref<WorkItemId | null>(null)
+  const moveError = ref<string | null>(null)
 
   async function load(): Promise<void> {
     const currentHumanId = humanId.value
@@ -54,6 +65,8 @@ export function useBoardItems(
     loaded.value = []
     foreign.value = []
     selectedItemId.value = null
+    movingItemId.value = null
+    moveError.value = null
 
     if (currentHumanId === null || boardId === null) {
       status.value = 'idle'
@@ -94,11 +107,40 @@ export function useBoardItems(
       () => status.value === 'ready' && loaded.value.length === 0,
     ),
     selectedItemId,
+    movingItemId,
+    moveError,
     selectItem(itemId: WorkItemId): void {
       selectedItemId.value = itemId
     },
     clearSelection(): void {
       selectedItemId.value = null
+    },
+    async moveItem(itemId: WorkItemId, lane: Lane): Promise<void> {
+      const currentHumanId = humanId.value
+      const current = loaded.value.find((item) => item.id === itemId)
+
+      if (currentHumanId === null || current === undefined || current.lane === lane) {
+        return
+      }
+
+      const previousLane = current.lane
+      moveError.value = null
+      movingItemId.value = itemId
+      loaded.value = loaded.value.map((item) =>
+        item.id === itemId ? { ...item, lane } : item,
+      )
+
+      try {
+        await gateway.moveItemToLane(currentHumanId, itemId, lane)
+      } catch (error) {
+        loaded.value = loaded.value.map((item) =>
+          item.id === itemId ? { ...item, lane: previousLane } : item,
+        )
+        moveError.value =
+          error instanceof Error ? error.message : 'The move was refused.'
+      } finally {
+        movingItemId.value = null
+      }
     },
   }
 }

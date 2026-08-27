@@ -33,6 +33,7 @@ function failingBoardList(): TaskGateway {
     }),
     getBoardItems: vi.fn(async () => []),
     getItemDetail: vi.fn(),
+    moveItemToLane: vi.fn(),
   }
 }
 

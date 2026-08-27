@@ -26,6 +26,7 @@ function gatewayServing(details: Readonly<Record<string, WorkItemDetail>>): Task
 
       return detail
     }),
+    moveItemToLane: vi.fn(),
   }
 }
 
@@ -121,6 +122,7 @@ describe('item detail — rejection: an item on a board this human may not open'
         getItemDetail: vi.fn(async () => {
           throw new Error('Kolonie Workplace: the detail could not be read.')
         }),
+        moveItemToLane: vi.fn(),
       },
       ref(FIXTURE_HUMANS.wren),
       selectedItemId,
@@ -174,6 +176,7 @@ describe('item detail — a slow read that is overtaken', () => {
             })
           }),
       ),
+      moveItemToLane: vi.fn(),
     }
     const selectedItemId = ref<WorkItemId | null>(null)
     const detail = useItemDetail(gateway, ref(FIXTURE_HUMANS.wren), selectedItemId)

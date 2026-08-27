@@ -5,15 +5,20 @@ import { fixtureBoards, fixtureWorkItems, FIXTURE_BOARDS, FIXTURE_HUMANS } from 
 
 const WRITE_LIKE = /^(create|update|delete|remove|save|persist|write|set|move|add|patch|put|sync)/
 
-describe('the gateway is read-only', () => {
-  it('exposes no write, create, update, delete or persistence method', () => {
+describe('the gateway write surface', () => {
+  it('exposes exactly the three reads and the one named lane move', () => {
     const methods = Object.getOwnPropertyNames(FixtureTaskGateway.prototype).filter(
       (name) => name !== 'constructor',
     )
     const symbols = Object.getOwnPropertySymbols(createFixtureTaskGateway())
 
-    expect(methods.sort()).toEqual(['getBoardItems', 'getItemDetail', 'listVisibleBoards'])
-    expect(methods.filter((name) => WRITE_LIKE.test(name))).toEqual([])
+    expect(methods.sort()).toEqual([
+      'getBoardItems',
+      'getItemDetail',
+      'listVisibleBoards',
+      'moveItemToLane',
+    ])
+    expect(methods.filter((name) => WRITE_LIKE.test(name))).toEqual(['moveItemToLane'])
     expect(symbols).toEqual([PREVIEW_DATA_GATEWAY])
   })
 

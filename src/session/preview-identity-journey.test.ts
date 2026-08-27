@@ -94,7 +94,9 @@ describe('the configured preview identity reaches the fixture boards', () => {
     })
 
     expect(screen.getAllByTestId('kanban-lane').length).toBeGreaterThan(0)
-    expect(screen.getByTestId('preview-data-indication').textContent).toBe('Example data')
+    expect(screen.getByTestId('preview-data-indication').textContent).toBe(
+      'Example data. Moves are session-local and not recorded.',
+    )
   })
 
   it('leaves no usable session after signing out', async () => {

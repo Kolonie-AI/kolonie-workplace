@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { WORKPLACE_LANE_LABELS } from '@/domain/lanes'
+import { WORKPLACE_LANE_LABELS, type Lane } from '@/domain/lanes'
 import type { WorkItemId } from '@/domain/workplace'
 import type { InvalidLaneItem } from '@/items/lane-columns'
 import type { ListRow as ListRowModel } from '@/items/list-rows'
@@ -16,8 +16,8 @@ import '@/list/list-view.css'
  * already ordered, and this component offers no way to reorder them — no sort
  * control, no column configuration, no filter bar.
  *
- * The list is read-only: no inline edit, no completion checkbox, no create-row
- * affordance. Selecting a row emits an id and writes nothing.
+ * The labelled lane control is the keyboard-accessible equivalent of dragging
+ * a card. It writes through the same move the Kanban uses, not a second path.
  */
 defineProps<{
   status: BoardItemsStatus
@@ -25,11 +25,18 @@ defineProps<{
   invalid: readonly InvalidLaneItem[]
   isBoardEmpty: boolean
   selectedItemId: WorkItemId | null
+  movingItemId: WorkItemId | null
+  moveError: string | null
 }>()
 
 const emit = defineEmits<{
   select: [itemId: WorkItemId]
+  move: [itemId: WorkItemId, lane: Lane]
 }>()
+
+function onRowMove(itemId: WorkItemId, lane: Lane): void {
+  emit('move', itemId, lane)
+}
 </script>
 
 <template>
@@ -64,6 +71,15 @@ const emit = defineEmits<{
     </p>
 
     <template v-else>
+      <p
+        v-if="moveError !== null"
+        class="list-view__state list-view__state--error"
+        data-testid="list-move-error"
+        role="alert"
+      >
+        {{ moveError }}
+      </p>
+
       <p
         v-if="invalid.length > 0"
         class="list-view__state list-view__state--error"
@@ -111,7 +127,9 @@ const emit = defineEmits<{
           <ListRow
             :row="row"
             :selected="selectedItemId === row.item.id"
+            :moving="movingItemId === row.item.id"
             @select="emit('select', $event)"
+            @move="onRowMove"
           />
         </li>
       </ol>

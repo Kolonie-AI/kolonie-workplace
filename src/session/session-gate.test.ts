@@ -29,7 +29,7 @@ describe('SessionGate — signed out', () => {
     expect(screen.queryByTestId('topbar')).toBeNull()
     expect(screen.queryByTestId('board-header')).toBeNull()
     expect(screen.queryByTestId('preview-data-indication')).toBeNull()
-    expect(screen.queryByText('Example data')).toBeNull()
+    expect(screen.queryByText(/Example data/)).toBeNull()
     expect(screen.queryByRole('tablist')).toBeNull()
     expect(screen.queryByRole('tabpanel')).toBeNull()
   })
@@ -121,6 +121,7 @@ describe('SessionGate — rejection: no session at all', () => {
       listVisibleBoards: vi.fn(),
       getBoardItems: vi.fn(),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     render(SessionGate, {

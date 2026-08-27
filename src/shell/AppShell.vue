@@ -124,7 +124,7 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
           v-if="showsPreviewData"
           class="app-shell__preview-data"
           data-testid="preview-data-indication"
-        >Example data</span>
+        >Example data. Moves are session-local and not recorded.</span>
         <SignedInHuman />
       </header>
 
@@ -211,7 +211,10 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
               :invalid="items.invalid.value"
               :is-board-empty="items.isBoardEmpty.value"
               :selected-item-id="items.selectedItemId.value"
+              :moving-item-id="items.movingItemId.value"
+              :move-error="items.moveError.value"
               @select="items.selectItem"
+              @move="items.moveItem"
             />
 
             <ListView
@@ -221,7 +224,10 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
               :invalid="items.invalid.value"
               :is-board-empty="items.isBoardEmpty.value"
               :selected-item-id="items.selectedItemId.value"
+              :moving-item-id="items.movingItemId.value"
+              :move-error="items.moveError.value"
               @select="items.selectItem"
+              @move="items.moveItem"
             />
           </section>
 

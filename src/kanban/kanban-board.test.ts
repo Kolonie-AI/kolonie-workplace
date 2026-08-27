@@ -121,9 +121,8 @@ describe('kanban board — the six fixed Colony lanes', () => {
     expect(screen.queryByRole('button', { name: /delete/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /create/i })).toBeNull()
     expect(screen.queryByRole('textbox')).toBeNull()
-    expect(container.querySelector('[draggable]')).toBeNull()
-    expect(container.querySelector('[draggable="true"]')).toBeNull()
-    expect(container.querySelector('select')).toBeNull()
+    expect(container.querySelectorAll('[draggable="true"]')).toHaveLength(6)
+    expect(container.querySelector('[data-lane][draggable]')).toBeNull()
   })
 })
 
@@ -211,7 +210,7 @@ describe('kanban board — cards', () => {
     expect(spy).not.toHaveBeenCalled()
   })
 
-  it('offers no inline edit, status control or create-card affordance', async () => {
+  it('offers no inline edit, completion or create-card affordance', async () => {
     const { container } = await renderBoard(
       FIXTURE_HUMANS.wren,
       FIXTURE_BOARDS.quillDelivery,
@@ -222,9 +221,8 @@ describe('kanban board — cards', () => {
     })
 
     expect(screen.queryByRole('button', { name: /add (a )?(card|task|item)/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /move to/i })).toBeNull()
+    expect(screen.getAllByLabelText('Move to lane')).toHaveLength(6)
     expect(screen.queryByRole('checkbox')).toBeNull()
-    expect(screen.queryByRole('combobox')).toBeNull()
     expect(container.querySelector('input')).toBeNull()
     expect(container.querySelector('textarea')).toBeNull()
     expect(container.querySelector('[contenteditable]')).toBeNull()
@@ -263,6 +261,7 @@ describe('kanban board — an empty lane is not an empty board', () => {
         } as WorkItemSummary,
       ]),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
@@ -365,6 +364,7 @@ describe('kanban board — items of one board never appear on another', () => {
         ] as WorkItemSummary[]
       }),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     await renderBoard(FIXTURE_HUMANS.wren, 'board-mine', gateway)
@@ -405,6 +405,7 @@ describe('kanban board — rejection: an item in a lane the Colony does not defi
         },
       ] as unknown as WorkItemSummary[]),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
   }
 
@@ -453,6 +454,7 @@ describe('kanban board — loading and failure', () => {
         .mockResolvedValueOnce([])
         .mockImplementation(() => new Promise<never>(() => undefined)),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     await renderBoard(FIXTURE_HUMANS.wren, 'board-mine', gateway)
@@ -483,6 +485,7 @@ describe('kanban board — loading and failure', () => {
           new Error('Kolonie Workplace: the board items could not be read.'),
         ),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     await renderBoard(FIXTURE_HUMANS.wren, 'board-mine', gateway)
@@ -602,6 +605,7 @@ describe('kanban board — any implementation of the session port', () => {
       listVisibleBoards: vi.fn(async () => []),
       getBoardItems: vi.fn(),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     render(AppShell, {

@@ -93,6 +93,7 @@ describe('useBoardList — reading the visible boards', () => {
       listVisibleBoards: vi.fn(),
       getBoardItems: vi.fn(),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     await settled(null, gateway)
@@ -109,6 +110,7 @@ describe('useBoardList — failure is not emptiness', () => {
       }),
       getBoardItems: vi.fn(),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     const list = await settled(FIXTURE_HUMANS.wren, gateway)
@@ -188,6 +190,7 @@ describe('useBoardList — selecting a board', () => {
         throw new BoardAccessRefused(FIXTURE_BOARDS.marlowOutreach)
       }),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     const list = await settled(FIXTURE_HUMANS.wren, gateway)
@@ -234,6 +237,7 @@ describe('useBoardList — a read failure is not a permission refusal', () => {
         throw error
       }),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
   }
 
@@ -304,6 +308,7 @@ describe('useBoardList — a read failure is not a permission refusal', () => {
         .mockResolvedValueOnce([])
         .mockRejectedValue(new Error('Kolonie Workplace: the board items could not be read.')),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     const list = await settled(FIXTURE_HUMANS.wren, gateway)
@@ -332,6 +337,7 @@ describe('useBoardList — a read failure is not a permission refusal', () => {
         .mockRejectedValueOnce(new Error('Kolonie Workplace: the read failed.'))
         .mockResolvedValue([]),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     const list = await settled(FIXTURE_HUMANS.wren, gateway)
@@ -375,6 +381,7 @@ describe('useBoardList — a failed selection leaves no board active', () => {
       ]),
       getBoardItems: vi.fn().mockResolvedValueOnce([]).mockRejectedValue(secondCall),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
   }
 
@@ -432,6 +439,7 @@ describe('useBoardList — a failed selection leaves no board active', () => {
         .mockRejectedValueOnce(new BoardAccessRefused(FIXTURE_BOARDS.birchResearch))
         .mockResolvedValue([]),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     const list = await settled(FIXTURE_HUMANS.wren, gateway)
@@ -469,6 +477,7 @@ describe('useBoardList — a failed selection leaves no board active', () => {
         .mockRejectedValueOnce(new Error('Kolonie Workplace: the read failed.'))
         .mockResolvedValue([]),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     const list = await settled(FIXTURE_HUMANS.wren, gateway)
