@@ -20,6 +20,7 @@ defineProps<{
   columns: readonly LaneColumn[]
   invalid: readonly InvalidLaneItem[]
   isBoardEmpty: boolean
+  isFilterEmpty: boolean
   selectedItemId: WorkItemId | null
   movingItemId: WorkItemId | null
   moveError: string | null
@@ -113,7 +114,16 @@ function onCardMove(itemId: WorkItemId, lane: Lane): void {
       </p>
 
       <p
-        v-else
+        v-if="isFilterEmpty"
+        class="kanban__state"
+        data-testid="kanban-no-match"
+      >
+        No work item matches this filter. The board holds work — the filter is
+        hiding it, so widening or clearing the filter brings it back.
+      </p>
+
+      <p
+        v-if="!isBoardEmpty && !isFilterEmpty"
         class="kanban__move-hint"
         data-testid="kanban-move-hint"
       >

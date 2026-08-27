@@ -211,7 +211,7 @@ describe('kanban board — cards', () => {
   })
 
   it('offers no inline edit, completion or create-card affordance', async () => {
-    const { container } = await renderBoard(
+    await renderBoard(
       FIXTURE_HUMANS.wren,
       FIXTURE_BOARDS.quillDelivery,
     )
@@ -223,9 +223,10 @@ describe('kanban board — cards', () => {
     expect(screen.queryByRole('button', { name: /add (a )?(card|task|item)/i })).toBeNull()
     expect(screen.getAllByLabelText('Move to lane')).toHaveLength(6)
     expect(screen.queryByRole('checkbox')).toBeNull()
-    expect(container.querySelector('input')).toBeNull()
-    expect(container.querySelector('textarea')).toBeNull()
-    expect(container.querySelector('[contenteditable]')).toBeNull()
+    const board = screen.getByTestId('kanban-board')
+    expect(board.querySelector('input')).toBeNull()
+    expect(board.querySelector('textarea')).toBeNull()
+    expect(board.querySelector('[contenteditable]')).toBeNull()
   })
 })
 
