@@ -32,6 +32,7 @@ function gatewayReturning(
       return items
     }),
     getItemDetail: vi.fn(),
+    moveItemToLane: vi.fn(),
   }
 }
 
@@ -95,6 +96,7 @@ describe('board kanban — loading the active board', () => {
           throw new Error('Kolonie Workplace: the board items could not be read.')
         }),
         getItemDetail: vi.fn(),
+    moveItemToLane: vi.fn(),
       },
       ref(FIXTURE_HUMANS.wren),
       ref(FIXTURE_BOARDS.quillDelivery),

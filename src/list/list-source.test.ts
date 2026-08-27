@@ -20,10 +20,12 @@ const view = withoutComments(readFileSync(resolve(root, 'src/list/ListView.vue')
 const row = withoutComments(readFileSync(resolve(root, 'src/list/ListRow.vue'), 'utf8'))
 const styles = withoutComments(readFileSync(resolve(root, 'src/list/list-view.css'), 'utf8'))
 
-describe('list source — read-only by construction', () => {
-  it('emits nothing that could write, reorder or change a status', () => {
+describe('list source — shared lane moves without extra data paths', () => {
+  it('emits lane moves but no create, delete or reorder operation', () => {
+    expect(view).toMatch(/emit\('move'/)
+    expect(row).toMatch(/emit\('move'/)
     for (const source of [view, row]) {
-      expect(source).not.toMatch(/emit\(\s*['"](update|move|reorder|create|delete|save|sort)/i)
+      expect(source).not.toMatch(/emit\(\s*['"](update|reorder|create|delete|save|sort)/i)
       expect(source).not.toMatch(/v-model/)
       expect(source).not.toMatch(/contenteditable/i)
       expect(source).not.toMatch(/draggable/i)
@@ -34,7 +36,7 @@ describe('list source — read-only by construction', () => {
     for (const source of [view, row]) {
       expect(source).not.toMatch(/@click\s*=\s*"[^"]*\b(sort|filter|configure)/i)
       expect(source).not.toMatch(/\.sort\(/)
-      expect(source).not.toMatch(/<input|<select|<textarea/i)
+      expect(source).not.toMatch(/<input|<textarea/i)
     }
   })
 

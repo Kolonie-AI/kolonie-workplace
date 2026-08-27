@@ -22,6 +22,7 @@ const nonFixtureGateway: TaskGateway = {
   listVisibleBoards: async () => [],
   getBoardItems: async () => [],
   getItemDetail: async () => Promise.reject(new Error('No item requested in this test.')),
+  moveItemToLane: async () => undefined,
 }
 
 describe('AppShell', () => {
@@ -167,7 +168,9 @@ describe('AppShell — preview data derives from the active gateway', () => {
 
     const indication = screen.getByTestId('preview-data-indication')
 
-    expect(indication.textContent?.trim()).toBe('Example data')
+    expect(indication.textContent?.trim()).toBe(
+      'Example data. Moves are session-local and not recorded.',
+    )
     expect(screen.getByTestId('topbar').contains(indication)).toBe(true)
     expect(indication.getAttribute('role')).toBeNull()
     expect(indication.getAttribute('aria-live')).toBeNull()

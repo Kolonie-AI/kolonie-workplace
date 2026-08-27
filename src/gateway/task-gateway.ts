@@ -1,3 +1,4 @@
+import type { Lane } from '@/domain/lanes'
 import type {
   BoardId,
   HumanId,
@@ -8,9 +9,10 @@ import type {
 } from '@/domain/workplace'
 
 /**
- * Read-only port over workplace data. It is workplace-owned and disposable: it
- * is not a `kolonie-platform` schema proposal, and it deliberately exposes no
- * create, update, delete or persistence method.
+ * Workplace-owned, disposable port over workplace data. It is not a
+ * `kolonie-platform` schema proposal. The three reads load a board; the one
+ * named write moves one item to one of the six Colony lanes. There is no
+ * create, update of any other field, delete or persistence method.
  */
 export const PREVIEW_DATA_GATEWAY: unique symbol = Symbol('previewDataGateway')
 
@@ -23,4 +25,5 @@ export interface TaskGateway {
   listVisibleBoards(humanId: HumanId): Promise<readonly VisibleBoard[]>
   getBoardItems(humanId: HumanId, boardId: BoardId): Promise<readonly WorkItemSummary[]>
   getItemDetail(humanId: HumanId, itemId: WorkItemId): Promise<WorkItemDetail>
+  moveItemToLane(humanId: HumanId, itemId: WorkItemId, lane: Lane): Promise<void>
 }

@@ -94,7 +94,6 @@
   color: var(--color-text);
   font-size: var(--text-small);
   font-weight: 600;
-  white-space: nowrap;
 }
 
 .app-shell__board-header {

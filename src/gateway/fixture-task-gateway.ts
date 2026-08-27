@@ -1,3 +1,4 @@
+import type { Lane } from '@/domain/lanes'
 import type {
   BoardId,
   HumanId,
@@ -29,8 +30,24 @@ function visibleBoardIdsFor(humanId: HumanId): ReadonlySet<BoardId> {
   )
 }
 
+function toSummary(item: WorkItemDetail): WorkItemSummary {
+  return {
+    id: item.id,
+    boardId: item.boardId,
+    title: item.title,
+    lane: item.lane,
+    owner: item.owner,
+  }
+}
+
+/**
+ * In-memory copy of the fixture catalogue. A lane move lives here for the
+ * lifetime of this instance and is never written to the catalogue, a server,
+ * or browser storage.
+ */
 export class FixtureTaskGateway implements TaskGateway {
   readonly [PREVIEW_DATA_GATEWAY] = true as const
+  private items: WorkItemDetail[] = fixtureWorkItems.map((item) => ({ ...item }))
 
   async listVisibleBoards(humanId: HumanId): Promise<readonly VisibleBoard[]> {
     const visible = visibleBoardIdsFor(humanId)
@@ -55,26 +72,31 @@ export class FixtureTaskGateway implements TaskGateway {
       throw new BoardAccessRefused(boardId)
     }
 
-    return fixtureWorkItems
-      .filter((item) => item.boardId === boardId)
-      .map(({ id, boardId: itemBoardId, title, lane, owner }) => ({
-        id,
-        boardId: itemBoardId,
-        title,
-        lane,
-        owner,
-      }))
+    return this.items.filter((item) => item.boardId === boardId).map(toSummary)
   }
 
   async getItemDetail(humanId: HumanId, itemId: WorkItemId): Promise<WorkItemDetail> {
     const visible = visibleBoardIdsFor(humanId)
-    const item = fixtureWorkItems.find((candidate) => candidate.id === itemId)
+    const item = this.items.find((candidate) => candidate.id === itemId)
 
     if (item === undefined || !visible.has(item.boardId)) {
       throw new WorkItemAccessRefused(itemId)
     }
 
     return item
+  }
+
+  async moveItemToLane(humanId: HumanId, itemId: WorkItemId, lane: Lane): Promise<void> {
+    const visible = visibleBoardIdsFor(humanId)
+    const item = this.items.find((candidate) => candidate.id === itemId)
+
+    if (item === undefined || !visible.has(item.boardId)) {
+      throw new WorkItemAccessRefused(itemId)
+    }
+
+    this.items = this.items.map((candidate) =>
+      candidate.id === itemId ? { ...candidate, lane } : candidate,
+    )
   }
 }
 

@@ -136,7 +136,7 @@ describe('list view — rows over the active board', () => {
 
 describe('list view — read-only, with no controls', () => {
   it('offers no sorting control, column configuration or filter bar', async () => {
-    const { container } = await renderList(
+    await renderList(
       FIXTURE_HUMANS.wren,
       FIXTURE_BOARDS.quillDelivery,
     )
@@ -149,8 +149,7 @@ describe('list view — read-only, with no controls', () => {
     expect(screen.queryByRole('button', { name: /filter/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /column/i })).toBeNull()
     expect(screen.queryByRole('searchbox')).toBeNull()
-    expect(screen.queryByRole('combobox')).toBeNull()
-    expect(container.querySelector('select')).toBeNull()
+    expect(screen.getAllByLabelText('Move to lane')).toHaveLength(6)
   })
 
   it('offers no inline edit, completion checkbox or create-row affordance', async () => {
@@ -212,6 +211,7 @@ describe('list view — empty, loading and failure states', () => {
           new Error('Kolonie Workplace: the board items could not be read.'),
         ),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     await renderList(FIXTURE_HUMANS.wren, 'board-mine', gateway)
@@ -265,6 +265,7 @@ describe('list view — rejection: an item the human may not see', () => {
         },
       ] as WorkItemSummary[]),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     await renderList(FIXTURE_HUMANS.wren, 'board-mine', gateway)

@@ -5,10 +5,9 @@ import { describe, expect, it } from 'vitest'
 const root = process.cwd()
 
 /**
- * The prose in these files explains why there is no drag handler and no
- * user-defined bucket, so it necessarily contains those words. The rules below
- * are about what the components do, so they read the code with the comments
- * taken out.
+ * The comments still explain that lanes are not user-defined buckets. The
+ * rules below are about what the components do, so they read the code with
+ * the comments taken out.
  */
 function withoutComments(source: string): string {
   return source
@@ -42,7 +41,7 @@ const DRAG_LIBRARIES = [
   'interactjs',
 ]
 
-describe('kanban source — read-only by construction', () => {
+describe('kanban source — lane moves without a drag library', () => {
   it('depends on no drag-and-drop library', () => {
     const declared = Object.keys({
       ...manifest.dependencies,
@@ -54,19 +53,19 @@ describe('kanban source — read-only by construction', () => {
     }
   })
 
-  it('carries no draggable attribute and no drag or drop handler', () => {
-    for (const source of [board, card]) {
-      expect(source).not.toMatch(/draggable/i)
-      expect(source).not.toMatch(/@drag|@drop|ondrag|ondrop|dragstart|dragover/i)
-      expect(source).not.toMatch(/\bmove\b\s*[:=]/i)
-    }
+  it('moves a card with the browser drag events and a labelled lane control', () => {
+    expect(card).toMatch(/draggable="true"/)
+    expect(board).toMatch(/@drop/)
+    expect(card).toMatch(/Move to lane/)
+    expect(board).not.toMatch(/v-model/)
+    expect(card).not.toMatch(/v-model/)
+    expect(board).not.toMatch(/contenteditable/i)
+    expect(card).not.toMatch(/contenteditable/i)
   })
 
-  it('emits nothing that could write, reorder or change a status', () => {
+  it('emits a lane move and never a create, delete or reorder', () => {
     for (const source of [board, card]) {
-      expect(source).not.toMatch(/emit\(\s*['"](update|move|reorder|create|delete|save)/i)
-      expect(source).not.toMatch(/v-model/)
-      expect(source).not.toMatch(/contenteditable/i)
+      expect(source).not.toMatch(/emit\(\s*['"](update|reorder|create|delete|save)/i)
     }
   })
 })

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { WORKPLACE_LANE_LABELS } from '@/domain/lanes'
+import { WORKPLACE_LANE_LABELS, type Lane } from '@/domain/lanes'
 import type { WorkItemId } from '@/domain/workplace'
 import type { InvalidLaneItem, LaneColumn } from '@/items/lane-columns'
 import type { BoardItemsStatus } from '@/items/use-board-items'
@@ -11,9 +11,9 @@ import '@/kanban/kanban-board.css'
  * status and not user-defined buckets, so this component renders `columns` as
  * given and offers no way to add, rename, reorder or delete one.
  *
- * The board is read-only: no drag-and-drop, no reorder handler, no `draggable`
- * attribute, no inline edit and no create affordance. Selecting a card emits an
- * id and writes nothing.
+ * A card moves between those fixed lanes by being dropped on a target lane, or
+ * through the labelled keyboard control on the card. Within-lane order is not
+ * modelled. Selecting a card still writes nothing.
  */
 defineProps<{
   status: BoardItemsStatus
@@ -21,11 +21,28 @@ defineProps<{
   invalid: readonly InvalidLaneItem[]
   isBoardEmpty: boolean
   selectedItemId: WorkItemId | null
+  movingItemId: WorkItemId | null
+  moveError: string | null
 }>()
 
 const emit = defineEmits<{
   select: [itemId: WorkItemId]
+  move: [itemId: WorkItemId, lane: Lane]
 }>()
+
+function onDrop(event: DragEvent, lane: Lane): void {
+  const itemId = event.dataTransfer?.getData('text/plain')
+
+  if (itemId === undefined || itemId === '') {
+    return
+  }
+
+  emit('move', itemId, lane)
+}
+
+function onCardMove(itemId: WorkItemId, lane: Lane): void {
+  emit('move', itemId, lane)
+}
 </script>
 
 <template>
@@ -61,6 +78,15 @@ const emit = defineEmits<{
 
     <template v-else>
       <p
+        v-if="moveError !== null"
+        class="kanban__state kanban__state--error"
+        data-testid="kanban-move-error"
+        role="alert"
+      >
+        {{ moveError }}
+      </p>
+
+      <p
         v-if="invalid.length > 0"
         class="kanban__state kanban__state--error"
         data-testid="kanban-invalid"
@@ -86,6 +112,15 @@ const emit = defineEmits<{
         board is empty, not because a lane is missing.
       </p>
 
+      <p
+        v-else
+        class="kanban__move-hint"
+        data-testid="kanban-move-hint"
+      >
+        Drag a card onto another lane, or choose a lane with Move to lane. Lanes
+        themselves cannot be added, renamed or removed.
+      </p>
+
       <div
         class="kanban__lanes"
         data-testid="kanban-lanes"
@@ -97,6 +132,8 @@ const emit = defineEmits<{
           data-testid="kanban-lane"
           :data-lane="column.lane"
           :aria-label="WORKPLACE_LANE_LABELS[column.lane]"
+          @dragover.prevent
+          @drop.prevent="onDrop($event, column.lane)"
         >
           <h3 class="kanban__lane-title">
             <span>{{ WORKPLACE_LANE_LABELS[column.lane] }}</span>
@@ -125,7 +162,9 @@ const emit = defineEmits<{
               <KanbanCard
                 :item="item"
                 :selected="selectedItemId === item.id"
+                :moving="movingItemId === item.id"
                 @select="emit('select', $event)"
+                @move="onCardMove"
               />
             </li>
           </ul>

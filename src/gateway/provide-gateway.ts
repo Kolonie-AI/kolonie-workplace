@@ -3,9 +3,9 @@ import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
 import type { TaskGateway } from '@/gateway/task-gateway'
 
 /**
- * The single composition point where an implementation of the read port is
- * chosen. Board components resolve the port and never an implementation of it,
- * so a generated platform client replaces this file and nothing else.
+ * The single composition point where an implementation of the workplace port
+ * is chosen. Board components resolve the port and never an implementation of
+ * it, so a generated platform client replaces this file and nothing else.
  */
 export const TASK_GATEWAY: InjectionKey<TaskGateway> = Symbol('taskGateway')
 

@@ -231,6 +231,7 @@ describe('view parity — rejection: an item the human may not see appears in ne
         },
       ] as WorkItemSummary[]),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     await renderShell(FIXTURE_HUMANS.wren, 'board-mine', gateway)
@@ -272,6 +273,7 @@ describe('view parity — rejection: an item the human may not see appears in ne
         },
       ] as unknown as WorkItemSummary[]),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     await renderShell(FIXTURE_HUMANS.wren, 'board-mine', gateway)

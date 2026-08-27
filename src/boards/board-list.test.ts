@@ -226,6 +226,7 @@ describe('sidebar board list — loading and failure', () => {
       listVisibleBoards: vi.fn(() => new Promise<never>(() => undefined)),
       getBoardItems: vi.fn(),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     const session = await signedInSession(FIXTURE_HUMANS.wren)
@@ -246,6 +247,7 @@ describe('sidebar board list — loading and failure', () => {
       }),
       getBoardItems: vi.fn(),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     const session = await signedInSession(FIXTURE_HUMANS.wren)
@@ -318,6 +320,7 @@ describe('sidebar board list — read-only, and no cardinality assumption', () =
       ]),
       getBoardItems: vi.fn(async () => []),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     await renderForHuman(FIXTURE_HUMANS.wren, gateway)
@@ -345,6 +348,7 @@ describe('sidebar board list — any implementation of the session port', () => 
       listVisibleBoards: vi.fn(async () => []),
       getBoardItems: vi.fn(),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     renderShell(stub, gateway)
@@ -372,6 +376,7 @@ describe('sidebar board list — a read failure is not a permission refusal', ()
         throw new Error('Kolonie Workplace: the board items could not be read.')
       }),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     await renderForHuman(FIXTURE_HUMANS.wren, gateway, {
@@ -424,6 +429,7 @@ describe('sidebar board list — a read failure is not a permission refusal', ()
         throw new Error('Kolonie Workplace: the board items could not be read.')
       }),
       getItemDetail: vi.fn(),
+      moveItemToLane: vi.fn(),
     }
 
     await renderForHuman(FIXTURE_HUMANS.wren, gateway, {
