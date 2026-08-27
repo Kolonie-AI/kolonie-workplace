@@ -46,6 +46,7 @@ Imported or adapted from Vikunja:
       frontend/src/components/home/AppHeader.vue
 
   src/kanban/KanbanCard.vue
+  src/kanban/kanban-board.css
     adapted from
       frontend/src/components/tasks/partials/KanbanCard.vue
       frontend/src/components/tasks/partials/Labels.vue
