@@ -214,6 +214,19 @@ describe('list view — empty, loading and failure states', () => {
         ),
       getItemDetail: vi.fn(),
       moveItemToLane: vi.fn(),
+      createWorkItem: vi.fn(),
+      updateWorkItem: vi.fn(),
+      deleteWorkItem: vi.fn(),
+      reorderWorkItem: vi.fn(),
+      createComment: vi.fn(),
+      updateComment: vi.fn(),
+      deleteComment: vi.fn(),
+      addAttachment: vi.fn(),
+      deleteAttachment: vi.fn(),
+      createChecklistItem: vi.fn(),
+      updateChecklistItem: vi.fn(),
+      reorderChecklistItem: vi.fn(),
+      deleteChecklistItem: vi.fn(),
     }
 
     await renderList(FIXTURE_HUMANS.wren, 'board-mine', gateway)
@@ -269,6 +282,19 @@ describe('list view — rejection: an item the human may not see', () => {
       ] as WorkItemSummary[]),
       getItemDetail: vi.fn(),
       moveItemToLane: vi.fn(),
+      createWorkItem: vi.fn(),
+      updateWorkItem: vi.fn(),
+      deleteWorkItem: vi.fn(),
+      reorderWorkItem: vi.fn(),
+      createComment: vi.fn(),
+      updateComment: vi.fn(),
+      deleteComment: vi.fn(),
+      addAttachment: vi.fn(),
+      deleteAttachment: vi.fn(),
+      createChecklistItem: vi.fn(),
+      updateChecklistItem: vi.fn(),
+      reorderChecklistItem: vi.fn(),
+      deleteChecklistItem: vi.fn(),
     }
 
     await renderList(FIXTURE_HUMANS.wren, 'board-mine', gateway)

@@ -23,6 +23,19 @@ const nonFixtureGateway: TaskGateway = {
   getBoardItems: async () => [],
   getItemDetail: async () => Promise.reject(new Error('No item requested in this test.')),
   moveItemToLane: async () => undefined,
+  createWorkItem: async () => Promise.reject(new Error('No write requested in this test.')),
+  updateWorkItem: async () => Promise.reject(new Error('No write requested in this test.')),
+  deleteWorkItem: async () => undefined,
+  reorderWorkItem: async () => Promise.reject(new Error('No write requested in this test.')),
+  createComment: async () => Promise.reject(new Error('No write requested in this test.')),
+  updateComment: async () => Promise.reject(new Error('No write requested in this test.')),
+  deleteComment: async () => Promise.reject(new Error('No write requested in this test.')),
+  addAttachment: async () => Promise.reject(new Error('No write requested in this test.')),
+  deleteAttachment: async () => Promise.reject(new Error('No write requested in this test.')),
+  createChecklistItem: async () => Promise.reject(new Error('No write requested in this test.')),
+  updateChecklistItem: async () => Promise.reject(new Error('No write requested in this test.')),
+  reorderChecklistItem: async () => Promise.reject(new Error('No write requested in this test.')),
+  deleteChecklistItem: async () => Promise.reject(new Error('No write requested in this test.')),
 }
 
 describe('AppShell', () => {

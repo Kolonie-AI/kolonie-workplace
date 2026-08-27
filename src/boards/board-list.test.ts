@@ -237,6 +237,19 @@ describe('sidebar board list — loading and failure', () => {
       getBoardItems: vi.fn(),
       getItemDetail: vi.fn(),
       moveItemToLane: vi.fn(),
+      createWorkItem: vi.fn(),
+      updateWorkItem: vi.fn(),
+      deleteWorkItem: vi.fn(),
+      reorderWorkItem: vi.fn(),
+      createComment: vi.fn(),
+      updateComment: vi.fn(),
+      deleteComment: vi.fn(),
+      addAttachment: vi.fn(),
+      deleteAttachment: vi.fn(),
+      createChecklistItem: vi.fn(),
+      updateChecklistItem: vi.fn(),
+      reorderChecklistItem: vi.fn(),
+      deleteChecklistItem: vi.fn(),
     }
 
     const session = await signedInSession(FIXTURE_HUMANS.wren)
@@ -258,6 +271,19 @@ describe('sidebar board list — loading and failure', () => {
       getBoardItems: vi.fn(),
       getItemDetail: vi.fn(),
       moveItemToLane: vi.fn(),
+      createWorkItem: vi.fn(),
+      updateWorkItem: vi.fn(),
+      deleteWorkItem: vi.fn(),
+      reorderWorkItem: vi.fn(),
+      createComment: vi.fn(),
+      updateComment: vi.fn(),
+      deleteComment: vi.fn(),
+      addAttachment: vi.fn(),
+      deleteAttachment: vi.fn(),
+      createChecklistItem: vi.fn(),
+      updateChecklistItem: vi.fn(),
+      reorderChecklistItem: vi.fn(),
+      deleteChecklistItem: vi.fn(),
     }
 
     const session = await signedInSession(FIXTURE_HUMANS.wren)
@@ -388,6 +414,19 @@ describe('sidebar board list — read-only, and no cardinality assumption', () =
       getBoardItems: vi.fn(async () => []),
       getItemDetail: vi.fn(),
       moveItemToLane: vi.fn(),
+      createWorkItem: vi.fn(),
+      updateWorkItem: vi.fn(),
+      deleteWorkItem: vi.fn(),
+      reorderWorkItem: vi.fn(),
+      createComment: vi.fn(),
+      updateComment: vi.fn(),
+      deleteComment: vi.fn(),
+      addAttachment: vi.fn(),
+      deleteAttachment: vi.fn(),
+      createChecklistItem: vi.fn(),
+      updateChecklistItem: vi.fn(),
+      reorderChecklistItem: vi.fn(),
+      deleteChecklistItem: vi.fn(),
     }
 
     await renderForHuman(FIXTURE_HUMANS.wren, gateway)
@@ -416,6 +455,19 @@ describe('sidebar board list — any implementation of the session port', () => 
       getBoardItems: vi.fn(),
       getItemDetail: vi.fn(),
       moveItemToLane: vi.fn(),
+      createWorkItem: vi.fn(),
+      updateWorkItem: vi.fn(),
+      deleteWorkItem: vi.fn(),
+      reorderWorkItem: vi.fn(),
+      createComment: vi.fn(),
+      updateComment: vi.fn(),
+      deleteComment: vi.fn(),
+      addAttachment: vi.fn(),
+      deleteAttachment: vi.fn(),
+      createChecklistItem: vi.fn(),
+      updateChecklistItem: vi.fn(),
+      reorderChecklistItem: vi.fn(),
+      deleteChecklistItem: vi.fn(),
     }
 
     renderShell(stub, gateway)
@@ -445,6 +497,19 @@ describe('sidebar board list — a read failure is not a permission refusal', ()
       }),
       getItemDetail: vi.fn(),
       moveItemToLane: vi.fn(),
+      createWorkItem: vi.fn(),
+      updateWorkItem: vi.fn(),
+      deleteWorkItem: vi.fn(),
+      reorderWorkItem: vi.fn(),
+      createComment: vi.fn(),
+      updateComment: vi.fn(),
+      deleteComment: vi.fn(),
+      addAttachment: vi.fn(),
+      deleteAttachment: vi.fn(),
+      createChecklistItem: vi.fn(),
+      updateChecklistItem: vi.fn(),
+      reorderChecklistItem: vi.fn(),
+      deleteChecklistItem: vi.fn(),
     }
 
     await renderForHuman(FIXTURE_HUMANS.wren, gateway, {
@@ -499,6 +564,19 @@ describe('sidebar board list — a read failure is not a permission refusal', ()
       }),
       getItemDetail: vi.fn(),
       moveItemToLane: vi.fn(),
+      createWorkItem: vi.fn(),
+      updateWorkItem: vi.fn(),
+      deleteWorkItem: vi.fn(),
+      reorderWorkItem: vi.fn(),
+      createComment: vi.fn(),
+      updateComment: vi.fn(),
+      deleteComment: vi.fn(),
+      addAttachment: vi.fn(),
+      deleteAttachment: vi.fn(),
+      createChecklistItem: vi.fn(),
+      updateChecklistItem: vi.fn(),
+      reorderChecklistItem: vi.fn(),
+      deleteChecklistItem: vi.fn(),
     }
 
     await renderForHuman(FIXTURE_HUMANS.wren, gateway, {

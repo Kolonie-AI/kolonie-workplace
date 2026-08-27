@@ -3,22 +3,50 @@ import { FixtureTaskGateway, createFixtureTaskGateway } from '@/gateway/fixture-
 import { PREVIEW_DATA_GATEWAY } from '@/gateway/task-gateway'
 import { fixtureBoards, fixtureWorkItems, FIXTURE_BOARDS, FIXTURE_HUMANS } from '@/fixtures/catalogue'
 
-const WRITE_LIKE = /^(create|update|delete|remove|save|persist|write|set|move|add|patch|put|sync)/
+const WRITE_LIKE = /^(create|update|delete|remove|save|persist|write|set|move|add|patch|put|sync|reorder)/
 
 describe('the gateway write surface', () => {
-  it('exposes exactly the three reads and the one named lane move', () => {
+  it('exposes the reads and named writes without persistence', () => {
     const methods = Object.getOwnPropertyNames(FixtureTaskGateway.prototype).filter(
-      (name) => name !== 'constructor',
+      (name) => name !== 'constructor' && !name.startsWith('require') && name !== 'replace',
     )
     const symbols = Object.getOwnPropertySymbols(createFixtureTaskGateway())
 
     expect(methods.sort()).toEqual([
+      'addAttachment',
+      'createChecklistItem',
+      'createComment',
+      'createWorkItem',
+      'deleteAttachment',
+      'deleteChecklistItem',
+      'deleteComment',
+      'deleteWorkItem',
       'getBoardItems',
       'getItemDetail',
       'listVisibleBoards',
       'moveItemToLane',
+      'reorderChecklistItem',
+      'reorderWorkItem',
+      'updateChecklistItem',
+      'updateComment',
+      'updateWorkItem',
     ])
-    expect(methods.filter((name) => WRITE_LIKE.test(name))).toEqual(['moveItemToLane'])
+    expect(methods.filter((name) => WRITE_LIKE.test(name)).sort()).toEqual([
+      'addAttachment',
+      'createChecklistItem',
+      'createComment',
+      'createWorkItem',
+      'deleteAttachment',
+      'deleteChecklistItem',
+      'deleteComment',
+      'deleteWorkItem',
+      'moveItemToLane',
+      'reorderChecklistItem',
+      'reorderWorkItem',
+      'updateChecklistItem',
+      'updateComment',
+      'updateWorkItem',
+    ])
     expect(symbols).toEqual([PREVIEW_DATA_GATEWAY])
   })
 

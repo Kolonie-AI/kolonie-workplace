@@ -271,16 +271,20 @@ describe('detail pane — rejection: an item on a board this human may not open'
   it('refuses and renders no part of the detail', async () => {
     const gateway = createFixtureTaskGateway()
     const original = gateway.getBoardItems.bind(gateway)
-    vi.spyOn(gateway, 'getBoardItems').mockImplementation(async (humanId, boardId) => [
-      ...(await original(humanId, boardId)),
-      {
-        id: 'fictional-item-foreign',
-        boardId,
-        title: 'Prepare the fictional outreach list',
-        lane: 'ready',
-        owner: 'Fictional Agent Marlow',
-      },
-    ])
+    vi.spyOn(gateway, 'getBoardItems').mockImplementation(async (humanId, boardId) => {
+      const items = await original(humanId, boardId)
+      return [
+        ...items,
+        {
+          ...items[0]!,
+          id: 'fictional-item-foreign',
+          boardId,
+          title: 'Prepare the fictional outreach list',
+          lane: 'ready',
+          owner: 'Fictional Agent Marlow',
+        },
+      ]
+    })
 
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
     await openItem('fictional-item-foreign')

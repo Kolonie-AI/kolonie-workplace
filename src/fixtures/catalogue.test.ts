@@ -16,6 +16,11 @@ const ALL_TEXT = [
   ...fixtureWorkItems.map(
     (item) =>
       `${item.id} ${item.title} ${item.owner} ${item.blocker?.actor ?? ''} ` +
+      `${item.description} ${item.labels.map((label) => label.title).join(' ')} ` +
+      `${item.assignees.map((assignee) => assignee.name).join(' ')} ` +
+      `${item.checklist.map((entry) => entry.title).join(' ')} ` +
+      `${item.comments.map((comment) => `${comment.author} ${comment.body}`).join(' ')} ` +
+      `${item.attachments.map((attachment) => attachment.name).join(' ')} ` +
       `${(item.handover?.evidence ?? []).map((entry) => `${entry.label} ${entry.href}`).join(' ')} ` +
       item.externalReferences.map((reference) => `${reference.label} ${reference.href}`).join(' '),
   ),
@@ -70,6 +75,9 @@ describe('fixture hygiene', () => {
 
     expect(fixtureWorkItems.every((item) => isLane(item.lane))).toBe(true)
     expect(fixtureWorkItems.every((item) => boardIds.has(item.boardId))).toBe(true)
+    expect(fixtureWorkItems.some((item) => item.labels.length > 0)).toBe(true)
+    expect(fixtureWorkItems.some((item) => item.checklist.length > 0)).toBe(true)
+    expect(fixtureWorkItems.some((item) => item.comments.length > 0)).toBe(true)
   })
 
   it('encodes the cardinality the product depends on: 0..n agents, 0..n boards', () => {

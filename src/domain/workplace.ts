@@ -37,6 +37,46 @@ export interface VisibleBoard extends Board {
 }
 
 export type WorkItemId = string
+export type LabelId = string
+export type CommentId = string
+export type AttachmentId = string
+export type ChecklistItemId = string
+
+export type WorkItemPriority = 'unset' | 'low' | 'medium' | 'high' | 'urgent' | 'do_now'
+
+export interface WorkItemLabel {
+  readonly id: LabelId
+  readonly title: string
+  readonly colour: string
+}
+
+export interface WorkItemAssignee {
+  readonly id: string
+  readonly name: string
+}
+
+export interface ChecklistItem {
+  readonly id: ChecklistItemId
+  readonly title: string
+  readonly done: boolean
+  readonly position: number
+}
+
+export interface WorkItemComment {
+  readonly id: CommentId
+  readonly author: string
+  readonly body: string
+  readonly createdAt: string
+  readonly updatedAt: string
+}
+
+export interface WorkItemAttachment {
+  readonly id: AttachmentId
+  readonly name: string
+  readonly size: number
+  readonly mimeType: string
+  readonly file?: File
+}
 
 export interface ExternalReference {
   readonly label: string
@@ -62,6 +102,17 @@ export interface WorkItemSummary {
   readonly title: string
   readonly lane: Lane
   readonly owner: string
+  readonly description: string
+  readonly labels: readonly WorkItemLabel[]
+  readonly assignees: readonly WorkItemAssignee[]
+  readonly priority: WorkItemPriority
+  readonly dueDate: string | null
+  readonly percentDone: number
+  readonly checklist: readonly ChecklistItem[]
+  readonly comments: readonly WorkItemComment[]
+  readonly attachments: readonly WorkItemAttachment[]
+  readonly coverColour: string | null
+  readonly position: number
 }
 
 export interface WorkItemDetail extends WorkItemSummary {
@@ -69,3 +120,53 @@ export interface WorkItemDetail extends WorkItemSummary {
   readonly handover?: Handover
   readonly externalReferences: readonly ExternalReference[]
 }
+
+export interface CreateWorkItemInput {
+  readonly boardId: BoardId
+  readonly title: string
+  readonly lane: Lane
+  readonly owner?: string
+  readonly description?: string
+  readonly position?: number
+}
+
+export type UpdateWorkItemInput = Partial<
+  Pick<
+    WorkItemDetail,
+    | 'title'
+    | 'lane'
+    | 'owner'
+    | 'description'
+    | 'labels'
+    | 'assignees'
+    | 'priority'
+    | 'dueDate'
+    | 'percentDone'
+    | 'coverColour'
+    | 'position'
+    | 'blocker'
+    | 'handover'
+    | 'externalReferences'
+  >
+>
+
+export interface ReorderWorkItemInput {
+  readonly lane: Lane
+  readonly position: number
+}
+
+export interface CreateCommentInput {
+  readonly author: string
+  readonly body: string
+}
+
+export interface CreateAttachmentInput {
+  readonly name: string
+  readonly size: number
+  readonly mimeType: string
+  readonly file?: File
+}
+
+export type UpdateChecklistItemInput = Partial<
+  Pick<ChecklistItem, 'title' | 'done'>
+>
