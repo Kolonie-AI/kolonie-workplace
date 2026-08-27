@@ -5,6 +5,7 @@ import type { Human } from '@/domain/workplace'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import { TASK_GATEWAY } from '@/gateway/provide-gateway'
 import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
+import { BoardAccessRefused } from '@/gateway/refusals'
 import {
   FIXTURE_BOARDS,
   FIXTURE_HUMANS,
@@ -436,5 +437,182 @@ describe('sidebar board list — a read failure is not a permission refusal', ()
     expect(screen.queryByTestId('active-board')).toBeNull()
     expect(screen.queryByTestId('kanban-card')).toBeNull()
     expect(screen.queryByTestId('list-row')).toBeNull()
+  })
+
+  it('rejection case: a refused second board leaves none of the first board on screen', async () => {
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'getBoardItems').mockImplementation(async (humanId, boardId) => {
+      if (boardId === FIXTURE_BOARDS.birchResearch) {
+        throw new BoardAccessRefused(boardId)
+      }
+
+      return createFixtureTaskGateway().getBoardItems(humanId, boardId)
+    })
+
+    await renderForHuman(FIXTURE_HUMANS.wren, gateway, {
+      initialBoardId: FIXTURE_BOARDS.quillDelivery,
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-board').getAttribute('data-board-id')).toBe(
+        FIXTURE_BOARDS.quillDelivery,
+      )
+    })
+    await waitFor(() => {
+      expect(screen.getAllByTestId('kanban-card').length).toBeGreaterThan(0)
+    })
+    await fireEvent.click(screen.getAllByTestId('kanban-card')[0] as HTMLElement)
+    await waitFor(() => {
+      expect(screen.getByTestId('detail-pane')).toBeTruthy()
+    })
+
+    await fireEvent.click(screen.getByText(birchResearch.title))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('board-refused')).toBeTruthy()
+    })
+
+    expect(screen.getByTestId('board-refused').textContent).toMatch(/not available/i)
+    expect(screen.queryByTestId('board-unreadable')).toBeNull()
+    expect(screen.queryByTestId('active-board')).toBeNull()
+    expect(screen.queryByTestId('kanban-card')).toBeNull()
+    expect(screen.queryByTestId('list-row')).toBeNull()
+    expect(screen.queryByTestId('detail-pane')).toBeNull()
+    expect(screen.getByTestId('kanban-no-board')).toBeTruthy()
+
+    await fireEvent.click(screen.getByRole('tab', { name: 'List' }))
+
+    expect(screen.queryByTestId('kanban-card')).toBeNull()
+    expect(screen.queryByTestId('list-row')).toBeNull()
+    expect(screen.getByTestId('list-no-board')).toBeTruthy()
+  })
+
+  it('rejection case: a failed second read leaves none of the first board on screen', async () => {
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'getBoardItems').mockImplementation(async (_humanId, boardId) => {
+      if (boardId === FIXTURE_BOARDS.birchResearch) {
+        throw new Error('Kolonie Workplace: the board items could not be read.')
+      }
+
+      return createFixtureTaskGateway().getBoardItems(_humanId, boardId)
+    })
+
+    await renderForHuman(FIXTURE_HUMANS.wren, gateway, {
+      initialBoardId: FIXTURE_BOARDS.quillDelivery,
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-board').getAttribute('data-board-id')).toBe(
+        FIXTURE_BOARDS.quillDelivery,
+      )
+    })
+    await waitFor(() => {
+      expect(screen.getAllByTestId('kanban-card').length).toBeGreaterThan(0)
+    })
+    await fireEvent.click(screen.getByRole('tab', { name: 'List' }))
+    await waitFor(() => {
+      expect(screen.getAllByTestId('list-row').length).toBeGreaterThan(0)
+    })
+    await fireEvent.click(screen.getAllByTestId('list-row')[0] as HTMLElement)
+    await waitFor(() => {
+      expect(screen.getByTestId('detail-pane')).toBeTruthy()
+    })
+
+    await fireEvent.click(screen.getByText(birchResearch.title))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('board-unreadable')).toBeTruthy()
+    })
+
+    expect(screen.getByTestId('board-unreadable').textContent).toMatch(/could not be read/i)
+    expect(screen.getByTestId('board-unreadable').textContent).not.toMatch(/not available/i)
+    expect(screen.queryByTestId('board-refused')).toBeNull()
+    expect(screen.queryByTestId('active-board')).toBeNull()
+    expect(screen.queryByTestId('kanban-card')).toBeNull()
+    expect(screen.queryByTestId('list-row')).toBeNull()
+    expect(screen.queryByTestId('detail-pane')).toBeNull()
+    expect(screen.getByTestId('list-no-board')).toBeTruthy()
+  })
+
+  it('renders the newly selected board after a refusal once that board can be read', async () => {
+    const gateway = createFixtureTaskGateway()
+    let refuseBirch = true
+    vi.spyOn(gateway, 'getBoardItems').mockImplementation(async (humanId, boardId) => {
+      if (boardId === FIXTURE_BOARDS.birchResearch && refuseBirch) {
+        throw new BoardAccessRefused(boardId)
+      }
+
+      return createFixtureTaskGateway().getBoardItems(humanId, boardId)
+    })
+
+    await renderForHuman(FIXTURE_HUMANS.wren, gateway, {
+      initialBoardId: FIXTURE_BOARDS.quillDelivery,
+    })
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId('kanban-card').length).toBeGreaterThan(0)
+    })
+
+    await fireEvent.click(screen.getByText(birchResearch.title))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('board-refused')).toBeTruthy()
+    })
+    expect(screen.queryByTestId('active-board')).toBeNull()
+
+    refuseBirch = false
+    await fireEvent.click(screen.getByText(birchResearch.title))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-board').getAttribute('data-board-id')).toBe(
+        FIXTURE_BOARDS.birchResearch,
+      )
+    })
+
+    expect(screen.queryByTestId('board-refused')).toBeNull()
+    expect(screen.queryByTestId('board-unreadable')).toBeNull()
+    expect(screen.getByTestId('active-board').textContent).toContain(birchResearch.title)
+  })
+
+  it('renders the newly selected board after a read failure once that board can be read', async () => {
+    const gateway = createFixtureTaskGateway()
+    let failBirch = true
+    vi.spyOn(gateway, 'getBoardItems').mockImplementation(async (humanId, boardId) => {
+      if (boardId === FIXTURE_BOARDS.birchResearch && failBirch) {
+        throw new Error('Kolonie Workplace: the board items could not be read.')
+      }
+
+      return createFixtureTaskGateway().getBoardItems(humanId, boardId)
+    })
+
+    await renderForHuman(FIXTURE_HUMANS.wren, gateway, {
+      initialBoardId: FIXTURE_BOARDS.quillDelivery,
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-board').getAttribute('data-board-id')).toBe(
+        FIXTURE_BOARDS.quillDelivery,
+      )
+    })
+
+    await fireEvent.click(screen.getByText(birchResearch.title))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('board-unreadable')).toBeTruthy()
+    })
+    expect(screen.queryByTestId('active-board')).toBeNull()
+
+    failBirch = false
+    await fireEvent.click(screen.getByText(birchResearch.title))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-board').getAttribute('data-board-id')).toBe(
+        FIXTURE_BOARDS.birchResearch,
+      )
+    })
+
+    expect(screen.queryByTestId('board-unreadable')).toBeNull()
+    expect(screen.queryByTestId('board-refused')).toBeNull()
+    expect(screen.getByTestId('active-board').textContent).toContain(birchResearch.title)
   })
 })

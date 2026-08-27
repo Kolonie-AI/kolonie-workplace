@@ -65,12 +65,24 @@ export function useBoardList(
     }
   }
 
+  /**
+   * A selection that fails leaves no board active. Holding the previous board
+   * would put its header, its cards and its rows underneath a message saying
+   * the selection failed — content belonging to a board the human did not just
+   * choose, under an alert about one they did. Clearing happens at the start of
+   * the attempt rather than in the failure branch, so a selection in flight
+   * cannot show one board's content while another is being read.
+   */
   async function selectBoard(boardId: BoardId): Promise<void> {
     const currentHumanId = humanId.value
 
     if (currentHumanId === null) {
       return
     }
+
+    active.value = null
+    selectionFailure.value = null
+    refusal.value = null
 
     try {
       await gateway.getBoardItems(currentHumanId, boardId)
@@ -89,8 +101,6 @@ export function useBoardList(
       return
     }
 
-    selectionFailure.value = null
-    refusal.value = null
     active.value = board
   }
 
