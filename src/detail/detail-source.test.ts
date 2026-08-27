@@ -5,8 +5,7 @@ import { describe, expect, it } from 'vitest'
 const root = process.cwd()
 
 /**
- * The prose in these files explains why there is no edit control and no
- * comment box, so it necessarily contains those words. The rules below are
+ * Comments name Vikunja sources and the write path. The rules below are
  * about what the pane does, so they read the code with the comments removed.
  */
 function withoutComments(source: string): string {
@@ -26,21 +25,14 @@ const styles = withoutComments(
   readFileSync(resolve(root, 'src/detail/detail-pane.css'), 'utf8'),
 )
 
-describe('detail source — read-only by construction', () => {
-  it('renders no form control of any kind', () => {
-    expect(pane).not.toMatch(/<form|<input|<textarea|<select/i)
-    expect(pane).not.toMatch(/v-model/)
-    expect(pane).not.toMatch(/contenteditable/i)
+describe('detail source — writes through the parent, never a gateway of its own', () => {
+  it('emits an update and never talks to a gateway', () => {
+    expect(pane).toMatch(/emit\('update'/)
+    expect(pane).not.toMatch(/useTaskGateway|getItemDetail|getBoardItems|updateWorkItem/)
   })
 
-  it('emits nothing that could write, comment or change a status', () => {
-    expect(pane).not.toMatch(
-      /emit\(\s*['"](update|save|create|delete|comment|assign|move|status)/i,
-    )
-  })
-
-  it('reaches no gateway of its own — the detail arrives as a prop', () => {
-    expect(pane).not.toMatch(/useTaskGateway|getItemDetail|getBoardItems/)
+  it('sanitises description markup before it is written', () => {
+    expect(pane).toMatch(/sanitizeDescription/)
   })
 })
 
@@ -61,9 +53,9 @@ describe('detail source — original code, not a Vikunja port', () => {
     }
   })
 
-  it('speaks of one accountable owner rather than a list of assignees', () => {
+  it('keeps the Colony owner field beside the assignee list', () => {
     expect(pane).toMatch(/owner/i)
-    expect(pane).not.toMatch(/assignee/i)
+    expect(pane).toMatch(/assignee/i)
   })
 })
 

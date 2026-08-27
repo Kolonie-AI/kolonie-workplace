@@ -110,6 +110,36 @@ describe('item detail — loaded on open, never with the board', () => {
   })
 })
 
+describe('item detail — writes update the open item', () => {
+  it('updates through the gateway and keeps the returned detail locally', async () => {
+    const gateway = createFixtureTaskGateway()
+    const selectedItemId = ref<WorkItemId | null>(FIXTURE_ITEMS.review)
+    const detail = useItemDetail(gateway, ref(FIXTURE_HUMANS.wren), selectedItemId)
+    await settled()
+
+    const updated = await detail.updateItem({ title: 'Revised through the detail' })
+
+    expect(updated?.title).toBe('Revised through the detail')
+    expect(detail.item.value?.title).toBe('Revised through the detail')
+    expect(detail.updateError.value).toBeNull()
+  })
+
+  it('restores the previous detail when a write fails', async () => {
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'updateWorkItem').mockRejectedValue(new Error('write unavailable'))
+    const selectedItemId = ref<WorkItemId | null>(FIXTURE_ITEMS.review)
+    const detail = useItemDetail(gateway, ref(FIXTURE_HUMANS.wren), selectedItemId)
+    await settled()
+    const previous = detail.item.value
+
+    const updated = await detail.updateItem({ title: 'This write fails' })
+
+    expect(updated).toBeNull()
+    expect(detail.item.value).toEqual(previous)
+    expect(detail.updateError.value).toMatch(/failed/i)
+  })
+})
+
 describe('item detail — rejection: an item on a board this human may not open', () => {
   it('refuses without rendering any part of the detail', async () => {
     const selectedItemId = ref<WorkItemId | null>(null)

@@ -97,7 +97,9 @@ describe('detail pane — opened from the board, beside it', () => {
     const owners = within(pane()).queryAllByTestId('detail-owner')
     expect(owners).toHaveLength(1)
     expect(owners[0]?.textContent).toContain('Fictional Agent Quill')
-    expect(within(pane()).queryByTestId('detail-assignees')).toBeNull()
+    expect(within(pane()).getByTestId('detail-assignees').textContent).toContain(
+      'Fictional Human Wren',
+    )
   })
 
   it('opens from a List row through the same selection, not a second one', async () => {
@@ -244,26 +246,141 @@ describe('detail pane — evidence and external references', () => {
   })
 })
 
-describe('detail pane — read-only', () => {
-  it('offers no form, no edit control and no status change', async () => {
-    const { container } = await renderBoard(
+describe('detail pane — editable title', () => {
+  it('saves on blur and updates the board card without refetching the board', async () => {
+    const gateway = createFixtureTaskGateway()
+    const boardReads = vi.spyOn(gateway, 'getBoardItems')
+    const updates = vi.spyOn(gateway, 'updateWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.review)
+    const readsBeforeEdit = boardReads.mock.calls.length
+    const title = within(pane()).getByRole('textbox', { name: 'Work item title' })
+    title.textContent = 'Review the revised fictional catalogue'
+    await fireEvent.input(title)
+    await fireEvent.blur(title)
+
+    await waitFor(() => {
+      const card = screen
+        .getAllByTestId('kanban-card')
+        .find((candidate) => candidate.getAttribute('data-item-id') === FIXTURE_ITEMS.review)
+      expect(card?.textContent).toContain('Review the revised fictional catalogue')
+    })
+    expect(updates).toHaveBeenCalledWith(
       FIXTURE_HUMANS.wren,
-      FIXTURE_BOARDS.quillDelivery,
+      FIXTURE_ITEMS.review,
+      { title: 'Review the revised fictional catalogue' },
     )
+    expect(boardReads).toHaveBeenCalledTimes(readsBeforeEdit)
+  })
+
+  it('saves on Enter', async () => {
+    const gateway = createFixtureTaskGateway()
+    const updates = vi.spyOn(gateway, 'updateWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.review)
+    const title = within(pane()).getByRole('textbox', { name: 'Work item title' })
+    title.textContent = 'Review on Enter'
+    await fireEvent.input(title)
+    await fireEvent.keyDown(title, { key: 'Enter' })
+
+    await waitFor(() => {
+      expect(updates).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.review,
+        { title: 'Review on Enter' },
+      )
+    })
+  })
+
+  it('restores the previous title on Escape without writing', async () => {
+    const gateway = createFixtureTaskGateway()
+    const updates = vi.spyOn(gateway, 'updateWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.review)
+    const title = within(pane()).getByRole('textbox', { name: 'Work item title' })
+    title.textContent = 'Discard this title'
+    await fireEvent.input(title)
+    await fireEvent.keyDown(title, { key: 'Escape' })
+
+    expect(title.textContent).toBe('Review the fictional catalogue summary')
+    expect(updates).not.toHaveBeenCalled()
+  })
+})
+
+describe('detail pane — rich-text description', () => {
+  it('renders formatted markup and exposes the supported formatting controls', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    await openItem(FIXTURE_ITEMS.review)
+    const description = within(pane()).getByRole('textbox', { name: 'Work item description' })
+
+    expect(description.querySelector('p')?.textContent).toContain(
+      'Review the typed summaries against the fictional catalogue.',
+    )
+    for (const name of ['Bold', 'Italic', 'Bulleted list', 'Numbered list', 'Link', 'Code']) {
+      expect(within(pane()).getByRole('button', { name })).toBeTruthy()
+    }
+  })
+
+  it('round-trips formatted markup through the gateway', async () => {
+    const gateway = createFixtureTaskGateway()
+    const updates = vi.spyOn(gateway, 'updateWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.review)
+    const description = within(pane()).getByRole('textbox', { name: 'Work item description' })
+    description.innerHTML = '<p><strong>Bold</strong> and <em>italic</em></p><ul><li><code>code</code></li></ul>'
+
+    await fireEvent.input(description)
+    await fireEvent.blur(description)
+
+    await waitFor(() => {
+      expect(updates).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.review,
+        {
+          description: '<p><strong>Bold</strong> and <em>italic</em></p><ul><li><code>code</code></li></ul>',
+        },
+      )
+    })
+    expect(description.querySelector('strong')?.textContent).toBe('Bold')
+    expect(description.querySelector('code')?.textContent).toBe('code')
+    expect(description.textContent).not.toContain('<strong>')
+  })
+
+  it('removes scripts and event-handler attributes before markup reaches the gateway or DOM', async () => {
+    const gateway = createFixtureTaskGateway()
+    const updates = vi.spyOn(gateway, 'updateWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.review)
+    const description = within(pane()).getByRole('textbox', { name: 'Work item description' })
+    description.innerHTML = '<p>Safe<img src="x" onerror="alert(1)"></p><script>alert(2)</script>'
+
+    await fireEvent.input(description)
+    await fireEvent.blur(description)
+
+    await waitFor(() => {
+      expect(updates).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.review,
+        { description: '<p>Safe</p>' },
+      )
+    })
+    expect(description.querySelector('script')).toBeNull()
+    expect(description.querySelector('[onerror]')).toBeNull()
+    expect(description.innerHTML).toBe('<p>Safe</p>')
+  })
+})
+
+describe('detail pane — metadata', () => {
+  it('lays out lane, owner, priority, due date, labels and assignees', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
     await openItem(FIXTURE_ITEMS.review)
 
-    const surface = pane()
-
-    expect(surface.querySelector('form')).toBeNull()
-    expect(surface.querySelector('input')).toBeNull()
-    expect(surface.querySelector('textarea')).toBeNull()
-    expect(surface.querySelector('select')).toBeNull()
-    expect(surface.querySelector('[contenteditable]')).toBeNull()
-    expect(container.querySelector('form')).toBeNull()
-
-    const buttons = within(surface).getAllByRole('button')
-    expect(buttons).toHaveLength(1)
-    expect(buttons[0]?.getAttribute('data-testid')).toBe('detail-close')
+    expect(within(pane()).getByTestId('detail-lane').textContent).toContain('Review')
+    expect(within(pane()).getByTestId('detail-owner').textContent).toContain('Fictional Agent Quill')
+    expect(within(pane()).getByTestId('detail-priority').textContent).toContain('Medium')
+    expect(within(pane()).getByTestId('detail-due-date').textContent).toContain('2026-09-10')
+    expect(within(pane()).getByTestId('detail-labels').textContent).toContain('Research')
+    expect(within(pane()).getByTestId('detail-assignees').textContent).toContain('Fictional Human Wren')
   })
 })
 

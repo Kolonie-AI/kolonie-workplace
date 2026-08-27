@@ -50,8 +50,78 @@
 
 .detail-pane__title {
   margin: 0;
+  min-block-size: 2.25rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-small);
   font-size: var(--text-title);
+  font-weight: 700;
   line-height: 1.3;
+}
+
+.detail-pane__title:focus {
+  border-color: var(--color-accent);
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.detail-pane__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.detail-pane__format {
+  min-block-size: 1.75rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-caption);
+}
+
+.detail-pane__format:hover {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+.detail-pane__format:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.detail-pane__description {
+  min-block-size: 6rem;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-body);
+  line-height: 1.5;
+}
+
+.detail-pane__description:focus {
+  border-color: var(--color-accent);
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.detail-pane__description :where(p, ul, ol, pre) {
+  margin: 0 0 var(--space-2);
+}
+
+.detail-pane__description :where(ul, ol) {
+  padding-inline-start: var(--space-5);
+}
+
+.detail-pane__description code,
+.detail-pane__description pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-small);
 }
 
 .detail-pane__state {
