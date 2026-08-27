@@ -126,21 +126,33 @@ The workplace builds into a two-stage image: Node 22 produces `dist/`, and
 bundle and `nginx.conf`, and no `node_modules` or build toolchain.
 
 ```sh
-# The values are deployment configuration; source them privately rather than
-# putting them in shell history.
-docker build \
-  --build-arg VITE_AUTH0_DOMAIN \
-  --build-arg VITE_AUTH0_CLIENT_ID \
-  --build-arg VITE_AUTH0_CALLBACK \
-  -t kolonie-workplace:local .
+# The values are deployment configuration. Keep them in a private file rather
+# than in shell history, and pass each as a BuildKit secret.
+docker buildx build \
+  --secret id=auth0_domain,src="$SECRETS_DIR/auth0_domain" \
+  --secret id=auth0_client_id,src="$SECRETS_DIR/auth0_client_id" \
+  --secret id=auth0_callback,src="$SECRETS_DIR/auth0_callback" \
+  --provenance=false \
+  -t kolonie-workplace:local --load .
 docker run --rm -p 8080:80 kolonie-workplace:local
 ```
 
-All three build arguments are required and are consumed by Vite in the build
-stage. An unset or empty value stops the build before the application bundle is
-created. They are not runtime environment variables or image labels, and the
-nginx stage receives only the finished bundle. The workplace is a public PKCE
-client, so there is no Auth0 client secret.
+All three are required and are read by Vite in the build stage. A missing or
+empty value stops the build before any bundle is produced, so an image that
+exists is an image that was configured.
+
+They are passed as **secret mounts and never as build arguments**. A build
+argument is recorded in the SLSA provenance attached to a published image and is
+echoed onto the build command line; a secret mount is neither, existing only for
+the one `RUN` that reads it. They are not runtime environment variables or image
+labels, and the nginx stage receives only the finished bundle. The workplace is a
+public PKCE client, so there is no Auth0 client secret.
+
+In CI the same three values come from Actions **repository secrets** named
+`VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID` and `VITE_AUTH0_CALLBACK`. Secrets
+rather than variables because the runner masks a secret in the public log and
+does not mask a variable — the masking is what is wanted, not a claim that these
+are credentials.
 
 - `/` serves the application.
 - `/health` returns 200 and the body `ok` — its own exact-match location, so a

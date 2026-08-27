@@ -50,34 +50,39 @@ jobs:
       # Before the registry login and before any build, so that a repository
       # missing one of the three values fails while nothing has been
       # authenticated and nothing can be pushed. Without this the build would
-      # still refuse (the Dockerfile's `${NAME:?}` guards see to that), but it
+      # still refuse (the Dockerfile's `test -s` guards see to that), but it
       # would refuse after logging in and after uploading a build context, and
       # the reason would be buried in a Docker layer log rather than named by a
       # step whose title says what is wrong.
       #
-      # The values arrive as `env:` on this step alone. They are tested with
-      # `-z` and never echoed, expanded into a message or written to
-      # `$GITHUB_OUTPUT`: the refusal names the *variable*, which is public, and
-      # never its value. `vars` and not `secrets` because the workplace is a
-      # public PKCE client — there is no client secret for it, on the tenant or
-      # anywhere else — but a tenant host name and a client id are still
-      # deployment configuration that `AGENTS.md` §3 keeps out of the tree.
+      # **`secrets` and not `vars`, and that is the correction this file exists
+      # for.** Actions prints a step's `env:` block and every action input
+      # verbatim in the public log, and repository *variables are not masked* —
+      # only secrets are. The first attempt at #38 read these from `vars`, so
+      # all three appeared in cleartext in the log of a public repository. The
+      # runner redacts a secret everywhere it would otherwise print one, which
+      # is the only mechanism that makes an unattended publication safe here.
+      #
+      # This says nothing about the values being credentials. The workplace is a
+      # public PKCE client and there is no client secret for it, on the tenant or
+      # anywhere else. `secrets` is used for its *masking*, and `AGENTS.md` §3 is
+      # what asks that a tenant host name stay out of the log.
       - name: Validate Auth0 build configuration
         env:
-          VITE_AUTH0_DOMAIN: ${{ vars.VITE_AUTH0_DOMAIN }}
-          VITE_AUTH0_CLIENT_ID: ${{ vars.VITE_AUTH0_CLIENT_ID }}
-          VITE_AUTH0_CALLBACK: ${{ vars.VITE_AUTH0_CALLBACK }}
+          VITE_AUTH0_DOMAIN: ${{ secrets.VITE_AUTH0_DOMAIN }}
+          VITE_AUTH0_CLIENT_ID: ${{ secrets.VITE_AUTH0_CLIENT_ID }}
+          VITE_AUTH0_CALLBACK: ${{ secrets.VITE_AUTH0_CALLBACK }}
         run: |
           missing=""
           [ -z "${VITE_AUTH0_DOMAIN}" ] && missing="${missing} VITE_AUTH0_DOMAIN"
           [ -z "${VITE_AUTH0_CLIENT_ID}" ] && missing="${missing} VITE_AUTH0_CLIENT_ID"
           [ -z "${VITE_AUTH0_CALLBACK}" ] && missing="${missing} VITE_AUTH0_CALLBACK"
           if [ -n "${missing}" ]; then
-            echo "::error::Refusing to publish: missing repository variables:${missing}"
-            echo "Set them as Actions repository variables. Values are never printed here."
+            echo "::error::Refusing to publish: missing repository secrets:${missing}"
+            echo "Set them as Actions repository secrets. Values are never printed here."
             exit 1
           fi
-          echo "All three Auth0 build variables are configured."
+          echo "All three Auth0 build values are configured."
 
       - uses: docker/setup-buildx-action@v4
 
@@ -99,17 +104,29 @@ jobs:
           context: .
           push: true
           # The Auth0 SPA configuration, read by Vite while the build stage
-          # runs. `build-args` reach the build stage only; they are not `env:`
-          # on the job, not labels on the image, and nothing writes them into
-          # the nginx runtime — the Dockerfile declares the three `ARG`s inside
-          # the build stage for exactly that reason.
+          # runs — as BuildKit secrets, never as `build-args`.
           #
-          # Buildx does not print a build argument's value, and none of these
-          # is passed to a `RUN` that echoes it.
-          build-args: |
-            VITE_AUTH0_DOMAIN=${{ vars.VITE_AUTH0_DOMAIN }}
-            VITE_AUTH0_CLIENT_ID=${{ vars.VITE_AUTH0_CLIENT_ID }}
-            VITE_AUTH0_CALLBACK=${{ vars.VITE_AUTH0_CALLBACK }}
+          # A build argument is recorded in the SLSA provenance buildx attaches
+          # to the published image and is echoed onto the `docker buildx build`
+          # command line in the log. That is how the first attempt at #38
+          # published these values in an attestation blob. A secret mount is
+          # neither: it lives only for the `RUN` that mounts it, and the echoed
+          # command names the id rather than the value.
+          #
+          # These come from `secrets` rather than `vars` because the runner masks
+          # a secret in the log and does not mask a variable — see the validation
+          # step above for why that is the whole point.
+          secrets: |
+            auth0_domain=${{ secrets.VITE_AUTH0_DOMAIN }}
+            auth0_client_id=${{ secrets.VITE_AUTH0_CLIENT_ID }}
+            auth0_callback=${{ secrets.VITE_AUTH0_CALLBACK }}
+          # Belt and braces after the exposure: buildx attaches a provenance
+          # attestation by default, and that attestation is what carried the
+          # values into the registry last time. Nothing here relies on it, and
+          # the secret mounts above are already absent from it — but an image
+          # this workflow publishes should not grow a new metadata surface for
+          # build inputs without somebody deciding to.
+          provenance: false
           # Both tags, and the commit SHA is the one that matters. `latest`
           # moves under whoever pulls it, so infra pins the SHA — or the digest
           # it resolves to — and gets a build that cannot change beneath it.

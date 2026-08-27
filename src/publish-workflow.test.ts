@@ -23,6 +23,9 @@ const AUTH0_VARIABLES = [
   'VITE_AUTH0_CALLBACK',
 ] as const
 
+/** The BuildKit secret id a value is mounted under: `VITE_AUTH0_DOMAIN` → `auth0_domain`. */
+const secretId = (name: string) => name.replace(/^VITE_/, '').toLowerCase()
+
 describe('publish workflow — when it runs', () => {
   it('runs on a push to main and on nothing else', () => {
     expect(workflow).toMatch(/on:\s*\n\s+push:\s*\n\s+branches:\s*\[main\]/)
@@ -46,12 +49,21 @@ describe('publish workflow — how it authenticates', () => {
     expect(workflow).toMatch(/permissions:\s*\n(?:\s+[^\n]+\n)*?\s+contents:\s*read/)
   })
 
-  it('uses the built-in token and no long-lived credential', () => {
+  /**
+   * #28's guarantee, kept but stated precisely. The registry credential is the
+   * built-in token and nothing else — no personal access token, no stored
+   * registry login. The three Auth0 entries are configuration carried through
+   * `secrets` for its masking, and they authenticate nothing.
+   */
+  it('uses the built-in token and no long-lived registry credential', () => {
     expect(workflow).toContain('password: ${{ secrets.GITHUB_TOKEN }}')
 
     const secretsUsed = [...workflow.matchAll(/secrets\.([A-Z0-9_]+)/g)].map((match) => match[1])
+    const credentials = [...new Set(secretsUsed)].filter(
+      (name) => !AUTH0_VARIABLES.includes(name as (typeof AUTH0_VARIABLES)[number]),
+    )
 
-    expect([...new Set(secretsUsed)]).toEqual(['GITHUB_TOKEN'])
+    expect(credentials).toEqual(['GITHUB_TOKEN'])
   })
 })
 
@@ -74,15 +86,50 @@ describe('publish workflow — what it publishes', () => {
 })
 
 describe('publish workflow — Auth0 build configuration', () => {
-  it('passes all required repository variables as build arguments', () => {
+  /**
+   * The correction from the 2026-08-27 exposure. The first implementation read
+   * the three values from `vars` and handed them to `build-push-action` as
+   * `build-args`. Actions prints a step's `env:` block and every action input
+   * verbatim, and repository *variables* are not masked — only secrets are — so
+   * the values appeared in the public job log and, because buildx records build
+   * arguments in SLSA provenance, in a published attestation blob.
+   *
+   * Nothing about a value's sensitivity fixes that: the masking is what differs.
+   * So delivery moves to `secrets`, which the runner redacts everywhere it would
+   * otherwise print, and to BuildKit secret mounts, which are never build
+   * arguments and are therefore never recorded in provenance.
+   */
+  it('never reads these values from unmasked repository variables', () => {
+    for (const name of AUTH0_VARIABLES) {
+      expect(workflow, `${name} must not be read from the unmasked vars context`).not.toContain(
+        `vars.${name}`,
+      )
+    }
+
+    expect(workflow).not.toMatch(/vars\.VITE_AUTH0_/)
+  })
+
+  it('never passes a value as a build argument, which provenance would record', () => {
+    expect(buildStep).toBeDefined()
+    expect(buildStep).not.toMatch(/build-args:[\s\S]*VITE_AUTH0_/)
+    expect(workflow).not.toMatch(/--build-arg/)
+  })
+
+  it('hands every required value to the build as a masked BuildKit secret', () => {
     expect(buildStep).toBeDefined()
 
     for (const name of AUTH0_VARIABLES) {
-      expect(buildStep).toContain(`${name}=\${{ vars.${name} }}`)
+      expect(buildStep).toContain(`${secretId(name)}=\${{ secrets.${name} }}`)
     }
+
+    expect(buildStep).toMatch(/secrets:\s*\|/)
   })
 
-  it('validates every required variable before login and push', () => {
+  it('keeps build arguments and environment out of the attached provenance', () => {
+    expect(buildStep).toMatch(/provenance:\s*(false|mode=min)/)
+  })
+
+  it('validates every required value before login and push, through masked env only', () => {
     expect(validationStep).toBeDefined()
 
     const validation = workflow.indexOf('- name: Validate Auth0 build configuration')
@@ -94,7 +141,7 @@ describe('publish workflow — Auth0 build configuration', () => {
     expect(validation).toBeLessThan(build)
 
     for (const name of AUTH0_VARIABLES) {
-      expect(validationStep).toContain(`${name}: \${{ vars.${name} }}`)
+      expect(validationStep).toContain(`${name}: \${{ secrets.${name} }}`)
       expect(validationStep).toContain(`-z "\${${name}}"`)
     }
   })

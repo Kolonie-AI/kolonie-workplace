@@ -15,26 +15,44 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 
 # The Auth0 SPA configuration from #2 is read by Vite while this stage runs, so
-# it has to arrive here and nowhere else. The three `ARG`s are declared inside
-# the build stage rather than before the first `FROM`, because an argument
-# declared there would be global and reachable from the runtime stage.
+# it has to arrive here and nowhere else.
 #
-# There is deliberately no default. Without them `npm run build` still succeeds
-# and produces a bundle carrying the `MissingAuth0Configuration` refusal, which
-# throws before the application mounts — a green build and a dead page, which is
-# the failure #38 exists to remove.
-ARG VITE_AUTH0_DOMAIN
-ARG VITE_AUTH0_CLIENT_ID
-ARG VITE_AUTH0_CALLBACK
-
-# `${NAME:?message}` is what moves that refusal from the browser to here: an
-# unset or empty argument fails this `RUN` before `npm run build` is reached,
-# and a failed stage produces no image to tag or push. `:` expands its operands
-# and prints nothing, so a configured value never enters the build log.
-RUN : "${VITE_AUTH0_DOMAIN:?VITE_AUTH0_DOMAIN is required to build the workplace}" \
-    && : "${VITE_AUTH0_CLIENT_ID:?VITE_AUTH0_CLIENT_ID is required to build the workplace}" \
-    && : "${VITE_AUTH0_CALLBACK:?VITE_AUTH0_CALLBACK is required to build the workplace}" \
-    && npm run build
+# **Not as build arguments.** The first attempt at #38 used `ARG`, and it leaked
+# the values twice: BuildKit records every build argument in the SLSA provenance
+# it attaches to the published image, and the `${NAME:?}` guards that enforced
+# them were expanded into the `RUN` line BuildKit echoes into the public build
+# log. Neither is about how sensitive the values are; both are about where a
+# build argument is written down.
+#
+# A secret mount is written down in neither. It exists only for the duration of
+# this one `RUN`, never becomes a layer, never reaches provenance, and the
+# echoed command names a path rather than a value.
+#
+# There is deliberately no default. Without configuration `npm run build` still
+# succeeds and produces a bundle carrying the `MissingAuth0Configuration`
+# refusal, which throws before the application mounts — a green build and a dead
+# page, which is the failure #38 exists to remove. `-s` is what refuses that
+# here: true only for a file that exists and is not empty, so a missing mount
+# and an empty value fail alike, and the message names the variable — which is
+# public — rather than what is in it.
+#
+# The values are exported into the environment of `npm run build` only, in the
+# same shell, so Vite reads them exactly as it reads a local `.env.local`. They
+# are never echoed, never written to a file in the image, and the next stage
+# copies only `dist/`.
+RUN --mount=type=secret,id=auth0_domain \
+    --mount=type=secret,id=auth0_client_id \
+    --mount=type=secret,id=auth0_callback \
+    test -s /run/secrets/auth0_domain \
+      || { echo "VITE_AUTH0_DOMAIN is required to build the workplace" >&2; exit 1; }; \
+    test -s /run/secrets/auth0_client_id \
+      || { echo "VITE_AUTH0_CLIENT_ID is required to build the workplace" >&2; exit 1; }; \
+    test -s /run/secrets/auth0_callback \
+      || { echo "VITE_AUTH0_CALLBACK is required to build the workplace" >&2; exit 1; }; \
+    export VITE_AUTH0_DOMAIN="$(cat /run/secrets/auth0_domain)"; \
+    export VITE_AUTH0_CLIENT_ID="$(cat /run/secrets/auth0_client_id)"; \
+    export VITE_AUTH0_CALLBACK="$(cat /run/secrets/auth0_callback)"; \
+    npm run build
 
 FROM nginx:1.29-alpine AS runtime
 

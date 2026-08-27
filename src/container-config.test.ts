@@ -4,6 +4,15 @@ import { describe, expect, it } from 'vitest'
 
 const readRootFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
+const AUTH0_VARIABLES = [
+  'VITE_AUTH0_DOMAIN',
+  'VITE_AUTH0_CLIENT_ID',
+  'VITE_AUTH0_CALLBACK',
+] as const
+
+/** The BuildKit secret id a value is mounted under: `VITE_AUTH0_DOMAIN` → `auth0_domain`. */
+const secretId = (name: string) => name.replace(/^VITE_/, '').toLowerCase()
+
 describe('container configuration — /health is not swallowed by the SPA fallback', () => {
   const config = readRootFile('nginx.conf')
 
@@ -44,28 +53,57 @@ describe('container configuration — the runtime image carries no toolchain', (
     expect(sources).toBeGreaterThan(manifests)
   })
 
-  it('requires every Auth0 value before building the application', () => {
-    const buildStage = dockerfile.slice(0, dockerfile.indexOf('FROM nginx:1.29-alpine AS runtime'))
-    const buildCommand = buildStage.slice(buildStage.indexOf('\nRUN :'))
+  /**
+   * The correction from the 2026-08-27 exposure. Build arguments were the wrong
+   * carrier twice over: BuildKit records them in SLSA provenance, and the
+   * `${NAME:?}` guards that enforced them were expanded into the `RUN` line
+   * BuildKit echoes, so the values were printed in the public build log.
+   *
+   * A secret mount is neither. It exists only for the one `RUN` that mounts it,
+   * never becomes a layer, and never appears in provenance or in the echoed
+   * command — the command names a path, and the value lives behind it.
+   */
+  it('takes no Auth0 build argument, because provenance would record one', () => {
+    expect(dockerfile).not.toMatch(/ARG\s+VITE_AUTH0_/)
+  })
 
-    for (const name of [
-      'VITE_AUTH0_DOMAIN',
-      'VITE_AUTH0_CLIENT_ID',
-      'VITE_AUTH0_CALLBACK',
-    ]) {
-      expect(buildStage).toContain(`ARG ${name}`)
+  it('reads every required value from a secret mount on the build step', () => {
+    const buildCommand = dockerfile.slice(dockerfile.indexOf('\nRUN --mount=type=secret'))
 
-      const guard = buildCommand.indexOf(`${name}:?${name} is required`)
+    expect(buildCommand).toContain('npm run build')
 
-      expect(guard).toBeGreaterThan(-1)
-      expect(guard).toBeLessThan(buildCommand.indexOf('npm run build'))
+    for (const name of AUTH0_VARIABLES) {
+      expect(buildCommand).toContain(`type=secret,id=${secretId(name)}`)
+      expect(buildCommand).toContain(`/run/secrets/${secretId(name)}`)
     }
   })
 
-  it('keeps Auth0 build arguments out of the runtime stage', () => {
+  /**
+   * The guard has to refuse without ever expanding a value, because BuildKit
+   * prints the resolved `RUN` line. So it tests the *file* — `-s` is true only
+   * for a file that exists and is non-empty — and the message names the
+   * variable, which is public, rather than what is in it.
+   */
+  it('refuses each missing or empty value before the bundle is built, without expanding it', () => {
+    const buildCommand = dockerfile.slice(dockerfile.indexOf('\nRUN --mount=type=secret'))
+    const build = buildCommand.indexOf('npm run build')
+
+    for (const name of AUTH0_VARIABLES) {
+      const guard = buildCommand.indexOf(`-s /run/secrets/${secretId(name)}`)
+
+      expect(guard).toBeGreaterThan(-1)
+      expect(guard).toBeLessThan(build)
+      expect(buildCommand).toContain(`${name} is required`)
+    }
+
+    expect(buildCommand).not.toMatch(/\$\{VITE_AUTH0_[A-Z_]*:\?/)
+    expect(buildCommand).not.toMatch(/echo[^\n]*\$\(cat \/run\/secrets/)
+  })
+
+  it('keeps Auth0 configuration out of the runtime stage', () => {
     const runtimeStage = dockerfile.slice(dockerfile.indexOf('FROM nginx:1.29-alpine AS runtime'))
 
-    expect(runtimeStage).not.toMatch(/VITE_AUTH0_|\bARG\b|\bENV\b/)
+    expect(runtimeStage).not.toMatch(/VITE_AUTH0_|\bARG\b|\bENV\b|\/run\/secrets/)
   })
 
   it('carries only the built bundle and the config into the runtime stage', () => {
