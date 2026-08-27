@@ -14,7 +14,7 @@ const buildStep = workflow.match(
 )?.[0]
 
 const validationStep = workflow.match(
-  /- name: Validate Auth0 build configuration[\s\S]*?(?=\n {6}- |\n {2}\S|$)/,
+  /- name: Validate build configuration[\s\S]*?(?=\n {6}- |\n {2}\S|$)/,
 )?.[0]
 
 const AUTH0_VARIABLES = [
@@ -22,6 +22,17 @@ const AUTH0_VARIABLES = [
   'VITE_AUTH0_CLIENT_ID',
   'VITE_AUTH0_CALLBACK',
 ] as const
+
+const PREVIEW_IDENTITY_VARIABLES = [
+  'VITE_PREVIEW_IDENTITY_PROVIDER',
+  'VITE_PREVIEW_IDENTITY_SUBJECT',
+] as const
+
+/**
+ * Everything Vite must have at build time. The preview mapping (#39) travels the
+ * delivery path #38 settled rather than a second one of its own.
+ */
+const REQUIRED_BUILD_VALUES = [...AUTH0_VARIABLES, ...PREVIEW_IDENTITY_VARIABLES] as const
 
 /** The BuildKit secret id a value is mounted under: `VITE_AUTH0_DOMAIN` → `auth0_domain`. */
 const secretId = (name: string) => name.replace(/^VITE_/, '').toLowerCase()
@@ -60,7 +71,7 @@ describe('publish workflow — how it authenticates', () => {
 
     const secretsUsed = [...workflow.matchAll(/secrets\.([A-Z0-9_]+)/g)].map((match) => match[1])
     const credentials = [...new Set(secretsUsed)].filter(
-      (name) => !AUTH0_VARIABLES.includes(name as (typeof AUTH0_VARIABLES)[number]),
+      (name) => !REQUIRED_BUILD_VALUES.includes(name as (typeof REQUIRED_BUILD_VALUES)[number]),
     )
 
     expect(credentials).toEqual(['GITHUB_TOKEN'])
@@ -85,10 +96,10 @@ describe('publish workflow — what it publishes', () => {
   })
 })
 
-describe('publish workflow — Auth0 build configuration', () => {
+describe('publish workflow — build configuration', () => {
   /**
    * The correction from the 2026-08-27 exposure. The first implementation read
-   * the three values from `vars` and handed them to `build-push-action` as
+   * the three Auth0 values from `vars` and handed them to `build-push-action` as
    * `build-args`. Actions prints a step's `env:` block and every action input
    * verbatim, and repository *variables* are not masked — only secrets are — so
    * the values appeared in the public job log and, because buildx records build
@@ -98,27 +109,31 @@ describe('publish workflow — Auth0 build configuration', () => {
    * So delivery moves to `secrets`, which the runner redacts everywhere it would
    * otherwise print, and to BuildKit secret mounts, which are never build
    * arguments and are therefore never recorded in provenance.
+   *
+   * The preview identity mapping (#39) travels the same path. It is held to
+   * every one of these properties, because a provider and a subject identify a
+   * real person's login at least as much as a tenant host names a tenant.
    */
-  it('never reads these values from unmasked repository variables', () => {
-    for (const name of AUTH0_VARIABLES) {
+  it('never reads any required value from unmasked repository variables', () => {
+    for (const name of REQUIRED_BUILD_VALUES) {
       expect(workflow, `${name} must not be read from the unmasked vars context`).not.toContain(
         `vars.${name}`,
       )
     }
 
-    expect(workflow).not.toMatch(/vars\.VITE_AUTH0_/)
+    expect(workflow).not.toMatch(/vars\.VITE_/)
   })
 
   it('never passes a value as a build argument, which provenance would record', () => {
     expect(buildStep).toBeDefined()
-    expect(buildStep).not.toMatch(/build-args:[\s\S]*VITE_AUTH0_/)
+    expect(buildStep).not.toMatch(/build-args:[\s\S]*VITE_/)
     expect(workflow).not.toMatch(/--build-arg/)
   })
 
   it('hands every required value to the build as a masked BuildKit secret', () => {
     expect(buildStep).toBeDefined()
 
-    for (const name of AUTH0_VARIABLES) {
+    for (const name of REQUIRED_BUILD_VALUES) {
       expect(buildStep).toContain(`${secretId(name)}=\${{ secrets.${name} }}`)
     }
 
@@ -132,7 +147,7 @@ describe('publish workflow — Auth0 build configuration', () => {
   it('validates every required value before login and push, through masked env only', () => {
     expect(validationStep).toBeDefined()
 
-    const validation = workflow.indexOf('- name: Validate Auth0 build configuration')
+    const validation = workflow.indexOf('- name: Validate build configuration')
     const login = workflow.indexOf('uses: docker/login-action')
     const build = workflow.indexOf('uses: docker/build-push-action')
 
@@ -140,7 +155,7 @@ describe('publish workflow — Auth0 build configuration', () => {
     expect(validation).toBeLessThan(login)
     expect(validation).toBeLessThan(build)
 
-    for (const name of AUTH0_VARIABLES) {
+    for (const name of REQUIRED_BUILD_VALUES) {
       expect(validationStep).toContain(`${name}: \${{ secrets.${name} }}`)
       expect(validationStep).toContain(`-z "\${${name}}"`)
     }
@@ -149,8 +164,8 @@ describe('publish workflow — Auth0 build configuration', () => {
   it('does not copy build configuration into workflow-wide or runtime environment', () => {
     const globalEnvironment = workflow.match(/\nenv:\s*\n[\s\S]*?(?=\n\S)/)?.[0] ?? ''
 
-    expect(globalEnvironment).not.toContain('VITE_AUTH0_')
-    expect(workflow).not.toMatch(/labels:[\s\S]*VITE_AUTH0_/)
+    expect(globalEnvironment).not.toContain('VITE_')
+    expect(workflow).not.toMatch(/labels:[\s\S]*VITE_/)
   })
 })
 

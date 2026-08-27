@@ -5,6 +5,7 @@ import {
   fixtureHumans,
 } from '@/fixtures/catalogue'
 import type { HumanDirectory } from '@/session/human-directory'
+import { readPreviewIdentity } from '@/session/preview-identity'
 
 /**
  * Resolution of `(provider, subject)` to an existing human.
@@ -71,10 +72,50 @@ const FIXTURE_KNOWN_IDENTITIES: readonly KnownIdentity[] = [
   { ...FIXTURE_IDENTITIES.rook, humanId: FIXTURE_HUMANS.rook },
 ]
 
-export function createColonyHumanDirectory(): HumanDirectory {
-  return new ColonyHumanDirectory(FIXTURE_KNOWN_IDENTITIES, fixtureHumans)
+/**
+ * The fixture human the configured preview identity resolves to.
+ *
+ * `wren` and not a new row, because the preview exists to be looked at: this
+ * human owns two agents and therefore the boards the sidebar, the Kanban and the
+ * detail pane have something to draw. Minting a human for the preview would be
+ * the second account store this repository is forbidden to grow.
+ */
+export const PREVIEW_HUMAN_ID = FIXTURE_HUMANS.wren
+
+/**
+ * The directory the running application uses: the fictional fixture identities,
+ * plus **one** identity read from the environment at build time.
+ *
+ * The preview entry is temporary and is described in full in `preview-identity.ts`,
+ * including what deletes it. It changes nothing about how resolution works —
+ * `(provider, subject)` still both have to match, nothing is created, and an
+ * identity with no entry is still refused. It adds one row and no rule.
+ *
+ * A missing or partial mapping throws out of here rather than yielding a
+ * directory with the fixture entries alone. That is the deliberate choice: a
+ * directory that quietly dropped the preview entry would leave the deployed
+ * preview refusing the only account that is meant to reach it, and it would look
+ * like a login problem rather than like missing configuration.
+ */
+export function createColonyHumanDirectory(
+  env: Readonly<Record<string, string | undefined>>,
+): HumanDirectory {
+  const preview = readPreviewIdentity(env)
+
+  return new ColonyHumanDirectory(
+    [
+      ...FIXTURE_KNOWN_IDENTITIES,
+      { provider: preview.provider, subject: preview.subject, humanId: PREVIEW_HUMAN_ID },
+    ],
+    fixtureHumans,
+  )
 }
 
+/**
+ * The fictional identities alone, with no preview entry and no environment read.
+ * Tests and injected development fixtures use this; application composition
+ * never does.
+ */
 export function createFixtureHumanDirectory(): HumanDirectory {
-  return createColonyHumanDirectory()
+  return new ColonyHumanDirectory(FIXTURE_KNOWN_IDENTITIES, fixtureHumans)
 }

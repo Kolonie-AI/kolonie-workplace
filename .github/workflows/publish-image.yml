@@ -48,7 +48,7 @@ jobs:
       - uses: actions/checkout@v5
 
       # Before the registry login and before any build, so that a repository
-      # missing one of the three values fails while nothing has been
+      # missing one of the five values fails while nothing has been
       # authenticated and nothing can be pushed. Without this the build would
       # still refuse (the Dockerfile's `test -s` guards see to that), but it
       # would refuse after logging in and after uploading a build context, and
@@ -67,22 +67,31 @@ jobs:
       # public PKCE client and there is no client secret for it, on the tenant or
       # anywhere else. `secrets` is used for its *masking*, and `AGENTS.md` §3 is
       # what asks that a tenant host name stay out of the log.
-      - name: Validate Auth0 build configuration
+      #
+      # The two preview identity values (#39) are validated here for the same
+      # reasons and with more force: a provider and a subject name how one real
+      # person signs in, and a build without them would publish green and then
+      # throw `MissingPreviewIdentityConfiguration` in the browser.
+      - name: Validate build configuration
         env:
           VITE_AUTH0_DOMAIN: ${{ secrets.VITE_AUTH0_DOMAIN }}
           VITE_AUTH0_CLIENT_ID: ${{ secrets.VITE_AUTH0_CLIENT_ID }}
           VITE_AUTH0_CALLBACK: ${{ secrets.VITE_AUTH0_CALLBACK }}
+          VITE_PREVIEW_IDENTITY_PROVIDER: ${{ secrets.VITE_PREVIEW_IDENTITY_PROVIDER }}
+          VITE_PREVIEW_IDENTITY_SUBJECT: ${{ secrets.VITE_PREVIEW_IDENTITY_SUBJECT }}
         run: |
           missing=""
           [ -z "${VITE_AUTH0_DOMAIN}" ] && missing="${missing} VITE_AUTH0_DOMAIN"
           [ -z "${VITE_AUTH0_CLIENT_ID}" ] && missing="${missing} VITE_AUTH0_CLIENT_ID"
           [ -z "${VITE_AUTH0_CALLBACK}" ] && missing="${missing} VITE_AUTH0_CALLBACK"
+          [ -z "${VITE_PREVIEW_IDENTITY_PROVIDER}" ] && missing="${missing} VITE_PREVIEW_IDENTITY_PROVIDER"
+          [ -z "${VITE_PREVIEW_IDENTITY_SUBJECT}" ] && missing="${missing} VITE_PREVIEW_IDENTITY_SUBJECT"
           if [ -n "${missing}" ]; then
             echo "::error::Refusing to publish: missing repository secrets:${missing}"
             echo "Set them as Actions repository secrets. Values are never printed here."
             exit 1
           fi
-          echo "All three Auth0 build values are configured."
+          echo "All five build values are configured."
 
       - uses: docker/setup-buildx-action@v4
 
@@ -103,8 +112,9 @@ jobs:
         with:
           context: .
           push: true
-          # The Auth0 SPA configuration, read by Vite while the build stage
-          # runs — as BuildKit secrets, never as `build-args`.
+          # The Auth0 SPA configuration and the preview identity mapping, read
+          # by Vite while the build stage runs — as BuildKit secrets, never as
+          # `build-args`.
           #
           # A build argument is recorded in the SLSA provenance buildx attaches
           # to the published image and is echoed onto the `docker buildx build`
@@ -120,6 +130,8 @@ jobs:
             auth0_domain=${{ secrets.VITE_AUTH0_DOMAIN }}
             auth0_client_id=${{ secrets.VITE_AUTH0_CLIENT_ID }}
             auth0_callback=${{ secrets.VITE_AUTH0_CALLBACK }}
+            preview_identity_provider=${{ secrets.VITE_PREVIEW_IDENTITY_PROVIDER }}
+            preview_identity_subject=${{ secrets.VITE_PREVIEW_IDENTITY_SUBJECT }}
           # Belt and braces after the exposure: buildx attaches a provenance
           # attestation by default, and that attestation is what carried the
           # values into the registry last time. Nothing here relies on it, and

@@ -9,10 +9,22 @@ import { createAuth0WorkplaceSession } from '@/session/auth0-workplace-session'
 import SignedOutView from '@/session/SignedOutView.vue'
 import { WORKPLACE_SESSION } from '@/session/workplace-session'
 
+/**
+ * A complete environment for composing the application: the tenant
+ * configuration from #2 and the preview identity mapping from #39. Both are
+ * required, so a test that composes a session has to supply both — the refusals
+ * for each missing piece live in `auth0-config.test.ts` and
+ * `preview-identity-boundary.test.ts`.
+ *
+ * Every value is fictional. The real ones arrive from the environment at build
+ * time and are written down nowhere in this repository.
+ */
 const CONFIGURED = {
   VITE_AUTH0_DOMAIN: 'configured-domain',
   VITE_AUTH0_CLIENT_ID: 'configured-client-id',
   VITE_AUTH0_CALLBACK: 'https://workplace.example.invalid/sign-in/callback',
+  VITE_PREVIEW_IDENTITY_PROVIDER: 'configured-provider',
+  VITE_PREVIEW_IDENTITY_SUBJECT: 'configured-subject',
 } as const
 
 describe('the fixture picker is unreachable from application composition', () => {
