@@ -330,6 +330,9 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
           <p class="app-shell__active-board-agent">
             {{ boardList.activeBoard.value.agentName }}
           </p>
+          <p class="app-shell__active-board-profession">
+            {{ boardList.activeBoard.value.profession ?? 'Profession not declared' }}
+          </p>
         </section>
 
         <div

@@ -66,6 +66,9 @@ const emit = defineEmits<{
         <p class="board-list__agent">
           {{ group.agentName }}
         </p>
+        <p class="board-list__profession">
+          {{ group.profession ?? 'Profession not declared' }}
+        </p>
         <ul class="board-list__boards">
           <li
             v-for="board in group.boards"

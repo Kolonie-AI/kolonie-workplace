@@ -21,6 +21,7 @@ export interface Human {
 export interface Agent {
   readonly id: AgentId
   readonly name: string
+  readonly profession: string | null
   readonly boardIds: readonly BoardId[]
 }
 
@@ -32,6 +33,7 @@ export interface Board {
 
 export interface VisibleBoard extends Board {
   readonly agentName: string
+  readonly profession: string | null
 }
 
 export type WorkItemId = string

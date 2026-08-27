@@ -37,10 +37,18 @@
 }
 
 .board-list__agent {
-  margin: 0 0 var(--space-2);
+  margin: 0;
   color: var(--color-sidebar-text);
   font-size: var(--text-small);
   font-weight: 600;
+}
+
+.board-list__profession {
+  margin: var(--space-1) 0 var(--space-2);
+  color: var(--color-sidebar-text);
+  font-size: var(--text-small);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .board-list__board {
