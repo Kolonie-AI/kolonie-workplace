@@ -11,21 +11,31 @@
  *   frontend/src/views/tasks/TaskDetailView.vue
  *   frontend/src/components/tasks/partials/Heading.vue
  *   frontend/src/components/tasks/partials/Description.vue
+ *   frontend/src/components/tasks/partials/EditLabels.vue
+ *   frontend/src/components/tasks/partials/EditAssignees.vue
+ *   frontend/src/components/input/Multiselect.vue
  * No Vikunja store, router, i18n or task model is used.
  */
-import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, ref, useId, useTemplateRef, watch } from 'vue'
 import { WORKPLACE_LANE_LABELS } from '@/domain/lanes'
-import type { UpdateWorkItemInput, WorkItemDetail } from '@/domain/workplace'
+import type {
+  UpdateWorkItemInput,
+  WorkItemAssignee,
+  WorkItemDetail,
+  WorkItemLabel,
+} from '@/domain/workplace'
 import type { ItemDetailStatus } from '@/detail/use-item-detail'
 import { renderHandover } from '@/detail/handover-parts'
 import { sanitizeDescription } from '@/detail/sanitize-description'
-import { WORK_ITEM_PRIORITY_LABELS } from '@/kanban/card-facets'
+import { readableTextOn, WORK_ITEM_PRIORITY_LABELS } from '@/kanban/card-facets'
 import '@/detail/detail-pane.css'
 
 const props = defineProps<{
   status: ItemDetailStatus
   item: WorkItemDetail | null
   updateError: string | null
+  availableLabels: readonly WorkItemLabel[]
+  availableAssignees: readonly WorkItemAssignee[]
 }>()
 
 const emit = defineEmits<{
@@ -36,6 +46,49 @@ const emit = defineEmits<{
 const titleDraft = ref('')
 const descriptionDraft = ref('')
 const descriptionEditor = useTemplateRef<HTMLElement>('descriptionEditor')
+const labelQuery = ref('')
+const assigneeQuery = ref('')
+const labelActive = ref(-1)
+const assigneeActive = ref(-1)
+const labelOpen = ref(false)
+const assigneeOpen = ref(false)
+const labelListId = `label-options-${useId()}`
+const assigneeListId = `assignee-options-${useId()}`
+const labelColours = ['#1973ff', '#00db60', '#ff4136', '#8338ec'] as const
+const selectedLabelColour = ref<(typeof labelColours)[number]>(labelColours[0])
+
+const filteredLabels = computed(() => {
+  const selected = new Set(props.item?.labels.map((label) => label.id) ?? [])
+  const query = labelQuery.value.trim().toLocaleLowerCase()
+
+  return props.availableLabels.filter(
+    (label) => !selected.has(label.id) && label.title.toLocaleLowerCase().includes(query),
+  )
+})
+
+const filteredAssignees = computed(() => {
+  const selected = new Set(props.item?.assignees.map((assignee) => assignee.id) ?? [])
+  const query = assigneeQuery.value.trim().toLocaleLowerCase()
+
+  return props.availableAssignees.filter(
+    (assignee) => !selected.has(assignee.id) && assignee.name.toLocaleLowerCase().includes(query),
+  )
+})
+
+const canCreateLabel = computed(() => {
+  const query = labelQuery.value.trim().toLocaleLowerCase()
+
+  return query !== '' && ![...props.availableLabels, ...(props.item?.labels ?? [])].some(
+    (label) => label.title.toLocaleLowerCase() === query,
+  )
+})
+
+const activeLabelId = computed(() =>
+  labelActive.value < 0 ? undefined : `${labelListId}-${labelActive.value}`,
+)
+const activeAssigneeId = computed(() =>
+  assigneeActive.value < 0 ? undefined : `${assigneeListId}-${assigneeActive.value}`,
+)
 
 const laneLabel = computed(() =>
   props.item === null ? null : WORKPLACE_LANE_LABELS[props.item.lane],
@@ -140,6 +193,99 @@ function addLink(): void {
 
   if (href !== null && /^(https?:|mailto:|\/|#)/i.test(href)) {
     formatDescription('createLink', href)
+  }
+}
+
+function labelStyle(colour: string): { background: string; color: string } {
+  return { background: colour, color: readableTextOn(colour) }
+}
+
+function updateLabels(labels: readonly WorkItemLabel[]): void {
+  emit('update', { labels })
+  labelQuery.value = ''
+  labelActive.value = -1
+  labelOpen.value = false
+}
+
+function updateAssignees(assignees: readonly WorkItemAssignee[]): void {
+  emit('update', { assignees })
+  assigneeQuery.value = ''
+  assigneeActive.value = -1
+  assigneeOpen.value = false
+}
+
+function addLabel(label: WorkItemLabel): void {
+  updateLabels([...(props.item?.labels ?? []), label])
+}
+
+function createLabel(): void {
+  const title = labelQuery.value.trim()
+
+  if (title === '' || !canCreateLabel.value) {
+    return
+  }
+
+  addLabel({
+    id: `created-label-${title.toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    title,
+    colour: selectedLabelColour.value,
+  })
+}
+
+function removeLabel(label: WorkItemLabel): void {
+  updateLabels((props.item?.labels ?? []).filter((candidate) => candidate.id !== label.id))
+}
+
+function addAssignee(assignee: WorkItemAssignee): void {
+  updateAssignees([...(props.item?.assignees ?? []), assignee])
+}
+
+function removeAssignee(assignee: WorkItemAssignee): void {
+  updateAssignees(
+    (props.item?.assignees ?? []).filter((candidate) => candidate.id !== assignee.id),
+  )
+}
+
+function onLabelKeydown(event: KeyboardEvent): void {
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    labelOpen.value = true
+    labelActive.value = Math.min(labelActive.value + 1, filteredLabels.value.length - 1)
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    labelActive.value = Math.max(labelActive.value - 1, 0)
+  } else if (event.key === 'Enter') {
+    event.preventDefault()
+    const label = filteredLabels.value[labelActive.value]
+    if (label !== undefined) addLabel(label)
+    else createLabel()
+  } else if (event.key === 'Backspace' && labelQuery.value === '') {
+    const last = props.item?.labels.at(-1)
+    if (last !== undefined) removeLabel(last)
+  } else if (event.key === 'Escape') {
+    labelOpen.value = false
+    labelActive.value = -1
+  }
+}
+
+function onAssigneeKeydown(event: KeyboardEvent): void {
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    assigneeOpen.value = true
+    assigneeActive.value = Math.min(assigneeActive.value + 1, filteredAssignees.value.length - 1)
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    assigneeActive.value = Math.max(assigneeActive.value - 1, 0)
+  } else if (event.key === 'Enter') {
+    event.preventDefault()
+    const assignee = filteredAssignees.value[assigneeActive.value]
+    if (assignee !== undefined) addAssignee(assignee)
+  } else if (event.key === 'Backspace' && assigneeQuery.value === '') {
+    const last = props.item?.assignees.at(-1)
+    if (last !== undefined) removeAssignee(last)
+  } else if (event.key === 'Escape') {
+    assigneeOpen.value = false
+    assigneeActive.value = -1
   }
 }
 </script>
@@ -319,13 +465,142 @@ function addLink(): void {
         <div class="detail-pane__fact">
           <dt>Labels</dt>
           <dd data-testid="detail-labels">
-            {{ item.labels.map((label) => label.title).join(', ') || 'None' }}
+            <div class="detail-pane__chips">
+              <span
+                v-for="label in item.labels"
+                :key="label.id"
+                class="detail-pane__chip"
+                :style="labelStyle(label.colour)"
+              >
+                {{ label.title }}
+                <button
+                  class="detail-pane__chip-remove"
+                  type="button"
+                  :aria-label="`Remove label ${label.title}`"
+                  @click="removeLabel(label)"
+                >×</button>
+              </span>
+            </div>
+            <div class="detail-pane__multiselect">
+              <input
+                v-model="labelQuery"
+                class="detail-pane__search"
+                type="text"
+                role="combobox"
+                aria-label="Search labels"
+                aria-autocomplete="list"
+                :aria-expanded="labelOpen && (filteredLabels.length > 0 || canCreateLabel)"
+                :aria-controls="labelListId"
+                :aria-activedescendant="activeLabelId"
+                @focus="labelOpen = true"
+                @input="labelOpen = true; labelActive = -1"
+                @keydown="onLabelKeydown"
+              >
+              <div
+                class="detail-pane__palette"
+                aria-label="Label colours"
+              >
+                <button
+                  v-for="(colour, index) in labelColours"
+                  :key="colour"
+                  class="detail-pane__swatch"
+                  :class="{ 'detail-pane__swatch--selected': colour === selectedLabelColour }"
+                  type="button"
+                  :aria-label="`Choose label colour ${index + 1}`"
+                  :aria-pressed="colour === selectedLabelColour"
+                  :style="{ background: colour }"
+                  @click="selectedLabelColour = colour"
+                />
+              </div>
+              <ul
+                v-if="labelOpen && (filteredLabels.length > 0 || canCreateLabel)"
+                :id="labelListId"
+                class="detail-pane__options"
+                role="listbox"
+                aria-label="Label suggestions"
+              >
+                <li
+                  v-for="(label, index) in filteredLabels"
+                  :id="`${labelListId}-${index}`"
+                  :key="label.id"
+                  class="detail-pane__option"
+                  :class="{ 'detail-pane__option--active': index === labelActive }"
+                  role="option"
+                  :aria-selected="index === labelActive"
+                  :aria-label="label.title"
+                  @click="addLabel(label)"
+                >
+                  {{ label.title }}
+                </li>
+                <li
+                  v-if="canCreateLabel"
+                  class="detail-pane__option"
+                  role="option"
+                  :aria-label="`Create label ${labelQuery.trim()}`"
+                  aria-selected="false"
+                  @click="createLabel"
+                >
+                  Create “{{ labelQuery.trim() }}”
+                </li>
+              </ul>
+            </div>
           </dd>
         </div>
         <div class="detail-pane__fact">
           <dt>Assignees</dt>
           <dd data-testid="detail-assignees">
-            {{ item.assignees.map((assignee) => assignee.name).join(', ') || 'None' }}
+            <div class="detail-pane__chips">
+              <span
+                v-for="assignee in item.assignees"
+                :key="assignee.id"
+                class="detail-pane__chip detail-pane__chip--plain"
+              >
+                {{ assignee.name }}
+                <button
+                  class="detail-pane__chip-remove"
+                  type="button"
+                  :aria-label="`Remove assignee ${assignee.name}`"
+                  @click="removeAssignee(assignee)"
+                >×</button>
+              </span>
+            </div>
+            <div class="detail-pane__multiselect">
+              <input
+                v-model="assigneeQuery"
+                class="detail-pane__search"
+                type="text"
+                role="combobox"
+                aria-label="Search assignees"
+                aria-autocomplete="list"
+                :aria-expanded="assigneeOpen && filteredAssignees.length > 0"
+                :aria-controls="assigneeListId"
+                :aria-activedescendant="activeAssigneeId"
+                @focus="assigneeOpen = true"
+                @input="assigneeOpen = true; assigneeActive = -1"
+                @keydown="onAssigneeKeydown"
+              >
+              <ul
+                v-if="assigneeOpen && filteredAssignees.length > 0"
+                :id="assigneeListId"
+                class="detail-pane__options"
+                role="listbox"
+                aria-label="Assignee suggestions"
+              >
+                <li
+                  v-for="(assignee, index) in filteredAssignees"
+                  :id="`${assigneeListId}-${index}`"
+                  :key="assignee.id"
+                  class="detail-pane__option"
+                  :class="{ 'detail-pane__option--active': index === assigneeActive }"
+                  role="option"
+                  :aria-selected="index === assigneeActive"
+                  :aria-label="assignee.name"
+                  @click="addAssignee(assignee)"
+                >
+                  {{ assignee.name }}
+                </li>
+              </ul>
+            </div>
           </dd>
         </div>
       </dl>
