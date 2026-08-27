@@ -17,11 +17,8 @@ actions belong in [`kolonie-platform`](https://github.com/Kolonie-AI/kolonie-pla
 Read `README.md` in this repository before writing code. It states the product
 boundary and the UI-first sequence.
 
-**`README.md`'s Vikunja section is stale as of 2026-08-26** and still presents
-extraction as an open candidate with a kill question. That question is answered
-— see §5. The bootstrap issue
-([#3](https://github.com/Kolonie-AI/kolonie-workplace/issues/3)) rewrites that
-section; until it merges, §5 of this file wins over `README.md` on the point.
+`README.md` and this file agree on the Vikunja question as of 2026-08-27; §5
+is the binding statement, and `README.md` states the same rule in prose.
 
 ## 2. Where the work is
 
@@ -69,12 +66,15 @@ The writing standard is
   different domains. Platform schema work belongs in `kolonie-platform`.
 - **No secrets, credentials, host names or IP addresses** in any file,
   including tests and comments.
-- **No Vikunja source in this repository.** Not a component, stylesheet, class
-  name, icon or asset — see §5. Vikunja is read for shape only. If a
-  third-party frontend tree is ever imported after a maintainer approves it
-  (§4), its licence and copyright notices are preserved intact; Vikunja is
-  AGPL-3.0-or-later. `NOTICE` stays accurate: today it covers our own code,
-  because nothing has been imported.
+- **Vikunja source may be imported or adapted, with attribution** — see §5.
+  This repository is AGPL-3.0-or-later and so is Vikunja, so reuse is a
+  licence-compatible engineering choice rather than a prohibited one. Three
+  duties come with it and none of them are optional: an imported or adapted
+  file keeps its upstream copyright and licence header intact; `NOTICE` names
+  the pinned upstream release and commit together with every imported or
+  derived path; and the issue that asks for the import names the source paths
+  it expects, so a reviewer can tell reuse from an unreviewed fork. Importing
+  a whole third-party frontend tree still needs the maintainer (§4).
 - **English** in repository prose, issues, comments and commit messages.
 
 ## 4. Integration
@@ -107,18 +107,34 @@ Confirm with the maintainer before:
 See `kolonie-docs/AGENTS.md` for the global list of things that need a
 maintainer; §4 above adds this repository's own.
 
-**The Vikunja extraction question is settled and is not open to re-litigate.**
-The 2026-08-25 spike answered it **No-Go**: Vikunja's Kanban, list and detail
-components import Pinia stores, HTTP services, `vue-router`, `vue-i18n` and a
-35-field `ITask`, so they are not adapter-shaped and extracting them would add
-a permanent attribution obligation for no benefit. That spike is closed
-([#1](https://github.com/Kolonie-AI/kolonie-workplace/issues/1)).
+**Selective Vikunja reuse is permitted, and a blind fork is not.** Gregor
+Sprint and Colette Reprise decided this on 2026-08-27, reversing the blanket
+import ban that stood before it. The reversal rests on a fact worth stating
+plainly rather than re-deriving: `LICENSE` and `NOTICE` already make this
+application **AGPL-3.0-or-later**, and Vikunja is AGPL-3.0-or-later too. The
+earlier rule read as if importing would impose a new obligation on otherwise
+unencumbered code. It would not. The obligation is attribution, and this
+repository already lives under the licence that obligation belongs to.
 
-What the Colony builds instead is original Vue 3 + TypeScript code in this
-repository, informed by Vikunja's **information architecture and visual
-density** and by nothing else. Read Vikunja for shape; copy no source file,
-stylesheet, class name, icon or asset from it. Do not open another spike to
-"just copy the card".
+So a worker may clone Vikunja, run the reference instance, read its source
+directly, and **copy or adapt a component, stylesheet, icon or asset** when
+that is cheaper and clearer than rebuilding it. Doing so carries the three
+duties in §3, and they are what makes the reuse honest: upstream headers stay
+intact, `NOTICE` records the pinned release, commit and every affected path,
+and the issue names the source paths it expects to be read.
+
+**The 2026-08-25 measurement still stands, and it is now a warning rather than
+a ban.** Vikunja's Kanban, list and detail components import Pinia stores, HTTP
+services, `vue-router`, `vue-i18n` and a 35-field `ITask`. That is why a
+wholesale copy of the tree is the wrong shape: it drags an architecture across
+the `TaskGateway` seam this repository exists to keep. Take the surface, leave
+the store. Where a file cannot be separated from Vikunja's data model, adapt it
+against Colony types instead of importing the model with it.
+
+Three things this decision does **not** change. The Colony domain does not come
+from Vikunja's `ITask`. Canonical work state stays in `kolonie-platform`. And
+`TaskGateway` remains the only seam through which board data reaches a
+component, whatever the origin of that component.
 
 The decision record is
 [`human-workplace-form.md`](https://github.com/Kolonie-AI/kolonie-concept-lab/blob/main/concepts/human-workplace-form.md)

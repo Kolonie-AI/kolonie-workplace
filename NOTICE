@@ -11,5 +11,18 @@ back.
 The copyright holder is Kolonie AI FZ-LLC, a Dubai Free Zone company in
 formation as of 2026-07-27. See governance/legal-structure.md in kolonie-docs.
 
-Third-party code imported later, including any Vikunja frontend extraction,
-must keep its original copyright, licence notices and attribution intact.
+Third-party code imported or adapted here must keep its original copyright and
+licence notices intact, and must be listed below with the upstream release, the
+commit it was taken from, and the paths it affects.
+
+Vikunja (https://github.com/go-vikunja/vikunja) is licensed under
+AGPL-3.0-or-later and is the reference this workplace reuses from. A maintainer
+decision of 2026-08-27 permits copying and adapting Vikunja source here, on the
+condition that this file stays accurate.
+
+Imported or adapted from Vikunja:
+
+  (none yet)
+
+Nothing has been imported as of 2026-08-27, so the list above is empty. An
+import that does not add its row here is incomplete, not merely undocumented.
