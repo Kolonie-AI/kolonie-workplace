@@ -210,7 +210,7 @@ describe('kanban board — cards', () => {
     expect(spy).not.toHaveBeenCalled()
   })
 
-  it('offers no inline edit, completion or create-card affordance', async () => {
+  it('offers no inline edit or completion affordance', async () => {
     await renderBoard(
       FIXTURE_HUMANS.wren,
       FIXTURE_BOARDS.quillDelivery,
@@ -220,7 +220,6 @@ describe('kanban board — cards', () => {
       expect(allCardIds()).toHaveLength(6)
     })
 
-    expect(screen.queryByRole('button', { name: /add (a )?(card|task|item)/i })).toBeNull()
     expect(screen.getAllByLabelText('Move to lane')).toHaveLength(6)
     expect(screen.queryByRole('checkbox')).toBeNull()
     const board = screen.getByTestId('kanban-board')
@@ -478,6 +477,101 @@ describe('kanban board — rejection: an item in a lane the Colony does not defi
     expect(cardIdsInLane('ready')).toEqual(['sound'])
     expect(screen.getAllByTestId('kanban-lane')).toHaveLength(6)
     expect(screen.queryByTestId('kanban-board-empty')).toBeNull()
+  })
+})
+
+describe('kanban board — inline card composer', () => {
+  function laneNamed(lane: string): HTMLElement {
+    const element = screen
+      .getAllByTestId('kanban-lane')
+      .find((candidate) => candidate.getAttribute('data-lane') === lane)
+
+    if (element === undefined) {
+      throw new Error(`Expected the ${lane} lane.`)
+    }
+
+    return element
+  }
+
+  it('offers one Add card button in every lane', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: /add card to/i })).toHaveLength(6)
+    })
+  })
+
+  it('creates in the chosen lane, clears the input and keeps the composer open', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    await screen.findAllByTestId('kanban-lane')
+    const ready = laneNamed('ready')
+    await fireEvent.click(within(ready).getByRole('button', { name: 'Add card to Ready' }))
+    const input = within(ready).getByRole('textbox', { name: 'Card title for Ready' })
+
+    await fireEvent.update(input, 'A card created from Ready')
+    await fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => {
+      expect(within(ready).getByText('A card created from Ready')).toBeTruthy()
+    })
+    expect((input as HTMLInputElement).value).toBe('')
+    expect(document.activeElement).toBe(input)
+    expect(within(ready).getByRole('textbox', { name: 'Card title for Ready' })).toBe(input)
+  })
+
+  it('closes on Escape and returns focus to the Add card button', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    await screen.findAllByTestId('kanban-lane')
+    const blocked = laneNamed('blocked')
+    const add = within(blocked).getByRole('button', { name: 'Add card to Blocked' })
+    await fireEvent.click(add)
+    const input = within(blocked).getByRole('textbox', { name: 'Card title for Blocked' })
+
+    await fireEvent.keyDown(input, { key: 'Escape' })
+
+    expect(within(blocked).queryByRole('textbox', { name: 'Card title for Blocked' })).toBeNull()
+    await waitFor(() => {
+      expect(document.activeElement).toBe(
+        within(blocked).getByRole('button', { name: 'Add card to Blocked' }),
+      )
+    })
+  })
+
+  it('closes on blur when the field is empty without creating', async () => {
+    const gateway = createFixtureTaskGateway()
+    const create = vi.spyOn(gateway, 'createWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await screen.findAllByTestId('kanban-lane')
+    const review = laneNamed('review')
+    await fireEvent.click(within(review).getByRole('button', { name: 'Add card to Review' }))
+
+    await fireEvent.blur(within(review).getByRole('textbox', { name: 'Card title for Review' }))
+
+    expect(within(review).queryByRole('textbox', { name: 'Card title for Review' })).toBeNull()
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('removes a rejected optimistic card and surfaces the failure', async () => {
+    let rejectCreate: ((error: Error) => void) | undefined
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'createWorkItem').mockImplementation(
+      async () => new Promise((_resolve, reject) => { rejectCreate = reject }),
+    )
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await screen.findAllByTestId('kanban-lane')
+    const inbox = laneNamed('inbox')
+    await fireEvent.click(within(inbox).getByRole('button', { name: 'Add card to Inbox' }))
+    const input = within(inbox).getByRole('textbox', { name: 'Card title for Inbox' })
+    await fireEvent.update(input, 'A card that will be rejected')
+    await fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(within(inbox).getByText('A card that will be rejected')).toBeTruthy()
+    rejectCreate?.(new Error('write unavailable'))
+
+    await waitFor(() => {
+      expect(within(inbox).queryByText('A card that will be rejected')).toBeNull()
+    })
+    expect(screen.getByTestId('kanban-create-error').textContent).toMatch(/failed/i)
   })
 })
 

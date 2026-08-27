@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 import { WORKPLACE_LANES } from '@/domain/lanes'
-import type { BoardId, WorkItemSummary } from '@/domain/workplace'
+import type { BoardId, WorkItemDetail, WorkItemSummary } from '@/domain/workplace'
 import { BoardAccessRefused } from '@/gateway/refusals'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
@@ -308,6 +308,95 @@ describe('board kanban — selection', () => {
     await settled()
 
     expect(kanban.selectedItemId.value).toBeNull()
+  })
+})
+
+function createdItem(id: string, title: string, lane: 'ready' | 'blocked' = 'ready'): WorkItemDetail {
+  return {
+    id,
+    boardId: FIXTURE_BOARDS.quillDelivery,
+    title,
+    lane,
+    owner: 'Unassigned',
+    description: '',
+    labels: [],
+    assignees: [],
+    priority: 'unset',
+    dueDate: null,
+    percentDone: 0,
+    checklist: [],
+    comments: [],
+    attachments: [],
+    coverColour: null,
+    position: 0,
+    externalReferences: [],
+  }
+}
+
+describe('board items — optimistic create', () => {
+  it('adds a temporary card to the requested lane before the gateway settles, then replaces it', async () => {
+    let resolveCreate: ((item: WorkItemDetail) => void) | undefined
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'createWorkItem').mockImplementation(
+      async () => new Promise((resolve) => { resolveCreate = resolve }),
+    )
+    const items = useBoardItems(
+      gateway,
+      ref(FIXTURE_HUMANS.wren),
+      ref(FIXTURE_BOARDS.quillDelivery),
+    )
+    await settled()
+
+    const creation = items.createItem('A newly drafted card', 'blocked')
+    await settled()
+
+    const optimistic = items.loadedItems.value.find(
+      (entry) => entry.title === 'A newly drafted card',
+    )
+    expect(optimistic?.lane).toBe('blocked')
+    expect(optimistic?.id).toMatch(/^optimistic-/)
+
+    resolveCreate?.(createdItem('created-by-gateway', 'A newly drafted card', 'blocked'))
+    await creation
+
+    expect(items.loadedItems.value.some((entry) => entry.id.startsWith('optimistic-'))).toBe(false)
+    expect(items.loadedItems.value.some((entry) => entry.id === 'created-by-gateway')).toBe(true)
+  })
+
+  it('removes the optimistic card and calls a gateway failure a failure', async () => {
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'createWorkItem').mockRejectedValue(new Error('write unavailable'))
+    const items = useBoardItems(
+      gateway,
+      ref(FIXTURE_HUMANS.wren),
+      ref(FIXTURE_BOARDS.quillDelivery),
+    )
+    await settled()
+
+    await items.createItem('A card the gateway rejects', 'ready')
+
+    expect(items.loadedItems.value.some((entry) => entry.title === 'A card the gateway rejects')).toBe(false)
+    expect(items.createError.value).toMatch(/failed/i)
+    expect(items.createError.value).not.toMatch(/refused/i)
+  })
+
+  it('removes the optimistic card and calls BoardAccessRefused a refusal', async () => {
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'createWorkItem').mockRejectedValue(
+      new BoardAccessRefused(FIXTURE_BOARDS.quillDelivery),
+    )
+    const items = useBoardItems(
+      gateway,
+      ref(FIXTURE_HUMANS.wren),
+      ref(FIXTURE_BOARDS.quillDelivery),
+    )
+    await settled()
+
+    await items.createItem('A refused card', 'ready')
+
+    expect(items.loadedItems.value.some((entry) => entry.title === 'A refused card')).toBe(false)
+    expect(items.createError.value).toMatch(/refused/i)
+    expect(items.createError.value).not.toMatch(/failed/i)
   })
 })
 

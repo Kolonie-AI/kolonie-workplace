@@ -63,9 +63,12 @@ describe('kanban source — lane moves without a drag library', () => {
     expect(card).not.toMatch(/contenteditable/i)
   })
 
-  it('emits a lane move and never a create, delete or reorder', () => {
+  it('emits lane moves and card creation, but never delete or reorder', () => {
+    expect(board).toMatch(/emit\(\s*['"]move/i)
+    expect(board).toMatch(/emit\(\s*['"]create/i)
+
     for (const source of [board, card]) {
-      expect(source).not.toMatch(/emit\(\s*['"](update|reorder|create|delete|save)/i)
+      expect(source).not.toMatch(/emit\(\s*['"](update|reorder|delete|save)/i)
     }
   })
 })

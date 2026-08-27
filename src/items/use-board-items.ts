@@ -1,6 +1,13 @@
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import type { Lane } from '@/domain/lanes'
-import type { BoardId, HumanId, WorkItemId, WorkItemSummary } from '@/domain/workplace'
+import type {
+  BoardId,
+  HumanId,
+  WorkItemDetail,
+  WorkItemId,
+  WorkItemSummary,
+} from '@/domain/workplace'
+import { BoardAccessRefused } from '@/gateway/refusals'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import { applyBoardFilter, EMPTY_BOARD_FILTER, type BoardFilter } from '@/items/board-filter'
 import {
@@ -44,8 +51,10 @@ export interface BoardItems {
   readonly selectedItemId: Readonly<Ref<WorkItemId | null>>
   readonly movingItemId: Readonly<Ref<WorkItemId | null>>
   readonly moveError: Readonly<Ref<string | null>>
+  readonly createError: Readonly<Ref<string | null>>
   selectItem(itemId: WorkItemId): void
   moveItem(itemId: WorkItemId, lane: Lane): Promise<void>
+  createItem(title: string, lane: Lane): Promise<void>
   clearSelection(): void
 }
 
@@ -61,6 +70,8 @@ export function useBoardItems(
   const selectedItemId = ref<WorkItemId | null>(null)
   const movingItemId = ref<WorkItemId | null>(null)
   const moveError = ref<string | null>(null)
+  const createError = ref<string | null>(null)
+  let optimisticSequence = 0
 
   async function load(): Promise<void> {
     const currentHumanId = humanId.value
@@ -71,6 +82,7 @@ export function useBoardItems(
     selectedItemId.value = null
     movingItemId.value = null
     moveError.value = null
+    createError.value = null
 
     if (currentHumanId === null || boardId === null) {
       status.value = 'idle'
@@ -121,11 +133,62 @@ export function useBoardItems(
     selectedItemId,
     movingItemId,
     moveError,
+    createError,
     selectItem(itemId: WorkItemId): void {
       selectedItemId.value = itemId
     },
     clearSelection(): void {
       selectedItemId.value = null
+    },
+    async createItem(title: string, lane: Lane): Promise<void> {
+      const currentHumanId = humanId.value
+      const boardId = activeBoardId.value
+      const trimmed = title.trim()
+
+      if (currentHumanId === null || boardId === null || trimmed === '') {
+        return
+      }
+
+      optimisticSequence += 1
+      const optimisticId = `optimistic-${optimisticSequence}`
+      const optimistic: WorkItemSummary = {
+        id: optimisticId,
+        boardId,
+        title: trimmed,
+        lane,
+        owner: 'Unassigned',
+        description: '',
+        labels: [],
+        assignees: [],
+        priority: 'unset',
+        dueDate: null,
+        percentDone: 0,
+        checklist: [],
+        comments: [],
+        attachments: [],
+        coverColour: null,
+        position: loaded.value.length,
+      }
+
+      createError.value = null
+      loaded.value = [...loaded.value, optimistic]
+
+      try {
+        const created: WorkItemDetail = await gateway.createWorkItem(currentHumanId, {
+          boardId,
+          title: trimmed,
+          lane,
+        })
+        loaded.value = loaded.value.map((item) =>
+          item.id === optimisticId ? created : item,
+        )
+      } catch (error) {
+        loaded.value = loaded.value.filter((item) => item.id !== optimisticId)
+        createError.value =
+          error instanceof BoardAccessRefused
+            ? 'Creating this card was refused.'
+            : 'Creating this card failed.'
+      }
     },
     async moveItem(itemId: WorkItemId, lane: Lane): Promise<void> {
       const currentHumanId = humanId.value
