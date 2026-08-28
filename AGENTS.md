@@ -107,6 +107,16 @@ Confirm with the maintainer before:
 See `kolonie-docs/AGENTS.md` for the global list of things that need a
 maintainer; §4 above adds this repository's own.
 
+**Trello is the visual and interaction reference; do not copy Trello source.**
+Rebuild behaviour and hierarchy by observation. Do not copy Trello CSS,
+assets, logos or proprietary copy. Hermes Kanban supplies lifecycle
+semantics only: the six lanes in `src/domain/lanes.ts` stay fixed, and
+Workplace must not grow a seventh list. The dated measurement, file matrix
+and state machines live in
+[`docs/trello-reference.md`](docs/trello-reference.md). Colette's persistent
+Trello research account is Vault key `trello/colette-reprise` and nothing
+more about that account belongs in git.
+
 **Selective Vikunja reuse is permitted, and a blind fork is not.** Gregor
 Sprint and Colette Reprise decided this on 2026-08-27, reversing the blanket
 import ban that stood before it. The reversal rests on a fact worth stating
