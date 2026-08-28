@@ -6,7 +6,7 @@
  *
  * Data reaches this component only through TaskGateway.
  */
-import { computed, nextTick, onUnmounted, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import { useWorkplaceClock } from '@/clock/workplace-clock'
 import {
   WORKPLACE_VIEWS,
@@ -34,11 +34,14 @@ import ListView from '@/list/ListView.vue'
 import { useBoardItems } from '@/items/use-board-items'
 import {
   EMPTY_BOARD_FILTER,
+  assigneesOf,
   isBoardFilterActive,
+  labelsOf,
   ownersOf,
   parseBoardFilter,
   withBoardFilterInQuery,
   type BoardFilter,
+  type BoardFilterDue,
 } from '@/items/board-filter'
 import DetailPane from '@/detail/DetailPane.vue'
 import { revokeAllPreviews, revokePreview } from '@/detail/attachment-previews'
@@ -47,6 +50,8 @@ import { useTaskGateway } from '@/gateway/provide-gateway'
 import { isPreviewDataGateway } from '@/gateway/task-gateway'
 import SignedInHuman from '@/session/SignedInHuman.vue'
 import { useSignedInHuman } from '@/session/use-session'
+import { trapFocus } from '@/a11y/focus-trap'
+import { WORKPLACE_SHORTCUTS, isTypingTarget } from '@/shell/shortcuts'
 import '@/shell/app-shell.css'
 
 const props = defineProps<{
@@ -58,6 +63,7 @@ const props = defineProps<{
 const activeView = ref<WorkplaceView>(resolveWorkplaceView(props.initialView))
 const tabRefs = useTemplateRef<HTMLButtonElement[]>('tabs')
 const searchInput = useTemplateRef<HTMLInputElement>('searchInput')
+const filterOpenButton = useTemplateRef<HTMLButtonElement>('filterOpenButton')
 
 /**
  * Chrome state, kept in the shell because nothing else needs it: the desktop
@@ -86,26 +92,42 @@ const activeBoardId = computed(() => boardList.activeBoard.value?.id ?? null)
 const boardFilter = ref<BoardFilter>(
   parseBoardFilter(props.initialQuery ?? window.location.search),
 )
-const items = useBoardItems(gateway, humanId, activeBoardId, boardFilter)
+const items = useBoardItems(gateway, humanId, activeBoardId, boardFilter, clock)
+const filterOpen = ref(false)
+const shortcutOpen = ref(false)
+const filterPopover = useTemplateRef<HTMLElement>('filterPopover')
+const shortcutOverlay = useTemplateRef<HTMLElement>('shortcutOverlay')
 const detail = useItemDetail(gateway, humanId, items.selectedItemId)
 
-onUnmounted(() => {
-  revokeAllPreviews()
-})
-
 const filterOwners = computed(() => ownersOf(items.loadedItems.value))
+const filterAssignees = computed(() => assigneesOf(items.loadedItems.value))
+const filterLabels = computed(() => labelsOf(items.loadedItems.value))
 const isFiltered = computed(() => isBoardFilterActive(boardFilter.value))
 
 watch(
-  [activeBoardId, items.status, filterOwners],
-  ([boardId, status, owners]) => {
-    if (
-      boardId !== null &&
-      status === 'ready' &&
-      boardFilter.value.owner !== '' &&
-      !owners.includes(boardFilter.value.owner)
-    ) {
+  [activeBoardId, items.status, filterOwners, filterAssignees, filterLabels],
+  ([boardId, status, owners, assignees, labels]) => {
+    if (boardId === null || status !== 'ready') {
+      return
+    }
+
+    if (boardFilter.value.owner !== '' && !owners.includes(boardFilter.value.owner)) {
       setOwner('')
+    }
+
+    if (
+      boardFilter.value.assignee !== '' &&
+      boardFilter.value.assignee !== 'none' &&
+      !assignees.some((assignee) => assignee.id === boardFilter.value.assignee)
+    ) {
+      setAssignee('')
+    }
+
+    if (
+      boardFilter.value.label !== '' &&
+      !labels.some((label) => label.id === boardFilter.value.label)
+    ) {
+      setLabel('')
     }
   },
 )
@@ -143,9 +165,120 @@ function setSearch(search: string): void {
   boardFilter.value = { ...boardFilter.value, search }
 }
 
+function setAssignee(assignee: string): void {
+  boardFilter.value = { ...boardFilter.value, assignee }
+}
+
+function setLabel(label: string): void {
+  boardFilter.value = { ...boardFilter.value, label }
+}
+
+function setDue(due: BoardFilterDue | ''): void {
+  boardFilter.value = { ...boardFilter.value, due }
+}
+
 function clearFilter(): void {
   boardFilter.value = EMPTY_BOARD_FILTER
 }
+
+async function openFilter(): Promise<void> {
+  filterOpen.value = true
+  await nextTick()
+  searchInput.value?.focus()
+}
+
+function closeFilter(): void {
+  filterOpen.value = false
+  void nextTick(() => {
+    filterOpenButton.value?.focus()
+  })
+}
+
+function closeShortcuts(): void {
+  shortcutOpen.value = false
+}
+
+function onFilterKeydown(event: KeyboardEvent): void {
+  trapFocus(filterPopover.value ?? (event.currentTarget as HTMLElement), event)
+
+  if (event.key !== 'Escape' || event.isComposing) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  closeFilter()
+}
+
+function onShortcutKeydown(event: KeyboardEvent): void {
+  trapFocus(shortcutOverlay.value ?? (event.currentTarget as HTMLElement), event)
+
+  if (event.key !== 'Escape' || event.isComposing) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  closeShortcuts()
+}
+
+function onWindowKeydown(event: KeyboardEvent): void {
+  if (event.isComposing || isTypingTarget(event.target)) {
+    return
+  }
+
+  if (event.key === '?' || (event.key === '/' && event.shiftKey)) {
+    event.preventDefault()
+    shortcutOpen.value = !shortcutOpen.value
+    return
+  }
+
+  if (event.key === 'f' || event.key === 'F') {
+    if (boardList.activeBoard.value === null) {
+      return
+    }
+
+    event.preventDefault()
+    if (filterOpen.value) {
+      closeFilter()
+    } else {
+      void openFilter()
+    }
+  }
+}
+
+function onDocumentPointerDown(event: PointerEvent): void {
+  if (!filterOpen.value) {
+    return
+  }
+
+  const target = event.target
+
+  if (!(target instanceof Node)) {
+    return
+  }
+
+  if (filterPopover.value?.contains(target) === true) {
+    return
+  }
+
+  if (filterOpenButton.value?.contains(target) === true) {
+    return
+  }
+
+  closeFilter()
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', onDocumentPointerDown)
+  window.addEventListener('keydown', onWindowKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('pointerdown', onDocumentPointerDown)
+  window.removeEventListener('keydown', onWindowKeydown)
+  revokeAllPreviews()
+})
 
 watch(
   () => boardList.status.value,
@@ -167,7 +300,7 @@ function toggleSidebar(): void {
 }
 
 function focusBoardSearch(): void {
-  searchInput.value?.focus()
+  void openFilter()
 }
 
 function selectView(view: WorkplaceView): void {
@@ -454,95 +587,192 @@ async function closeDetail(): Promise<void> {
         <h1 class="app-shell__title">
           Work board
         </h1>
-        <div
-          class="app-shell__tabs"
-          role="tablist"
-          aria-label="Board views"
-        >
-          <button
-            v-for="(view, index) in WORKPLACE_VIEWS"
-            :id="`view-tab-${view}`"
-            :key="view"
-            ref="tabs"
-            class="app-shell__tab"
-            type="button"
-            role="tab"
-            aria-controls="board-canvas"
-            :aria-selected="activeView === view"
-            :tabindex="activeView === view ? 0 : -1"
-            @click="selectView(view)"
-            @keydown="onTabKeydown($event, index)"
+        <div class="app-shell__board-toolbar">
+          <div
+            class="app-shell__tabs"
+            role="tablist"
+            aria-label="Board views"
           >
-            {{ WORKPLACE_VIEW_LABELS[view] }}
-          </button>
+            <button
+              v-for="(view, index) in WORKPLACE_VIEWS"
+              :id="`view-tab-${view}`"
+              :key="view"
+              ref="tabs"
+              class="app-shell__tab"
+              type="button"
+              role="tab"
+              aria-controls="board-canvas"
+              :aria-selected="activeView === view"
+              :tabindex="activeView === view ? 0 : -1"
+              @click="selectView(view)"
+              @keydown="onTabKeydown($event, index)"
+            >
+              {{ WORKPLACE_VIEW_LABELS[view] }}
+            </button>
+          </div>
+
+          <div
+            v-if="boardList.activeBoard.value !== null"
+            class="app-shell__filter"
+          >
+            <button
+              ref="filterOpenButton"
+              class="app-shell__filter-open"
+              type="button"
+              data-testid="filter-open"
+              title="Filter cards F"
+              aria-haspopup="dialog"
+              :aria-expanded="filterOpen ? 'true' : 'false'"
+              @click="filterOpen ? closeFilter() : openFilter()"
+            >
+              Filter cards
+            </button>
+            <button
+              v-if="isFiltered"
+              class="app-shell__filter-clear"
+              type="button"
+              data-testid="filter-clear"
+              @click="clearFilter"
+            >
+              Clear all filters
+            </button>
+            <div
+              v-if="filterOpen"
+              ref="filterPopover"
+              class="app-shell__filter-popover"
+              data-testid="filter-popover"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="filter-heading"
+              tabindex="-1"
+              @keydown="onFilterKeydown"
+            >
+              <div class="app-shell__filter-popover-head">
+                <h2
+                  id="filter-heading"
+                  class="app-shell__filter-heading"
+                >
+                  Filter
+                </h2>
+                <button
+                  class="app-shell__filter-close"
+                  type="button"
+                  data-testid="filter-close"
+                  aria-label="Close filter"
+                  @click="closeFilter"
+                >
+                  Close
+                </button>
+              </div>
+
+              <label class="app-shell__filter-field">
+                <span class="app-shell__filter-label">Keyword</span>
+                <input
+                  ref="searchInput"
+                  class="app-shell__filter-search"
+                  data-testid="filter-search"
+                  type="search"
+                  placeholder="Enter a keyword…"
+                  aria-label="Search cards, members, labels, and more."
+                  :value="boardFilter.search"
+                  @input="setSearch(($event.target as HTMLInputElement).value)"
+                >
+              </label>
+
+              <label class="app-shell__filter-field">
+                <span class="app-shell__filter-label">Members</span>
+                <select
+                  class="app-shell__filter-assignee"
+                  data-testid="filter-assignee"
+                  :value="boardFilter.assignee"
+                  @change="setAssignee(($event.target as HTMLSelectElement).value)"
+                >
+                  <option value="">Every member</option>
+                  <option value="none">No members</option>
+                  <option
+                    v-for="assignee in filterAssignees"
+                    :key="assignee.id"
+                    :value="assignee.id"
+                  >
+                    {{ assignee.name }}
+                  </option>
+                </select>
+              </label>
+
+              <label class="app-shell__filter-field">
+                <span class="app-shell__filter-label">Labels</span>
+                <select
+                  class="app-shell__filter-label-select"
+                  data-testid="filter-label"
+                  :value="boardFilter.label"
+                  @change="setLabel(($event.target as HTMLSelectElement).value)"
+                >
+                  <option value="">Every label</option>
+                  <option
+                    v-for="label in filterLabels"
+                    :key="label.id"
+                    :value="label.id"
+                  >
+                    {{ label.title }}
+                  </option>
+                </select>
+              </label>
+
+              <label class="app-shell__filter-field">
+                <span class="app-shell__filter-label">Due date</span>
+                <select
+                  class="app-shell__filter-due"
+                  data-testid="filter-due"
+                  :value="boardFilter.due"
+                  @change="setDue(($event.target as HTMLSelectElement).value as BoardFilterDue | '')"
+                >
+                  <option value="">Any date</option>
+                  <option value="has">Has dates</option>
+                  <option value="overdue">Overdue</option>
+                  <option value="none">No dates</option>
+                </select>
+              </label>
+
+              <label class="app-shell__filter-field">
+                <span class="app-shell__filter-label">Owner</span>
+                <select
+                  class="app-shell__filter-owner"
+                  data-testid="filter-owner"
+                  :value="boardFilter.owner"
+                  @change="setOwner(($event.target as HTMLSelectElement).value)"
+                >
+                  <option value="">Every owner</option>
+                  <option
+                    v-for="owner in filterOwners"
+                    :key="owner"
+                    :value="owner"
+                  >
+                    {{ owner }}
+                  </option>
+                </select>
+              </label>
+
+              <div
+                class="app-shell__filter-lanes"
+                role="group"
+                aria-label="Filter by lane"
+              >
+                <button
+                  v-for="lane in WORKPLACE_LANES"
+                  :key="lane"
+                  class="app-shell__filter-lane"
+                  type="button"
+                  :data-testid="`filter-lane-${lane}`"
+                  :aria-pressed="boardFilter.lanes.includes(lane)"
+                  @click="toggleLane(lane)"
+                >
+                  {{ WORKPLACE_LANE_LABELS[lane] }}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </header>
-
-      <section
-        v-if="boardList.activeBoard.value !== null"
-        class="app-shell__filters"
-        data-testid="board-filters"
-        aria-label="Filter this board"
-      >
-        <div
-          class="app-shell__filter-lanes"
-          role="group"
-          aria-label="Filter by lane"
-        >
-          <button
-            v-for="lane in WORKPLACE_LANES"
-            :key="lane"
-            class="app-shell__filter-lane"
-            type="button"
-            :data-testid="`filter-lane-${lane}`"
-            :aria-pressed="boardFilter.lanes.includes(lane)"
-            @click="toggleLane(lane)"
-          >
-            {{ WORKPLACE_LANE_LABELS[lane] }}
-          </button>
-        </div>
-
-        <label class="app-shell__filter-field">
-          <span class="app-shell__filter-label">Owner</span>
-          <select
-            class="app-shell__filter-owner"
-            data-testid="filter-owner"
-            :value="boardFilter.owner"
-            @change="setOwner(($event.target as HTMLSelectElement).value)"
-          >
-            <option value="">Every owner</option>
-            <option
-              v-for="owner in filterOwners"
-              :key="owner"
-              :value="owner"
-            >
-              {{ owner }}
-            </option>
-          </select>
-        </label>
-
-        <label class="app-shell__filter-field">
-          <span class="app-shell__filter-label">Search titles</span>
-          <input
-            ref="searchInput"
-            class="app-shell__filter-search"
-            data-testid="filter-search"
-            type="search"
-            :value="boardFilter.search"
-            @input="setSearch(($event.target as HTMLInputElement).value)"
-          >
-        </label>
-
-        <button
-          v-if="isFiltered"
-          class="app-shell__filter-clear"
-          type="button"
-          data-testid="filter-clear"
-          @click="clearFilter"
-        >
-          Clear all filters
-        </button>
-      </section>
 
       <main class="app-shell__main">
         <p
@@ -650,6 +880,48 @@ async function closeDetail(): Promise<void> {
           />
         </div>
       </main>
+    </div>
+
+    <div
+      v-if="shortcutOpen"
+      ref="shortcutOverlay"
+      class="app-shell__shortcuts"
+      data-testid="shortcut-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="shortcut-heading"
+      tabindex="-1"
+      @keydown="onShortcutKeydown"
+    >
+      <div class="app-shell__shortcuts-head">
+        <h2
+          id="shortcut-heading"
+          class="app-shell__shortcuts-heading"
+        >
+          Keyboard shortcuts
+        </h2>
+        <button
+          class="app-shell__shortcuts-close"
+          type="button"
+          data-testid="shortcut-close"
+          aria-label="Close keyboard shortcuts"
+          @click="closeShortcuts"
+        >
+          Close
+        </button>
+      </div>
+      <dl class="app-shell__shortcuts-list">
+        <div
+          v-for="shortcut in WORKPLACE_SHORTCUTS"
+          :key="shortcut.key"
+          class="app-shell__shortcuts-row"
+        >
+          <dt>
+            <kbd>{{ shortcut.key }}</kbd>
+          </dt>
+          <dd>{{ shortcut.label }}</dd>
+        </div>
+      </dl>
     </div>
   </div>
 </template>

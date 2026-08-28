@@ -65,6 +65,7 @@ export function useBoardItems(
   humanId: Readonly<Ref<HumanId | null>>,
   activeBoardId: Readonly<Ref<BoardId | null>>,
   boardFilter: Readonly<Ref<BoardFilter>> = ref(EMPTY_BOARD_FILTER),
+  now: () => Date = () => new Date(),
 ): BoardItems {
   const status = ref<BoardItemsStatus>('idle')
   const loaded = ref<readonly WorkItemSummary[]>([])
@@ -113,7 +114,7 @@ export function useBoardItems(
 
   watch([humanId, activeBoardId], () => void load(), { immediate: true })
 
-  const filtered = computed(() => applyBoardFilter(loaded.value, boardFilter.value))
+  const filtered = computed(() => applyBoardFilter(loaded.value, boardFilter.value, now()))
   const partition = computed(() => partitionIntoLanes(filtered.value))
 
   return {

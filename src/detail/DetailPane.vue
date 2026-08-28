@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 import { computed, nextTick, onMounted, ref, useId, useTemplateRef, watch } from 'vue'
+import { trapFocus } from '@/a11y/focus-trap'
 import { WORKPLACE_LANE_LABELS } from '@/domain/lanes'
 import type {
   AttachmentId,
@@ -155,6 +156,8 @@ function toggleRail(kind: Exclude<RailPopover, null>): void {
 }
 
 function onDialogKeydown(event: KeyboardEvent): void {
+  trapFocus(dialogEl.value ?? (event.currentTarget as HTMLElement), event)
+
   if (event.key !== 'Escape' || event.isComposing) {
     return
   }
