@@ -1,24 +1,107 @@
+/*
+ * Copyright 2018-present Vikunja and contributors. All rights reserved.
+ * Copyright 2026 Kolonie AI FZ-LLC.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Adapted for Kolonie Workplace on 2026-08-27 from Vikunja 2.5.0
+ * (ef2200e9429c5cc42f5c1811433418bfcc72b3aa):
+ *   frontend/src/styles/theme/navigation.scss
+ *   frontend/src/components/home/Navigation.vue
+ *   frontend/src/components/home/MenuButton.vue
+ *   frontend/src/components/home/AppHeader.vue
+ *
+ * Navigation chrome, collapse behaviour and the narrow-viewport drawer are
+ * adapted from Vikunja's navigation shell; names, tokens and structure follow
+ * Kolonie Workplace.
+ */
+
 .app-shell {
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   min-block-size: 100vh;
   overflow-x: hidden;
   background: var(--color-canvas);
+  transition: grid-template-columns var(--motion-fast);
+}
+
+.app-shell[data-sidebar-collapsed="true"] {
+  grid-template-columns: 4.5rem minmax(0, 1fr);
 }
 
 .app-shell__sidebar {
   grid-row: 1 / -1;
   min-inline-size: 0;
+  overflow: hidden;
   padding: var(--space-5) var(--space-4);
   background: var(--color-sidebar);
   color: var(--color-sidebar-text);
 }
 
+.app-shell__sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-block-end: var(--space-6);
+}
+
 .app-shell__brand {
-  margin: 0 0 var(--space-6);
+  margin: 0;
   color: var(--color-sidebar-text-strong);
   font-size: var(--text-title);
   font-weight: 700;
+  white-space: nowrap;
+}
+
+.app-shell__mark {
+  block-size: 2rem;
+  inline-size: 2rem;
+  flex: none;
+}
+
+.app-shell__mark-crest {
+  stroke: var(--color-warning);
+}
+
+.app-shell__mark-stem {
+  stroke: var(--color-sidebar-text-strong);
+}
+
+.app-shell__mark--topbar .app-shell__mark-stem {
+  stroke: var(--color-text);
+}
+
+.app-shell__sidebar-toggle {
+  min-block-size: 2rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-sidebar-text);
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--color-sidebar-text-strong);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-caption);
+}
+
+.app-shell__sidebar-toggle:focus-visible {
+  outline: var(--focus-ring-inverted);
+  outline-offset: var(--focus-offset);
+}
+
+.app-shell[data-sidebar-collapsed="true"] .app-shell__brand,
+.app-shell[data-sidebar-collapsed="true"] .board-list {
+  visibility: hidden;
+}
+
+.app-shell[data-sidebar-collapsed="true"] .app-shell__sidebar-head {
+  justify-content: center;
+}
+
+.app-shell[data-sidebar-collapsed="true"] .app-shell__sidebar-toggle {
+  max-inline-size: 3rem;
+  overflow: hidden;
+  text-overflow: clip;
 }
 
 .app-shell__refusal {
@@ -81,17 +164,65 @@
 
 .app-shell__topbar {
   display: flex;
-  min-block-size: 2.75rem;
+  min-block-size: 4rem;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-3);
   padding: var(--space-2) var(--space-5);
   border-block-end: 1px solid var(--color-border);
   background: var(--color-surface);
+  box-shadow: var(--shadow-small);
+  z-index: 10;
+}
+
+.app-shell__menu-button {
+  display: none;
+}
+
+.app-shell__menu-button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
 }
 
 .app-shell__workplace-name {
   font-weight: 700;
+  white-space: nowrap;
+}
+
+.app-shell__topbar-board-title {
+  min-inline-size: 0;
+  overflow: hidden;
+  font-size: var(--text-title);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell__search-button {
+  min-block-size: 2.25rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background: var(--color-canvas);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-small);
+}
+
+.app-shell__search-button:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.app-shell__search-button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.app-shell__search-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .app-shell__preview-data {
@@ -259,28 +390,77 @@
   background: var(--color-surface);
 }
 
-/*
- * Narrow viewport: the sidebar stacks above the workspace rather than being
- * hidden. It was `display: none` after #7, which was defensible while there
- * was nothing to select into — but the core journey starts by choosing a
- * board, and hiding the only control that does so put the first step of the
- * journey outside the viewport. Stacking keeps every control reachable
- * without introducing a drawer, which would be new behaviour and belongs to
- * an issue of its own.
- */
 @media (max-width: 48rem) {
-  .app-shell {
+  .app-shell,
+  .app-shell[data-sidebar-collapsed="true"] {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .app-shell__sidebar {
-    grid-row: auto;
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 30;
+    inline-size: min(20rem, 82vw);
+    overflow-y: auto;
     padding: var(--space-4);
+    box-shadow: var(--shadow-xlarge);
+    transform: translateX(-100%);
+    transition: transform var(--motion-fast);
   }
 
-  .app-shell__brand {
-    margin-block-end: var(--space-4);
+  .app-shell[data-mobile-menu-open="true"] .app-shell__sidebar {
+    transform: translateX(0);
+  }
+
+  .app-shell[data-sidebar-collapsed="true"] .app-shell__brand,
+  .app-shell[data-sidebar-collapsed="true"] .board-list {
+    visibility: visible;
+  }
+
+  .app-shell__sidebar-toggle {
+    display: none;
+  }
+
+  .app-shell__menu-button {
+    position: relative;
+    display: inline-grid;
+    block-size: 2.5rem;
+    inline-size: 2.5rem;
+    flex: none;
+    border: 0;
+    border-radius: var(--radius-small);
+    background: transparent;
+    cursor: pointer;
+    place-items: center;
+  }
+
+  .app-shell__menu-button:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
+  }
+
+  .app-shell__menu-lines,
+  .app-shell__menu-lines::before,
+  .app-shell__menu-lines::after {
+    display: block;
+    inline-size: 1.5rem;
+    block-size: 2px;
+    border-radius: var(--radius-pill);
+    background: var(--color-text-muted);
+    content: "";
+  }
+
+  .app-shell__menu-lines::before {
+    transform: translateY(-0.4rem);
+  }
+
+  .app-shell__menu-lines::after {
+    transform: translateY(0.3rem);
+  }
+
+  .app-shell__topbar-board-title,
+  .app-shell__search-button {
+    display: none;
   }
 
   .app-shell__topbar,

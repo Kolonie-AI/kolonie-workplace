@@ -1,4 +1,19 @@
 <script setup lang="ts">
+/*
+ * Copyright 2018-present Vikunja and contributors. All rights reserved.
+ * Copyright 2026 Kolonie AI FZ-LLC.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * The shell chrome — collapsible sidebar, menu button, top-bar board title and
+ * search affordance — is adapted for Kolonie Workplace on 2026-08-27 from
+ * Vikunja 2.5.0 (ef2200e9429c5cc42f5c1811433418bfcc72b3aa):
+ *   frontend/src/components/home/Navigation.vue
+ *   frontend/src/components/home/MenuButton.vue
+ *   frontend/src/components/home/AppHeader.vue
+ * No Vikunja store, router, i18n or task model is used; data reaches this
+ * component only through TaskGateway.
+ */
 import { computed, ref, useTemplateRef, watch } from 'vue'
 import {
   WORKPLACE_VIEWS,
@@ -37,6 +52,16 @@ const props = defineProps<{
 
 const activeView = ref<WorkplaceView>(resolveWorkplaceView(props.initialView))
 const tabRefs = useTemplateRef<HTMLButtonElement[]>('tabs')
+const searchInput = useTemplateRef<HTMLInputElement>('searchInput')
+
+/**
+ * Chrome state, kept in the shell because nothing else needs it: the desktop
+ * sidebar can collapse to give the board the full row, and below the mobile
+ * breakpoint the same sidebar becomes an overlay the menu button opens.
+ * Selecting a board closes the overlay, as navigation in Vikunja does.
+ */
+const sidebarCollapsed = ref(false)
+const mobileMenuOpen = ref(false)
 
 const human = useSignedInHuman()
 const humanId = computed(() => human.value?.id ?? null)
@@ -122,7 +147,16 @@ watch(
 )
 
 function selectBoard(boardId: BoardId): void {
+  mobileMenuOpen.value = false
   void boardList.selectBoard(boardId)
+}
+
+function toggleSidebar(): void {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
+
+function focusBoardSearch(): void {
+  searchInput.value?.focus()
 }
 
 function selectView(view: WorkplaceView): void {
@@ -171,14 +205,30 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
 </script>
 
 <template>
-  <div class="app-shell">
+  <div
+    class="app-shell"
+    data-testid="app-shell"
+    :data-sidebar-collapsed="sidebarCollapsed ? 'true' : 'false'"
+    :data-mobile-menu-open="mobileMenuOpen ? 'true' : 'false'"
+  >
     <aside
       class="app-shell__sidebar"
       data-testid="sidebar"
+      :aria-label="sidebarCollapsed ? 'Collapsed board navigation' : 'Board navigation'"
     >
-      <p class="app-shell__brand">
-        Kolonie
-      </p>
+      <div class="app-shell__sidebar-head">
+        <p class="app-shell__brand">
+          Kolonie
+        </p>
+        <button
+          class="app-shell__sidebar-toggle"
+          type="button"
+          :aria-expanded="sidebarCollapsed ? 'false' : 'true'"
+          @click="toggleSidebar"
+        >
+          {{ sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar' }}
+        </button>
+      </div>
       <BoardList
         :status="boardList.status.value"
         :groups="boardList.groups.value"
@@ -193,7 +243,58 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
         class="app-shell__topbar"
         data-testid="topbar"
       >
+        <button
+          class="app-shell__menu-button"
+          type="button"
+          :aria-expanded="mobileMenuOpen ? 'true' : 'false'"
+          :aria-label="mobileMenuOpen ? 'Close board navigation' : 'Open board navigation'"
+          @click="mobileMenuOpen = !mobileMenuOpen"
+        >
+          <span
+            class="app-shell__menu-lines"
+            aria-hidden="true"
+          />
+        </button>
+        <svg
+          class="app-shell__mark app-shell__mark--topbar"
+          viewBox="0 0 64 64"
+          role="img"
+          aria-label="Kolonie AI"
+        >
+          <g
+            fill="none"
+            stroke-width="5"
+            stroke-linejoin="miter"
+            stroke-linecap="butt"
+            stroke-miterlimit="6"
+          >
+            <path
+              d="M32 10 L51 15 C51 32 46 45.5 32 55 C18 45.5 13 32 13 15 Z"
+              class="app-shell__mark-crest"
+            />
+            <path
+              d="M24.5 21 L31.5 28 L24.5 35"
+              class="app-shell__mark-crest"
+            />
+            <path
+              d="M39.5 21 L39.5 35"
+              class="app-shell__mark-stem"
+            />
+          </g>
+        </svg>
         <span class="app-shell__workplace-name">Kolonie Workplace</span>
+        <span
+          v-if="boardList.activeBoard.value !== null"
+          class="app-shell__topbar-board-title"
+        >{{ boardList.activeBoard.value.title }}</span>
+        <button
+          class="app-shell__search-button"
+          type="button"
+          :disabled="boardList.activeBoard.value === null"
+          @click="focusBoardSearch"
+        >
+          Search this board
+        </button>
         <span
           v-if="showsPreviewData"
           class="app-shell__preview-data"
@@ -279,6 +380,7 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
         <label class="app-shell__filter-field">
           <span class="app-shell__filter-label">Search titles</span>
           <input
+            ref="searchInput"
             class="app-shell__filter-search"
             data-testid="filter-search"
             type="search"

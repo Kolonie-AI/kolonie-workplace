@@ -46,6 +46,9 @@ describe('visual integration — a visible keyboard focus state on every control
     ['src/detail/detail-pane.css', '.detail-pane__close'],
     ['src/detail/detail-pane.css', '.detail-pane__reference'],
     ['src/shell/app-shell.css', '.app-shell__tab'],
+    ['src/shell/app-shell.css', '.app-shell__sidebar-toggle'],
+    ['src/shell/app-shell.css', '.app-shell__menu-button'],
+    ['src/shell/app-shell.css', '.app-shell__search-button'],
     ['src/session/session.css', '.session-signed-out__candidate'],
     ['src/session/session.css', '.session-human__sign-out'],
   ] as const
@@ -165,7 +168,7 @@ describe('visual integration — the narrow viewport keeps the whole journey rea
   it('stacks the sidebar above the workspace rather than beside it', () => {
     expect(shell).toMatch(/@media\s*\(max-width:\s*48rem\)/)
     expect(shell).toMatch(
-      /\.app-shell\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/s,
+      /\.app-shell,\s*\n\s*\.app-shell\[data-sidebar-collapsed="true"\]\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/s,
     )
   })
 

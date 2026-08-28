@@ -236,6 +236,106 @@ describe('AppShell — preview data derives from the active gateway', () => {
   })
 })
 
+describe('AppShell — responsive application chrome', () => {
+  it('renders the Colony mark in the top bar', () => {
+    renderShell()
+
+    const mark = screen.getByRole('img', { name: 'Kolonie AI' })
+
+    expect(mark.tagName).toBe('svg')
+    expect(screen.getByTestId('topbar').contains(mark)).toBe(true)
+  })
+
+  it('collapses and expands the sidebar without losing the state on rerender', async () => {
+    const { rerender } = renderShell()
+    const shell = screen.getByTestId('app-shell')
+    const collapse = screen.getByRole('button', { name: 'Collapse sidebar' })
+
+    await fireEvent.click(collapse)
+    expect(shell.getAttribute('data-sidebar-collapsed')).toBe('true')
+    expect(screen.getByTestId('sidebar').getAttribute('aria-label')).toBe('Collapsed board navigation')
+
+    await rerender({ initialView: 'kanban' })
+    expect(shell.getAttribute('data-sidebar-collapsed')).toBe('true')
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
+    expect(shell.getAttribute('data-sidebar-collapsed')).toBe('false')
+  })
+
+  it('opens the mobile navigation and closes it after a board is chosen', async () => {
+    const session = createFixtureWorkplaceSession()
+    await session.signIn({ humanId: FIXTURE_HUMANS.wren })
+    render(AppShell, {
+      global: {
+        provide: {
+          [WORKPLACE_SESSION]: session,
+          [TASK_GATEWAY]: createFixtureTaskGateway(),
+        },
+      },
+    })
+
+    const menu = screen.getByRole('button', { name: 'Open board navigation' })
+    await fireEvent.click(menu)
+    expect(screen.getByTestId('app-shell').getAttribute('data-mobile-menu-open')).toBe('true')
+
+    await fireEvent.click((await screen.findAllByTestId('board-link'))[0]!)
+    expect(screen.getByTestId('app-shell').getAttribute('data-mobile-menu-open')).toBe('false')
+  })
+
+  it('uses tabbable native buttons for the keyboard-operable chrome', async () => {
+    const session = createFixtureWorkplaceSession()
+    await session.signIn({ humanId: FIXTURE_HUMANS.wren })
+    render(AppShell, {
+      global: {
+        provide: {
+          [WORKPLACE_SESSION]: session,
+          [TASK_GATEWAY]: createFixtureTaskGateway(),
+        },
+      },
+    })
+
+    const menu = screen.getByRole('button', { name: 'Open board navigation' })
+    const collapse = screen.getByRole('button', { name: 'Collapse sidebar' })
+    const boards = await screen.findAllByTestId('board-link')
+
+    expect(menu.tagName).toBe('BUTTON')
+    expect(collapse.tagName).toBe('BUTTON')
+    expect(menu.tabIndex).not.toBe(-1)
+    expect(collapse.tabIndex).not.toBe(-1)
+    expect(boards.length).toBeGreaterThan(0)
+
+    for (const board of boards) {
+      expect(board.tagName).toBe('BUTTON')
+      expect(board.tabIndex).not.toBe(-1)
+    }
+
+    collapse.focus()
+    await fireEvent.click(collapse)
+    expect(screen.getByTestId('app-shell').getAttribute('data-sidebar-collapsed')).toBe('true')
+
+    menu.focus()
+    await fireEvent.click(menu)
+    expect(screen.getByTestId('app-shell').getAttribute('data-mobile-menu-open')).toBe('true')
+  })
+
+  it('opens the existing board search from the top bar', async () => {
+    const session = createFixtureWorkplaceSession()
+    await session.signIn({ humanId: FIXTURE_HUMANS.wren })
+    render(AppShell, {
+      global: {
+        provide: {
+          [WORKPLACE_SESSION]: session,
+          [TASK_GATEWAY]: createFixtureTaskGateway(),
+        },
+      },
+    })
+
+    await fireEvent.click((await screen.findAllByTestId('board-link'))[0]!)
+    await fireEvent.click(screen.getByRole('button', { name: 'Search this board' }))
+    expect(document.activeElement).toBe(await screen.findByTestId('filter-search'))
+  })
+})
+
 describe('AppShell — rejection: an unknown requested view', () => {
   it('falls back to Kanban without rendering a third canvas or crashing', () => {
     renderShell({ initialView: 'gantt' })
