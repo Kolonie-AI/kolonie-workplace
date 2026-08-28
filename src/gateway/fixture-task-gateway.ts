@@ -54,12 +54,15 @@ export class FixtureTaskGateway implements TaskGateway {
 
     return fixtureBoards
       .filter((board) => visible.has(board.id))
-      .map((board) => ({
-        ...board,
-        agentName:
-          fixtureAgents.find((candidate) => candidate.id === board.agentId)?.name ??
-          'Unknown agent',
-      }))
+      .map((board) => {
+        const agent = fixtureAgents.find((candidate) => candidate.id === board.agentId)
+
+        return {
+          ...board,
+          agentName: agent?.name ?? 'Unknown agent',
+          profession: agent?.profession ?? null,
+        }
+      })
   }
 
   async getBoardItems(

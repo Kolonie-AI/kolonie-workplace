@@ -44,6 +44,10 @@ const quill = requireAgent(FIXTURE_BOARDS.quillDelivery)
 const birch = requireAgent(FIXTURE_BOARDS.birchResearch)
 const marlow = requireAgent(FIXTURE_BOARDS.marlowOutreach)
 
+function displayedProfession(agent: typeof quill): string {
+  return agent.profession ?? 'Profession not declared'
+}
+
 async function signedInSession(humanId: string): Promise<WorkplaceSession> {
   const session = createFixtureWorkplaceSession()
   await session.signIn({ humanId })
@@ -108,6 +112,11 @@ describe('sidebar board list — journey 1: two agents, one board each', () => {
     expect(sidebar.textContent).toContain(birchResearch.title)
     expect(sidebar.textContent).toContain(quill.name)
     expect(sidebar.textContent).toContain(birch.name)
+    expect(quill.profession).not.toBe(birch.profession)
+    expect(groups[0]?.textContent).toContain(displayedProfession(quill))
+    expect(groups[0]?.textContent).not.toContain(displayedProfession(birch))
+    expect(groups[1]?.textContent).toContain(displayedProfession(birch))
+    expect(groups[1]?.textContent).not.toContain(displayedProfession(quill))
   })
 })
 
@@ -122,6 +131,7 @@ describe('sidebar board list — journey 2: one agent, two boards', () => {
     const groups = screen.getAllByTestId('board-group')
     expect(groups).toHaveLength(1)
     expect(groups[0]?.textContent).toContain(marlow.name)
+    expect(groups[0]?.textContent).toContain(displayedProfession(marlow))
     expect(within(groups[0] as HTMLElement).getAllByTestId('board-link')).toHaveLength(2)
   })
 })
@@ -276,6 +286,45 @@ describe('sidebar board list — selecting a board', () => {
     })
     expect(screen.getByTestId('active-board').textContent).toContain(birchResearch.title)
     expect(screen.getByTestId('active-board').textContent).toContain(birch.name)
+    expect(screen.getByTestId('active-board').textContent).toContain(displayedProfession(birch))
+    expect(screen.getByTestId('active-board').textContent).not.toContain(
+      displayedProfession(quill),
+    )
+  })
+
+  it('keeps one agent profession unchanged while switching between its boards', async () => {
+    await renderForHuman(FIXTURE_HUMANS.ash)
+
+    await fireEvent.click(screen.getByText(marlowOutreach.title))
+    await waitFor(() => {
+      expect(screen.getByTestId('active-board').textContent).toContain(
+        displayedProfession(marlow),
+      )
+    })
+
+    await fireEvent.click(screen.getByText(marlowBacklog.title))
+    await waitFor(() => {
+      expect(screen.getByTestId('active-board').getAttribute('data-board-id')).toBe(
+        FIXTURE_BOARDS.marlowBacklog,
+      )
+    })
+    expect(screen.getByTestId('active-board').textContent).toContain(
+      displayedProfession(marlow),
+    )
+  })
+
+  it('keeps profession out of every work-item card', async () => {
+    await renderForHuman(FIXTURE_HUMANS.ash, createFixtureTaskGateway(), {
+      initialBoardId: FIXTURE_BOARDS.marlowOutreach,
+    })
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId('kanban-card').length).toBeGreaterThan(0)
+    })
+
+    for (const card of screen.getAllByTestId('kanban-card')) {
+      expect(card.textContent).not.toContain(displayedProfession(marlow))
+    }
   })
 
   it('marks the selected board in the sidebar', async () => {
@@ -314,9 +363,27 @@ describe('sidebar board list — read-only, and no cardinality assumption', () =
   it('renders exactly the boards the gateway returned, whatever their shape', async () => {
     const gateway: TaskGateway = {
       listVisibleBoards: vi.fn(async () => [
-        { id: 'board-a', agentId: 'agent-a', agentName: 'Agent A', title: 'Board A' },
-        { id: 'board-b', agentId: 'agent-a', agentName: 'Agent A', title: 'Board B' },
-        { id: 'board-c', agentId: 'agent-b', agentName: 'Agent B', title: 'Board C' },
+        {
+          id: 'board-a',
+          agentId: 'agent-a',
+          agentName: 'Agent A',
+          profession: null,
+          title: 'Board A',
+        },
+        {
+          id: 'board-b',
+          agentId: 'agent-a',
+          agentName: 'Agent A',
+          profession: null,
+          title: 'Board B',
+        },
+        {
+          id: 'board-c',
+          agentId: 'agent-b',
+          agentName: 'Agent B',
+          profession: null,
+          title: 'Board C',
+        },
       ]),
       getBoardItems: vi.fn(async () => []),
       getItemDetail: vi.fn(),
@@ -369,6 +436,7 @@ describe('sidebar board list — a read failure is not a permission refusal', ()
           id: FIXTURE_BOARDS.quillDelivery,
           agentId: 'fictional-agent-quill',
           agentName: 'Fictional Agent Quill',
+          profession: null,
           title: quillDelivery.title,
         },
       ]),
@@ -422,6 +490,7 @@ describe('sidebar board list — a read failure is not a permission refusal', ()
           id: FIXTURE_BOARDS.quillDelivery,
           agentId: 'fictional-agent-quill',
           agentName: 'Fictional Agent Quill',
+          profession: null,
           title: quillDelivery.title,
         },
       ]),

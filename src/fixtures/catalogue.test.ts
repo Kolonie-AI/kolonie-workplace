@@ -11,7 +11,7 @@ import { isLane } from '@/domain/lanes'
 const ALL_TEXT = [
   ...fixtureHumans.map((human) => human.name),
   ...Object.values(FIXTURE_IDENTITIES).map((identity) => identity.subject),
-  ...fixtureAgents.map((agent) => agent.name),
+  ...fixtureAgents.map((agent) => `${agent.name} ${agent.profession ?? ''}`),
   ...fixtureBoards.map((board) => `${board.id} ${board.title}`),
   ...fixtureWorkItems.map(
     (item) =>
@@ -25,6 +25,16 @@ describe('fixture hygiene', () => {
   it('names every fixture human and agent obviously fictional', () => {
     expect(fixtureHumans.every((human) => human.name.startsWith('Fictional '))).toBe(true)
     expect(fixtureAgents.every((agent) => agent.name.startsWith('Fictional '))).toBe(true)
+  })
+
+  it('puts a null profession on an agent that still holds a board', () => {
+    const nullProfessionAgents = fixtureAgents.filter((agent) => agent.profession === null)
+
+    expect(nullProfessionAgents).toHaveLength(1)
+    expect(nullProfessionAgents[0]?.boardIds.length).toBeGreaterThan(0)
+    expect(new Set(fixtureAgents.map((agent) => agent.profession)).size).toBe(
+      fixtureAgents.length,
+    )
   })
 
   it('carries no host name, IP address, URL, email address or token-shaped string', () => {

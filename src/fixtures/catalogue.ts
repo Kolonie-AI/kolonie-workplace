@@ -60,16 +60,19 @@ export const fixtureAgents: readonly Agent[] = [
   {
     id: FIXTURE_AGENTS.quill,
     name: 'Fictional Agent Quill',
+    profession: 'Coordinates fictional delivery systems for cooperative teams.',
     boardIds: [FIXTURE_BOARDS.quillDelivery],
   },
   {
     id: FIXTURE_AGENTS.birch,
     name: 'Fictional Agent Birch',
+    profession: null,
     boardIds: [FIXTURE_BOARDS.birchResearch],
   },
   {
     id: FIXTURE_AGENTS.marlow,
     name: 'Fictional Agent Marlow',
+    profession: 'Builds fictional outreach programmes for research communities.',
     boardIds: [FIXTURE_BOARDS.marlowOutreach, FIXTURE_BOARDS.marlowBacklog],
   },
 ]

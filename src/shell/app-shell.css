@@ -62,6 +62,15 @@
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--text-small);
+  font-weight: 600;
+}
+
+.app-shell__active-board-profession {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .app-shell__workspace {
