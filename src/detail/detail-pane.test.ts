@@ -513,6 +513,138 @@ describe('detail pane — labels and assignees', () => {
   })
 })
 
+describe('detail pane — checklist', () => {
+  it('shows progress in the detail heading and invites the first item when empty', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    await openItem(FIXTURE_ITEMS.inProgress)
+
+    expect(within(pane()).getByTestId('detail-checklist-summary').textContent).toBe('1 of 2 done')
+    expect(within(pane()).getByTestId('detail-checklist-progress').getAttribute('value')).toBe('1')
+
+    await fireEvent.click(within(pane()).getByRole('button', { name: 'Close the work item detail' }))
+    await openItem(FIXTURE_ITEMS.ready)
+
+    expect(within(pane()).getByText('No checklist items yet. Add the first item below.')).toBeTruthy()
+    expect(within(pane()).queryByTestId('detail-checklist-progress')).toBeNull()
+  })
+
+  it('adds, ticks, renames and removes through the checklist gateway verbs', async () => {
+    const gateway = createFixtureTaskGateway()
+    const boardReads = vi.spyOn(gateway, 'getBoardItems')
+    const creates = vi.spyOn(gateway, 'createChecklistItem')
+    const updates = vi.spyOn(gateway, 'updateChecklistItem')
+    const removes = vi.spyOn(gateway, 'deleteChecklistItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.inProgress)
+    const readsBeforeEdit = boardReads.mock.calls.length
+
+    await fireEvent.click(within(pane()).getByRole('checkbox', { name: 'Mark Write fictional body done' }))
+    await waitFor(() => {
+      expect(updates).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.inProgress,
+        'fictional-check-body',
+        { done: true },
+      )
+    })
+    const card = screen
+      .getAllByTestId('kanban-card')
+      .find((candidate) => candidate.getAttribute('data-item-id') === FIXTURE_ITEMS.inProgress)
+    await waitFor(() => {
+      expect(within(card!).getByTestId('kanban-card-checklist').textContent).toBe('2/2')
+    })
+
+    const title = within(pane()).getByRole('textbox', {
+      name: 'Checklist item title: Write fictional body',
+    })
+    await fireEvent.update(title, 'Write revised fictional body')
+    await fireEvent.blur(title)
+    await waitFor(() => {
+      expect(updates).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.inProgress,
+        'fictional-check-body',
+        { title: 'Write revised fictional body' },
+      )
+    })
+
+    const add = within(pane()).getByRole('textbox', { name: 'New checklist item' })
+    await fireEvent.update(add, 'Review revised fictional body')
+    await fireEvent.submit(within(pane()).getByRole('form', { name: 'Add checklist item' }))
+    await waitFor(() => {
+      expect(creates).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.inProgress,
+        'Review revised fictional body',
+      )
+    })
+    await waitFor(() => {
+      expect(within(card!).getByTestId('kanban-card-checklist').textContent).toBe('2/3')
+    })
+
+    await fireEvent.click(
+      within(pane()).getByRole('button', { name: 'Remove checklist item Review revised fictional body' }),
+    )
+    await waitFor(() => {
+      expect(removes).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.inProgress,
+        expect.any(String),
+      )
+    })
+    await waitFor(() => {
+      expect(within(card!).getByTestId('kanban-card-checklist').textContent).toBe('2/2')
+    })
+    expect(boardReads).toHaveBeenCalledTimes(readsBeforeEdit)
+  })
+
+  it('reorders with the keyboard alternative and performs the same gateway write', async () => {
+    const gateway = createFixtureTaskGateway()
+    const reorders = vi.spyOn(gateway, 'reorderChecklistItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.inProgress)
+
+    await fireEvent.click(
+      within(pane()).getByRole('button', { name: 'Move checklist item Write fictional body up' }),
+    )
+
+    await waitFor(() => {
+      expect(reorders).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.inProgress,
+        'fictional-check-body',
+        0,
+      )
+    })
+    expect(
+      within(pane())
+        .getAllByTestId('detail-checklist-item')
+        .map((item) => (within(item).getByRole('textbox') as HTMLInputElement).value),
+    ).toEqual(['Write fictional body', 'Draft fictional introduction'])
+  })
+
+  it('reverts a tick when the gateway rejects it', async () => {
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'updateChecklistItem').mockRejectedValueOnce(new Error('fixture rejection'))
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.inProgress)
+    const checkbox = within(pane()).getByRole('checkbox', { name: 'Mark Write fictional body done' })
+
+    await fireEvent.click(checkbox)
+
+    await waitFor(() => {
+      expect(within(pane()).getByRole('alert').textContent).toMatch(/checklist/i)
+    })
+    expect(
+      within(pane()).getByRole('checkbox', { name: 'Mark Write fictional body done' }),
+    ).toHaveProperty('checked', false)
+    const card = screen
+      .getAllByTestId('kanban-card')
+      .find((candidate) => candidate.getAttribute('data-item-id') === FIXTURE_ITEMS.inProgress)
+    expect(within(card!).getByTestId('kanban-card-checklist').textContent).toBe('1/2')
+  })
+})
+
 describe('detail pane — metadata', () => {
   it('lays out lane, owner, priority, due date, labels and assignees', async () => {
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)

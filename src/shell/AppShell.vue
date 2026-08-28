@@ -24,6 +24,8 @@ import {
 } from '@/shell/views'
 import type {
   BoardId,
+  ChecklistItemId,
+  UpdateChecklistItemInput,
   UpdateWorkItemInput,
   WorkItemAssignee,
   WorkItemDetail,
@@ -224,6 +226,15 @@ const availableLabels = computed<readonly WorkItemLabel[]>(() => {
   return [...labels.values()].sort((left, right) => left.title.localeCompare(right.title))
 })
 
+watch(
+  () => detail.item.value,
+  (current) => {
+    if (current !== null) {
+      items.replaceItem(current)
+    }
+  },
+)
+
 const availableAssignees = computed<readonly WorkItemAssignee[]>(() => {
   const assignees = new Map<string, WorkItemAssignee>()
 
@@ -237,7 +248,37 @@ const availableAssignees = computed<readonly WorkItemAssignee[]>(() => {
 })
 
 async function updateDetail(input: UpdateWorkItemInput): Promise<WorkItemDetail | null> {
-  const updated = await detail.updateItem(input)
+  return applyDetailWrite(detail.updateItem(input))
+}
+
+async function createChecklistItem(title: string): Promise<WorkItemDetail | null> {
+  return applyDetailWrite(detail.createChecklistItem(title))
+}
+
+async function updateChecklistItem(
+  checklistItemId: ChecklistItemId,
+  input: UpdateChecklistItemInput,
+): Promise<WorkItemDetail | null> {
+  return applyDetailWrite(detail.updateChecklistItem(checklistItemId, input))
+}
+
+async function reorderChecklistItem(
+  checklistItemId: ChecklistItemId,
+  position: number,
+): Promise<WorkItemDetail | null> {
+  return applyDetailWrite(detail.reorderChecklistItem(checklistItemId, position))
+}
+
+async function deleteChecklistItem(
+  checklistItemId: ChecklistItemId,
+): Promise<WorkItemDetail | null> {
+  return applyDetailWrite(detail.deleteChecklistItem(checklistItemId))
+}
+
+async function applyDetailWrite(
+  write: Promise<WorkItemDetail | null>,
+): Promise<WorkItemDetail | null> {
+  const updated = await write
 
   if (updated !== null) {
     items.replaceItem(updated)
@@ -532,6 +573,10 @@ async function updateDetail(input: UpdateWorkItemInput): Promise<WorkItemDetail 
             :available-assignees="availableAssignees"
             :now="now"
             @update="updateDetail"
+            @create-checklist-item="createChecklistItem"
+            @update-checklist-item="updateChecklistItem"
+            @reorder-checklist-item="reorderChecklistItem"
+            @delete-checklist-item="deleteChecklistItem"
             @close="items.clearSelection"
           />
         </div>

@@ -39,6 +39,16 @@ describe('detail source — writes through the parent, never a gateway of its ow
     expect(pane).toMatch(/relativeDueDate/)
     expect(pane).not.toMatch(/new Date\s*\(/)
   })
+
+  it('holds the checklist as a typed list and never parses the description', () => {
+    expect(pane).toMatch(/createChecklistItem/)
+    expect(pane).not.toMatch(/taskList|getChecklistStatistics|checklistFromText/)
+    expect(composable).toMatch(/gateway\.createChecklistItem/)
+    expect(composable).toMatch(/gateway\.updateChecklistItem/)
+    expect(composable).toMatch(/gateway\.reorderChecklistItem/)
+    expect(composable).toMatch(/gateway\.deleteChecklistItem/)
+    expect(composable).not.toMatch(/updateWorkItem\([^)]*checklist/)
+  })
 })
 
 describe('detail source — the detail is fetched, never taken from the board payload', () => {

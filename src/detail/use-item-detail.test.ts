@@ -138,6 +138,23 @@ describe('item detail — writes update the open item', () => {
     expect(detail.item.value).toEqual(previous)
     expect(detail.updateError.value).toMatch(/failed/i)
   })
+
+  it('reverts a checklist tick when the gateway rejects it', async () => {
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'updateChecklistItem').mockRejectedValueOnce(new Error('write unavailable'))
+    const selectedItemId = ref<WorkItemId | null>(FIXTURE_ITEMS.inProgress)
+    const detail = useItemDetail(gateway, ref(FIXTURE_HUMANS.wren), selectedItemId)
+    await settled()
+    const previous = detail.item.value?.checklist.find((entry) => entry.id === 'fictional-check-body')
+
+    const updated = await detail.updateChecklistItem('fictional-check-body', { done: true })
+
+    expect(updated).toBeNull()
+    expect(detail.item.value?.checklist.find((entry) => entry.id === 'fictional-check-body')).toEqual(
+      previous,
+    )
+    expect(detail.updateError.value).toMatch(/checklist/i)
+  })
 })
 
 describe('item detail — rejection: an item on a board this human may not open', () => {

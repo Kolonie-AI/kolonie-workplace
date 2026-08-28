@@ -78,6 +78,7 @@ Imported or adapted from Vikunja:
       frontend/src/components/input/Datepicker.vue
       frontend/src/components/tasks/partials/DateTableCell.vue
       frontend/src/components/tasks/partials/PercentDoneSelect.vue
+      frontend/src/components/tasks/partials/ChecklistSummary.vue
 
   src/kanban/card-facets.ts
     adapted from

@@ -18,11 +18,15 @@
  *   frontend/src/components/input/Datepicker.vue
  *   frontend/src/components/tasks/partials/DateTableCell.vue
  *   frontend/src/components/tasks/partials/PercentDoneSelect.vue
- * No Vikunja store, router, i18n or task model is used.
+ *   frontend/src/components/tasks/partials/ChecklistSummary.vue
+ * No Vikunja store, router, i18n or task model is used. Checklists are a
+ * typed list on the work item, never parsed out of the description.
  */
 import { computed, nextTick, ref, useId, useTemplateRef, watch } from 'vue'
 import { WORKPLACE_LANE_LABELS } from '@/domain/lanes'
 import type {
+  ChecklistItemId,
+  UpdateChecklistItemInput,
   UpdateWorkItemInput,
   WorkItemAssignee,
   WorkItemDetail,
@@ -32,6 +36,7 @@ import type { ItemDetailStatus } from '@/detail/use-item-detail'
 import { renderHandover } from '@/detail/handover-parts'
 import { sanitizeDescription } from '@/detail/sanitize-description'
 import {
+  checklistProgress,
   dueDateState,
   isWorkItemPriority,
   readableTextOn,
@@ -53,6 +58,10 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   update: [input: UpdateWorkItemInput]
+  createChecklistItem: [title: string]
+  updateChecklistItem: [checklistItemId: ChecklistItemId, input: UpdateChecklistItemInput]
+  reorderChecklistItem: [checklistItemId: ChecklistItemId, position: number]
+  deleteChecklistItem: [checklistItemId: ChecklistItemId]
 }>()
 
 const titleDraft = ref('')
@@ -68,6 +77,8 @@ const labelListId = `label-options-${useId()}`
 const assigneeListId = `assignee-options-${useId()}`
 const labelColours = ['#1973ff', '#00db60', '#ff4136', '#8338ec'] as const
 const selectedLabelColour = ref<(typeof labelColours)[number]>(labelColours[0])
+const newChecklistTitle = ref('')
+const draggingChecklistId = ref<ChecklistItemId | null>(null)
 
 const filteredLabels = computed(() => {
   const selected = new Set(props.item?.labels.map((label) => label.id) ?? [])
@@ -111,6 +122,10 @@ const dueState = computed(() =>
 const dueRelative = computed(() =>
   props.item === null ? null : relativeDueDate(props.item.dueDate, props.now),
 )
+const checklist = computed(() =>
+  [...(props.item?.checklist ?? [])].sort((left, right) => left.position - right.position),
+)
+const progress = computed(() => checklistProgress(checklist.value))
 const handoverParts = computed(() =>
   props.item?.handover === undefined ? null : renderHandover(props.item.handover),
 )
@@ -330,6 +345,79 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
     assigneeActive.value = -1
   }
 }
+
+function onChecklistDoneChange(checklistItemId: ChecklistItemId, event: Event): void {
+  emit('updateChecklistItem', checklistItemId, {
+    done: (event.target as HTMLInputElement).checked,
+  })
+}
+
+function onChecklistTitleChange(checklistItemId: ChecklistItemId, event: Event): void {
+  const title = (event.target as HTMLInputElement).value.trim()
+  const current = checklist.value.find((entry) => entry.id === checklistItemId)
+
+  if (current === undefined || title === '' || title === current.title) {
+    return
+  }
+
+  emit('updateChecklistItem', checklistItemId, { title })
+}
+
+function onChecklistTitleKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    ;(event.target as HTMLInputElement).blur()
+  }
+}
+
+function onAddChecklist(event: Event): void {
+  event.preventDefault()
+  const title = newChecklistTitle.value.trim()
+
+  if (title === '') {
+    return
+  }
+
+  emit('createChecklistItem', title)
+  newChecklistTitle.value = ''
+}
+
+function moveChecklist(checklistItemId: ChecklistItemId, direction: -1 | 1): void {
+  const current = checklist.value.findIndex((entry) => entry.id === checklistItemId)
+  const next = current + direction
+
+  if (current === -1 || next < 0 || next >= checklist.value.length) {
+    return
+  }
+
+  emit('reorderChecklistItem', checklistItemId, next)
+}
+
+function onChecklistDragStart(event: DragEvent, checklistItemId: ChecklistItemId): void {
+  draggingChecklistId.value = checklistItemId
+  event.dataTransfer?.setData('text/plain', checklistItemId)
+
+  if (event.dataTransfer !== null) {
+    event.dataTransfer.effectAllowed = 'move'
+  }
+}
+
+function onChecklistDrop(event: DragEvent, targetId: ChecklistItemId): void {
+  const movedId = event.dataTransfer?.getData('text/plain') ?? draggingChecklistId.value
+  draggingChecklistId.value = null
+
+  if (movedId === undefined || movedId === null || movedId === '' || movedId === targetId) {
+    return
+  }
+
+  const next = checklist.value.findIndex((entry) => entry.id === targetId)
+
+  if (next === -1) {
+    return
+  }
+
+  emit('reorderChecklistItem', movedId, next)
+}
 </script>
 
 <template>
@@ -404,6 +492,112 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
       >
         {{ titleDraft }}
       </h2>
+
+      <section
+        class="detail-pane__section"
+        aria-label="Checklist"
+        data-testid="detail-checklist"
+      >
+        <h3 class="detail-pane__section-title">
+          Checklist
+        </h3>
+        <p
+          v-if="progress !== null"
+          class="detail-pane__checklist-heading"
+        >
+          <progress
+            class="detail-pane__checklist-bar"
+            data-testid="detail-checklist-progress"
+            :value="progress.done"
+            :max="progress.total"
+          >
+            {{ progress.done }} of {{ progress.total }}
+          </progress>
+          <span data-testid="detail-checklist-summary">{{ progress.done }} of {{ progress.total }} done</span>
+        </p>
+        <p
+          v-else
+          class="detail-pane__empty"
+          data-testid="detail-checklist-empty"
+        >
+          No checklist items yet. Add the first item below.
+        </p>
+        <ol class="detail-pane__checklist">
+          <li
+            v-for="(entry, index) in checklist"
+            :key="entry.id"
+            class="detail-pane__checklist-item"
+            data-testid="detail-checklist-item"
+            :data-checklist-id="entry.id"
+            :data-done="entry.done ? 'true' : 'false'"
+            draggable="true"
+            @dragstart="onChecklistDragStart($event, entry.id)"
+            @dragover.prevent
+            @drop.prevent="onChecklistDrop($event, entry.id)"
+          >
+            <input
+              :key="`${entry.id}-${entry.done}`"
+              class="detail-pane__checklist-done"
+              type="checkbox"
+              :checked="entry.done"
+              :aria-label="entry.done ? `Mark ${entry.title} not done` : `Mark ${entry.title} done`"
+              @change="onChecklistDoneChange(entry.id, $event)"
+            >
+            <input
+              class="detail-pane__control"
+              type="text"
+              :value="entry.title"
+              :aria-label="`Checklist item title: ${entry.title}`"
+              @blur="onChecklistTitleChange(entry.id, $event)"
+              @keydown="onChecklistTitleKeydown"
+            >
+            <button
+              class="detail-pane__format"
+              type="button"
+              :aria-label="`Move checklist item ${entry.title} up`"
+              :disabled="index === 0"
+              @click="moveChecklist(entry.id, -1)"
+            >
+              Up
+            </button>
+            <button
+              class="detail-pane__format"
+              type="button"
+              :aria-label="`Move checklist item ${entry.title} down`"
+              :disabled="index === checklist.length - 1"
+              @click="moveChecklist(entry.id, 1)"
+            >
+              Down
+            </button>
+            <button
+              class="detail-pane__format"
+              type="button"
+              :aria-label="`Remove checklist item ${entry.title}`"
+              @click="emit('deleteChecklistItem', entry.id)"
+            >
+              Remove
+            </button>
+          </li>
+        </ol>
+        <form
+          class="detail-pane__checklist-add"
+          aria-label="Add checklist item"
+          @submit="onAddChecklist"
+        >
+          <input
+            v-model="newChecklistTitle"
+            class="detail-pane__control"
+            type="text"
+            aria-label="New checklist item"
+          >
+          <button
+            class="detail-pane__format"
+            type="submit"
+          >
+            Add item
+          </button>
+        </form>
+      </section>
 
       <section
         class="detail-pane__section"

@@ -243,6 +243,57 @@
   line-height: 1.5;
 }
 
+.detail-pane__checklist-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+  font-weight: 600;
+}
+
+.detail-pane__checklist-bar {
+  inline-size: 6rem;
+  block-size: 0.5rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  accent-color: var(--color-accent);
+}
+
+.detail-pane__checklist {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.detail-pane__checklist-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.detail-pane__checklist-item[data-done="true"] .detail-pane__control {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+
+.detail-pane__checklist-done {
+  inline-size: 1rem;
+  block-size: 1rem;
+  accent-color: var(--color-accent);
+}
+
+.detail-pane__checklist-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+}
+
 .detail-pane__chip-remove:focus-visible,
 .detail-pane__search:focus-visible,
 .detail-pane__swatch:focus-visible,
