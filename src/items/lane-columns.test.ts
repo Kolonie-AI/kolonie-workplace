@@ -19,6 +19,7 @@ function item(overrides: Partial<WorkItemSummary> & { id: string }): WorkItemSum
     comments: [],
     attachments: [],
     coverColour: null,
+    coverImageUrl: null,
     position: 0,
     ...overrides,
   }

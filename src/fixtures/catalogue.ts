@@ -149,6 +149,7 @@ const emptyBoardFields = {
   comments: [] as const,
   attachments: [] as const,
   coverColour: null,
+  coverImageUrl: null,
 }
 
 export const fixtureWorkItems: readonly WorkItemDetail[] = [
@@ -216,6 +217,20 @@ export const fixtureWorkItems: readonly WorkItemDetail[] = [
         body: '<p>Started the fictional body this morning.</p>',
         createdAt: '2026-08-26T09:00:00.000Z',
         updatedAt: '2026-08-26T09:00:00.000Z',
+      },
+      {
+        id: 'fictional-comment-mid',
+        author: 'Fictional Operator Ember',
+        body: '<p>The fictional middle section is next.</p>',
+        createdAt: '2026-08-26T12:00:00.000Z',
+        updatedAt: '2026-08-26T12:00:00.000Z',
+      },
+      {
+        id: 'fictional-comment-ask',
+        author: 'Fictional Human Wren',
+        body: '<p>Need a fictional example for the close.</p>',
+        createdAt: '2026-08-26T15:00:00.000Z',
+        updatedAt: '2026-08-26T15:00:00.000Z',
       },
     ],
     attachments: [

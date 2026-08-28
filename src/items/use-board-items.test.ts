@@ -328,6 +328,7 @@ function createdItem(id: string, title: string, lane: 'ready' | 'blocked' = 'rea
     comments: [],
     attachments: [],
     coverColour: null,
+    coverImageUrl: null,
     position: 0,
     externalReferences: [],
   }

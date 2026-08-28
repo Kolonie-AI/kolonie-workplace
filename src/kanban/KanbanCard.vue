@@ -10,7 +10,6 @@ import { computed } from 'vue'
 import { isLane, WORKPLACE_LANE_LABELS, WORKPLACE_LANES, type Lane } from '@/domain/lanes'
 import type { WorkItemSummary } from '@/domain/workplace'
 import {
-  WORK_ITEM_PRIORITY_LABELS,
   checklistProgress,
   dueDateState,
   initialsOf,
@@ -31,6 +30,7 @@ const emit = defineEmits<{
 }>()
 
 const isBlocked = computed(() => props.item.lane === 'blocked')
+const isReview = computed(() => props.item.lane === 'review')
 const moveControlId = computed(() => `kanban-move-${props.item.id}`)
 const labels = computed(() => props.item.labels ?? [])
 const assignees = computed(() => props.item.assignees ?? [])
@@ -40,12 +40,36 @@ const attachments = computed(() => props.item.attachments ?? [])
 const dueState = computed(() => dueDateState(props.item.dueDate ?? null, props.now))
 const dueLabel = computed(() => relativeDueDate(props.item.dueDate ?? null, props.now))
 const progress = computed(() => checklistProgress(checklist.value))
-const showsPriority = computed(
-  () => props.item.priority !== undefined && props.item.priority !== 'unset',
+const hasDescription = computed(() => (props.item.description ?? '').trim() !== '')
+const coverKind = computed<'image' | 'colour' | null>(() => {
+  if (props.item.coverImageUrl) {
+    return 'image'
+  }
+
+  if (props.item.coverColour) {
+    return 'colour'
+  }
+
+  return null
+})
+const showsBadges = computed(
+  () =>
+    hasDescription.value ||
+    dueState.value !== null ||
+    progress.value !== null ||
+    comments.value.length > 0 ||
+    attachments.value.length > 0 ||
+    assignees.value.length > 0,
 )
-const showsPercentDone = computed(() => props.item.percentDone > 0)
-const showsCounts = computed(
-  () => comments.value.length > 0 || attachments.value.length > 0,
+
+const commentLabel = computed(() =>
+  comments.value.length === 1 ? '1 comment' : `${comments.value.length} comments`,
+)
+const attachmentLabel = computed(() =>
+  attachments.value.length === 1 ? '1 attachment' : `${attachments.value.length} attachments`,
+)
+const dueAccessible = computed(() =>
+  dueLabel.value === null ? null : `Due ${dueLabel.value}`,
 )
 
 function labelStyle(colour: string): { background: string; color: string } {
@@ -89,12 +113,19 @@ function onLaneChange(event: Event): void {
       @dragstart="onDragStart"
     >
       <span
-        v-if="item.coverColour"
+        v-if="coverKind !== null"
         class="kanban-card__cover"
         data-testid="kanban-card-cover"
-        :style="{ background: item.coverColour }"
-      />
-      <span class="kanban-card__title">{{ item.title }}</span>
+        :data-cover-kind="coverKind"
+        :style="coverKind === 'colour' ? { background: item.coverColour ?? undefined } : undefined"
+      >
+        <img
+          v-if="coverKind === 'image' && item.coverImageUrl !== null"
+          class="kanban-card__cover-image"
+          :src="item.coverImageUrl"
+          alt=""
+        >
+      </span>
       <span
         v-if="labels.length > 0"
         class="kanban-card__labels"
@@ -104,30 +135,63 @@ function onLaneChange(event: Event): void {
           :key="label.id"
           class="kanban-card__label"
           data-testid="kanban-card-label"
+          role="img"
+          :aria-label="label.title"
           :style="labelStyle(label.colour)"
-        >{{ label.title }}</span>
+        />
       </span>
-      <span class="kanban-card__meta">
-        <span class="kanban-card__owner">{{ item.owner }}</span>
-        <span
-          v-if="isBlocked"
-          class="kanban-card__flag"
-          data-testid="kanban-card-blocked"
-        >Blocked</span>
-      </span>
-      <progress
-        v-if="showsPercentDone"
-        class="kanban-card__progress"
-        data-testid="kanban-card-progress"
-        :value="item.percentDone"
-        max="100"
-      >
-        {{ item.percentDone }}%
-      </progress>
+      <span class="kanban-card__title">{{ item.title }}</span>
       <span
-        v-if="assignees.length > 0 || showsPriority || dueState !== null || progress !== null || showsCounts"
+        v-if="isBlocked"
+        class="kanban-card__flag"
+        data-testid="kanban-card-blocked"
+        role="status"
+        aria-label="Blocked"
+      >Blocked</span>
+      <span
+        v-else-if="isReview"
+        class="kanban-card__flag kanban-card__flag--review"
+        data-testid="kanban-card-review"
+        role="status"
+        aria-label="Review"
+      >Review</span>
+      <span
+        v-if="showsBadges"
         class="kanban-card__footer"
+        data-testid="kanban-card-badges"
       >
+        <span
+          v-if="hasDescription"
+          class="kanban-card__count"
+          data-testid="kanban-card-description"
+          aria-label="Has a description"
+        >Aa</span>
+        <time
+          v-if="dueState !== null && item.dueDate !== null && dueAccessible !== null"
+          class="kanban-card__due"
+          data-testid="kanban-card-due"
+          :data-due-state="dueState"
+          :datetime="item.dueDate"
+          :aria-label="dueAccessible"
+        >{{ dueLabel }}</time>
+        <span
+          v-if="attachments.length > 0"
+          class="kanban-card__count"
+          data-testid="kanban-card-attachments"
+          :aria-label="attachmentLabel"
+        >{{ attachments.length }}</span>
+        <span
+          v-if="progress !== null"
+          class="kanban-card__checklist"
+          data-testid="kanban-card-checklist"
+          :aria-label="`Checklist ${progress.done}/${progress.total}`"
+        >{{ progress.done }}/{{ progress.total }}</span>
+        <span
+          v-if="comments.length > 0"
+          class="kanban-card__count"
+          data-testid="kanban-card-comments"
+          :aria-label="commentLabel"
+        >{{ comments.length }}</span>
         <span
           v-if="assignees.length > 0"
           class="kanban-card__assignees"
@@ -137,45 +201,20 @@ function onLaneChange(event: Event): void {
             :key="assignee.id"
             class="kanban-card__assignee"
             data-testid="kanban-card-assignee"
+            :aria-label="assignee.name"
             :title="assignee.name"
           >{{ initialsOf(assignee.name) }}</span>
-        </span>
-        <span
-          v-if="showsPriority"
-          class="kanban-card__priority"
-          data-testid="kanban-card-priority"
-          :data-priority="item.priority"
-        >{{ WORK_ITEM_PRIORITY_LABELS[item.priority] }}</span>
-        <time
-          v-if="dueState !== null && item.dueDate !== null"
-          class="kanban-card__due"
-          data-testid="kanban-card-due"
-          :data-due-state="dueState"
-          :datetime="item.dueDate"
-        >{{ dueLabel }}</time>
-        <span
-          v-if="progress !== null"
-          class="kanban-card__checklist"
-          data-testid="kanban-card-checklist"
-        >{{ progress.done }}/{{ progress.total }}</span>
-        <span
-          v-if="showsCounts"
-          class="kanban-card__counts"
-          data-testid="kanban-card-counts"
-        >
-          <span
-            v-if="comments.length > 0"
-            class="kanban-card__count"
-          >{{ comments.length }}</span>
-          <span
-            v-if="attachments.length > 0"
-            class="kanban-card__count"
-          >{{ attachments.length }}</span>
         </span>
       </span>
     </button>
 
-    <div class="kanban-card__move">
+    <details
+      class="kanban-card__move"
+      data-testid="kanban-card-move-disclosure"
+    >
+      <summary class="kanban-card__move-summary">
+        Move
+      </summary>
       <label
         class="kanban-card__move-label"
         :for="moveControlId"
@@ -197,6 +236,6 @@ function onLaneChange(event: Event): void {
           {{ WORKPLACE_LANE_LABELS[lane] }}
         </option>
       </select>
-    </div>
+    </details>
   </div>
 </template>

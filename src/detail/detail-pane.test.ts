@@ -414,7 +414,7 @@ describe('detail pane — labels and assignees', () => {
     const card = screen
       .getAllByTestId('kanban-card')
       .find((candidate) => candidate.getAttribute('data-item-id') === FIXTURE_ITEMS.review)
-    expect(card?.textContent).toContain('Delivery')
+    expect(within(card as HTMLElement).getByRole('img', { name: 'Delivery' })).toBeTruthy()
     expect(boardReads).toHaveBeenCalledTimes(readsBeforeEdit)
   })
 
@@ -568,10 +568,10 @@ describe('detail pane — priority, due date and progress', () => {
       .getAllByTestId('kanban-card')
       .find((candidate) => candidate.getAttribute('data-item-id') === FIXTURE_ITEMS.review)
 
-    expect(within(card!).getByTestId('kanban-card-priority').textContent).toMatch(/urgent/i)
+    expect(within(card!).queryByTestId('kanban-card-priority')).toBeNull()
     expect(within(card!).getByTestId('kanban-card-due').textContent).toBe('3 days ago')
     expect(within(card!).getByTestId('kanban-card-due').getAttribute('data-due-state')).toBe('overdue')
-    expect(within(card!).getByTestId('kanban-card-progress').getAttribute('value')).toBe('50')
+    expect(within(card!).queryByTestId('kanban-card-progress')).toBeNull()
     expect(boardReads).toHaveBeenCalledTimes(readsBeforeEdit)
   })
 

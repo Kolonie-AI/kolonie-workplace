@@ -178,7 +178,7 @@ describe('kanban board — cards', () => {
     expect(allCardIds().sort()).toEqual([...new Set(allCardIds())].sort())
   })
 
-  it('shows the title and the owner on a card', async () => {
+  it('shows the title on a card and keeps the owner off the face', async () => {
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
 
     const ready = requireItem(FIXTURE_ITEMS.ready)
@@ -192,7 +192,7 @@ describe('kanban board — cards', () => {
       .find((candidate) => candidate.getAttribute('data-item-id') === FIXTURE_ITEMS.ready)
 
     expect(card?.textContent).toContain(ready.title)
-    expect(card?.textContent).toContain(ready.owner)
+    expect(card?.textContent).not.toContain(ready.owner)
   })
 
   it('distinguishes a blocked item with a marker other cards do not carry', async () => {
@@ -214,6 +214,25 @@ describe('kanban board — cards', () => {
     expect(within(blocked as HTMLElement).getByTestId('kanban-card-blocked')).toBeTruthy()
     expect(notBlocked?.getAttribute('data-blocked')).toBe('false')
     expect(within(notBlocked as HTMLElement).queryByTestId('kanban-card-blocked')).toBeNull()
+  })
+
+  it('exposes the dense fixture card by accessible name', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+
+    await waitFor(() => {
+      expect(allCardIds()).toContain(FIXTURE_ITEMS.inProgress)
+    })
+
+    const card = screen
+      .getAllByTestId('kanban-card')
+      .find((candidate) => candidate.getAttribute('data-item-id') === FIXTURE_ITEMS.inProgress)
+
+    expect(within(card as HTMLElement).getByRole('img', { name: 'Delivery' })).toBeTruthy()
+    expect(within(card as HTMLElement).getByRole('img', { name: 'Research' })).toBeTruthy()
+    expect(within(card as HTMLElement).getByLabelText('Has a description')).toBeTruthy()
+    expect(within(card as HTMLElement).getByLabelText('Checklist 1/2')).toBeTruthy()
+    expect(within(card as HTMLElement).getByLabelText('3 comments')).toBeTruthy()
+    expect(within(card as HTMLElement).getByLabelText('1 attachment')).toBeTruthy()
   })
 
   it('stays compact: no description body, handover or reference content', async () => {
@@ -255,7 +274,16 @@ describe('kanban board — cards', () => {
       expect(allCardIds()).toHaveLength(6)
     })
 
-    expect(screen.getAllByLabelText('Move to lane')).toHaveLength(6)
+    for (const card of screen.getAllByTestId('kanban-card')) {
+      expect(within(card).queryByLabelText('Move to lane')).toBeNull()
+    }
+
+    const disclosures = screen.getAllByTestId('kanban-card-move-disclosure')
+    expect(disclosures).toHaveLength(6)
+    for (const disclosure of disclosures) {
+      expect(disclosure.hasAttribute('open')).toBe(false)
+    }
+
     expect(screen.queryByRole('checkbox')).toBeNull()
     const board = screen.getByTestId('kanban-board')
     expect(board.querySelector('input')).toBeNull()
