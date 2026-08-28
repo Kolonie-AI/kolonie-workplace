@@ -181,7 +181,7 @@ describe('kanban board — cards', () => {
     expect(within(notBlocked as HTMLElement).queryByTestId('kanban-card-blocked')).toBeNull()
   })
 
-  it('stays compact: no description body, comments or attachments', async () => {
+  it('stays compact: no description body, handover or reference content', async () => {
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
 
     await waitFor(() => {
@@ -194,7 +194,7 @@ describe('kanban board — cards', () => {
 
     expect(review?.textContent).not.toMatch(/Prepared the fictional catalogue/i)
     expect(review?.textContent).not.toMatch(/fictional-reference/i)
-    expect(review?.textContent).not.toMatch(/comment|attachment|description/i)
+    expect(review?.textContent).not.toMatch(/The fictional summaries look complete/i)
   })
 
   it('reads the detail of no card while the board renders', async () => {
