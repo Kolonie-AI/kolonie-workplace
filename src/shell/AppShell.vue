@@ -606,6 +606,7 @@ async function closeDetail(): Promise<void> {
               :now="now"
               @select="openItem"
               @move="items.moveItem"
+              @reorder="items.reorderItem"
               @create="items.createItem"
             />
 

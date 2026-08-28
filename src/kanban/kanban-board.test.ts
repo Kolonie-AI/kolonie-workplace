@@ -998,3 +998,267 @@ describe('kanban board — any implementation of the session port', () => {
     expect(screen.queryAllByTestId('kanban-lane')).toEqual([])
   })
 })
+
+function transfer() {
+  return {
+    data: '',
+    setData(_type: string, value: string) {
+      this.data = value
+    },
+    getData() {
+      return this.data
+    },
+    effectAllowed: '',
+    dropEffect: '',
+  }
+}
+
+function cardById(id: string): HTMLElement {
+  const card = screen
+    .getAllByTestId('kanban-card')
+    .find((candidate) => candidate.getAttribute('data-item-id') === id)
+
+  if (card === undefined) {
+    throw new Error(`Kolonie Workplace: card ${id} was not rendered.`)
+  }
+
+  return card
+}
+
+function laneNamed(lane: string): HTMLElement {
+  const element = screen
+    .getAllByTestId('kanban-lane')
+    .find((candidate) => candidate.getAttribute('data-lane') === lane)
+
+  if (element === undefined) {
+    throw new Error(`Kolonie Workplace: lane ${lane} was not rendered.`)
+  }
+
+  return element
+}
+
+async function dragCardOnto(sourceId: string, target: HTMLElement): Promise<void> {
+  const payload = transfer()
+  const source = cardById(sourceId)
+  const start = new Event('dragstart', { bubbles: true }) as DragEvent
+  Object.defineProperty(start, 'dataTransfer', { value: payload })
+  source.dispatchEvent(start)
+
+  const over = new Event('dragover', { bubbles: true, cancelable: true }) as DragEvent
+  Object.defineProperty(over, 'dataTransfer', { value: payload })
+  target.dispatchEvent(over)
+
+  const drop = new Event('drop', { bubbles: true, cancelable: true }) as DragEvent
+  Object.defineProperty(drop, 'dataTransfer', { value: payload })
+  target.dispatchEvent(drop)
+
+  const end = new Event('dragend', { bubbles: true }) as DragEvent
+  source.dispatchEvent(end)
+}
+
+describe('kanban board — within-list reorder and cross-list move', () => {
+  it('reorders two cards in one lane through the gateway and keeps that order after a re-read', async () => {
+    const gateway = createFixtureTaskGateway()
+    const created = await gateway.createWorkItem(FIXTURE_HUMANS.wren, {
+      boardId: FIXTURE_BOARDS.quillDelivery,
+      title: 'Second fictional ready card',
+      lane: 'ready',
+    })
+    const reorders = vi.spyOn(gateway, 'reorderWorkItem')
+    const view = await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+
+    await waitFor(() => {
+      expect(cardIdsInLane('ready')).toEqual([FIXTURE_ITEMS.ready, created.id])
+    })
+
+    await dragCardOnto(FIXTURE_ITEMS.ready, cardById(created.id))
+
+    await waitFor(() => {
+      expect(reorders).toHaveBeenCalledWith(FIXTURE_HUMANS.wren, FIXTURE_ITEMS.ready, {
+        lane: 'ready',
+        position: 1,
+      })
+    })
+    expect(cardIdsInLane('ready')).toEqual([created.id, FIXTURE_ITEMS.ready])
+
+    await fireEvent.click(screen.getByText('Fictional Birch Research'))
+    await waitFor(() => {
+      expect(within(view.container as HTMLElement).getByTestId('kanban-board-empty')).toBeTruthy()
+    })
+    await fireEvent.click(screen.getByText('Fictional Quill Delivery'))
+    await waitFor(() => {
+      expect(cardIdsInLane('ready')).toEqual([created.id, FIXTURE_ITEMS.ready])
+    })
+  })
+
+  it('moves a card onto another lifecycle lane through moveItemToLane', async () => {
+    const gateway = createFixtureTaskGateway()
+    const moves = vi.spyOn(gateway, 'moveItemToLane')
+    const reorders = vi.spyOn(gateway, 'reorderWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+
+    await waitFor(() => {
+      expect(cardIdsInLane('ready')).toEqual([FIXTURE_ITEMS.ready])
+    })
+
+    await dragCardOnto(
+      FIXTURE_ITEMS.ready,
+      within(laneNamed('in_progress')).getByTestId('kanban-cards'),
+    )
+
+    await waitFor(() => {
+      expect(moves).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.ready,
+        'in_progress',
+      )
+    })
+    expect(reorders).not.toHaveBeenCalled()
+    expect(cardIdsInLane('ready')).toEqual([])
+    expect(cardIdsInLane('in_progress')).toEqual([
+      FIXTURE_ITEMS.inProgress,
+      FIXTURE_ITEMS.ready,
+    ])
+  })
+
+  it('reorders with ArrowUp and ArrowDown and never uses a pointer', async () => {
+    const gateway = createFixtureTaskGateway()
+    const created = await gateway.createWorkItem(FIXTURE_HUMANS.wren, {
+      boardId: FIXTURE_BOARDS.quillDelivery,
+      title: 'Second fictional ready card',
+      lane: 'ready',
+    })
+    const reorders = vi.spyOn(gateway, 'reorderWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+
+    await waitFor(() => {
+      expect(cardIdsInLane('ready')).toEqual([FIXTURE_ITEMS.ready, created.id])
+    })
+
+    await fireEvent.keyDown(cardById(FIXTURE_ITEMS.ready), { key: 'ArrowDown' })
+
+    await waitFor(() => {
+      expect(reorders).toHaveBeenCalledWith(FIXTURE_HUMANS.wren, FIXTURE_ITEMS.ready, {
+        lane: 'ready',
+        position: 1,
+      })
+    })
+    expect(cardIdsInLane('ready')).toEqual([created.id, FIXTURE_ITEMS.ready])
+
+    await fireEvent.keyDown(cardById(FIXTURE_ITEMS.ready), { key: 'ArrowUp' })
+
+    await waitFor(() => {
+      expect(reorders).toHaveBeenCalledWith(FIXTURE_HUMANS.wren, FIXTURE_ITEMS.ready, {
+        lane: 'ready',
+        position: 0,
+      })
+    })
+    expect(cardIdsInLane('ready')).toEqual([FIXTURE_ITEMS.ready, created.id])
+  })
+
+  it('moves across lanes with ArrowLeft and ArrowRight through the same gateway call as a drop', async () => {
+    const gateway = createFixtureTaskGateway()
+    const moves = vi.spyOn(gateway, 'moveItemToLane')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+
+    await waitFor(() => {
+      expect(cardIdsInLane('ready')).toEqual([FIXTURE_ITEMS.ready])
+    })
+
+    await fireEvent.keyDown(cardById(FIXTURE_ITEMS.ready), { key: 'ArrowRight' })
+
+    await waitFor(() => {
+      expect(moves).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.ready,
+        'in_progress',
+      )
+    })
+    expect(moves).toHaveBeenCalledTimes(1)
+    expect(cardIdsInLane('in_progress')).toContain(FIXTURE_ITEMS.ready)
+
+    await fireEvent.keyDown(cardById(FIXTURE_ITEMS.ready), { key: 'ArrowLeft' })
+
+    await waitFor(() => {
+      expect(moves).toHaveBeenCalledWith(FIXTURE_HUMANS.wren, FIXTURE_ITEMS.ready, 'ready')
+    })
+    expect(cardIdsInLane('ready')).toContain(FIXTURE_ITEMS.ready)
+  })
+
+  it('shows a lifted card and a drop placeholder while a card is dragged', async () => {
+    const gateway = createFixtureTaskGateway()
+    await gateway.createWorkItem(FIXTURE_HUMANS.wren, {
+      boardId: FIXTURE_BOARDS.quillDelivery,
+      title: 'Second fictional ready card',
+      lane: 'ready',
+    })
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+
+    await waitFor(() => {
+      expect(cardIdsInLane('ready')).toHaveLength(2)
+    })
+
+    const payload = transfer()
+    const source = cardById(FIXTURE_ITEMS.ready)
+    const start = new Event('dragstart', { bubbles: true }) as DragEvent
+    Object.defineProperty(start, 'dataTransfer', { value: payload })
+    source.dispatchEvent(start)
+
+    const over = new Event('dragover', { bubbles: true, cancelable: true }) as DragEvent
+    Object.defineProperty(over, 'dataTransfer', { value: payload })
+    laneNamed('ready').dispatchEvent(over)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('kanban-drop-placeholder')).toBeTruthy()
+    })
+    expect(source.getAttribute('data-lifted')).toBe('true')
+    expect(laneNamed('ready').getAttribute('draggable')).toBeNull()
+  })
+
+  it('ignores a drop on list chrome rather than a card position', async () => {
+    const gateway = createFixtureTaskGateway()
+    const moves = vi.spyOn(gateway, 'moveItemToLane')
+    const reorders = vi.spyOn(gateway, 'reorderWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+
+    await waitFor(() => {
+      expect(cardIdsInLane('ready')).toEqual([FIXTURE_ITEMS.ready])
+    })
+
+    const title = laneNamed('in_progress').querySelector('.kanban__lane-title')
+    if (title === null) {
+      throw new Error('Kolonie Workplace: expected a lane title.')
+    }
+
+    await dragCardOnto(FIXTURE_ITEMS.ready, title as HTMLElement)
+    await dragCardOnto(FIXTURE_ITEMS.ready, laneNamed('in_progress'))
+
+    expect(moves).not.toHaveBeenCalled()
+    expect(reorders).not.toHaveBeenCalled()
+    expect(cardIdsInLane('ready')).toEqual([FIXTURE_ITEMS.ready])
+  })
+
+  it('restores the previous order when a reorder is refused', async () => {
+    const gateway = createFixtureTaskGateway()
+    const created = await gateway.createWorkItem(FIXTURE_HUMANS.wren, {
+      boardId: FIXTURE_BOARDS.quillDelivery,
+      title: 'Second fictional ready card',
+      lane: 'ready',
+    })
+    vi.spyOn(gateway, 'reorderWorkItem').mockRejectedValue(
+      new Error('Kolonie Workplace: that work item is not available to this human.'),
+    )
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+
+    await waitFor(() => {
+      expect(cardIdsInLane('ready')).toEqual([FIXTURE_ITEMS.ready, created.id])
+    })
+
+    await fireEvent.keyDown(cardById(FIXTURE_ITEMS.ready), { key: 'ArrowDown' })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('kanban-move-error')).toBeTruthy()
+    })
+    expect(cardIdsInLane('ready')).toEqual([FIXTURE_ITEMS.ready, created.id])
+  })
+})

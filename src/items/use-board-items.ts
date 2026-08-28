@@ -34,10 +34,10 @@ export type BoardItemsStatus = 'idle' | 'loading' | 'ready' | 'error'
  * sibling, because there is only one set. `columns` and `rows` are two orderings
  * of the same partitioned items and never of two different reads.
  *
- * A lane move updates that same set, so both views agree without a second
- * write path. The update is optimistic: a gateway refusal restores the
- * previous lane and surfaces the refusal rather than keeping a move the
- * gateway did not accept.
+ * A lane move or a within-lane reorder updates that same set, so both views
+ * agree without a second write path. The update is optimistic: a gateway
+ * refusal restores the previous lane and order and surfaces the refusal
+ * rather than keeping a write the gateway did not accept.
  */
 export interface BoardItems {
   readonly status: Readonly<Ref<BoardItemsStatus>>
@@ -53,7 +53,8 @@ export interface BoardItems {
   readonly moveError: Readonly<Ref<string | null>>
   readonly createError: Readonly<Ref<string | null>>
   selectItem(itemId: WorkItemId): void
-  moveItem(itemId: WorkItemId, lane: Lane): Promise<void>
+  moveItem(itemId: WorkItemId, lane: Lane, position?: number): Promise<void>
+  reorderItem(itemId: WorkItemId, lane: Lane, position: number): Promise<void>
   createItem(title: string, lane: Lane): Promise<void>
   replaceItem(item: WorkItemSummary): void
   clearSelection(): void
@@ -198,7 +199,7 @@ export function useBoardItems(
             : 'Creating this card failed.'
       }
     },
-    async moveItem(itemId: WorkItemId, lane: Lane): Promise<void> {
+    async moveItem(itemId: WorkItemId, lane: Lane, position?: number): Promise<void> {
       const currentHumanId = humanId.value
       const current = loaded.value.find((item) => item.id === itemId)
 
@@ -206,21 +207,84 @@ export function useBoardItems(
         return
       }
 
-      const previousLane = current.lane
+      const previous = loaded.value
+      const originLane = current.lane
+      const dest = previous
+        .filter((item) => item.lane === lane)
+        .slice()
+        .sort((left, right) => left.position - right.position)
+      const destPosition = Math.max(0, Math.min(position ?? dest.length, dest.length))
+      dest.splice(destPosition, 0, { ...current, lane })
+      const positionedDest = dest.map((item, index) => ({ ...item, position: index }))
+      const origin = previous
+        .filter((item) => item.lane === originLane && item.id !== itemId)
+        .slice()
+        .sort((left, right) => left.position - right.position)
+        .map((item, index) => ({ ...item, position: index }))
+      const rest = previous.filter(
+        (item) => item.lane !== lane && item.lane !== originLane,
+      )
+
       moveError.value = null
       movingItemId.value = itemId
-      loaded.value = loaded.value.map((item) =>
-        item.id === itemId ? { ...item, lane } : item,
-      )
+      loaded.value = [...rest, ...origin, ...positionedDest]
 
       try {
         await gateway.moveItemToLane(currentHumanId, itemId, lane)
+        if (position !== undefined) {
+          await gateway.reorderWorkItem(currentHumanId, itemId, { lane, position: destPosition })
+        }
       } catch (error) {
-        loaded.value = loaded.value.map((item) =>
-          item.id === itemId ? { ...item, lane: previousLane } : item,
-        )
+        loaded.value = previous
         moveError.value =
           error instanceof Error ? error.message : 'The move was refused.'
+      } finally {
+        movingItemId.value = null
+      }
+    },
+    async reorderItem(itemId: WorkItemId, lane: Lane, position: number): Promise<void> {
+      const currentHumanId = humanId.value
+      const current = loaded.value.find((item) => item.id === itemId)
+
+      if (currentHumanId === null || current === undefined || current.lane !== lane) {
+        return
+      }
+
+      const inLane = loaded.value
+        .filter((item) => item.lane === lane)
+        .slice()
+        .sort((left, right) => left.position - right.position)
+      const from = inLane.findIndex((item) => item.id === itemId)
+      const to = Math.max(0, Math.min(position, inLane.length - 1))
+
+      if (from === -1 || from === to) {
+        return
+      }
+
+      const previous = loaded.value
+      const reordered = inLane.slice()
+      const [carried] = reordered.splice(from, 1)
+
+      if (carried === undefined) {
+        return
+      }
+
+      reordered.splice(to, 0, carried)
+      const positioned = reordered.map((item, index) => ({ ...item, position: index }))
+
+      moveError.value = null
+      movingItemId.value = itemId
+      loaded.value = [
+        ...previous.filter((item) => item.lane !== lane),
+        ...positioned,
+      ]
+
+      try {
+        await gateway.reorderWorkItem(currentHumanId, itemId, { lane, position: to })
+      } catch (error) {
+        loaded.value = previous
+        moveError.value =
+          error instanceof Error ? error.message : 'The reorder was refused.'
       } finally {
         movingItemId.value = null
       }

@@ -73,12 +73,13 @@ describe('kanban source — lane moves without a drag library', () => {
     expect(card).not.toMatch(/contenteditable/i)
   })
 
-  it('emits lane moves and card creation, but never delete or reorder', () => {
+  it('emits lane moves, within-lane reorders and card creation, but never delete', () => {
     expect(board).toMatch(/emit\(\s*['"]move/i)
+    expect(board).toMatch(/emit\(\s*['"]reorder/i)
     expect(board).toMatch(/emit\(\s*['"]create/i)
 
     for (const source of [board, card]) {
-      expect(source).not.toMatch(/emit\(\s*['"](update|reorder|delete|save)/i)
+      expect(source).not.toMatch(/emit\(\s*['"](update|delete|save)/i)
     }
   })
 })
@@ -147,5 +148,20 @@ describe('kanban styles', () => {
 
   it('does not keep the standing drag-instruction chrome', () => {
     expect(styles).not.toMatch(/kanban__move-hint/)
+  })
+
+  it('lifts a dragged card and inserts a drop placeholder', () => {
+    expect(styles).toMatch(/\.kanban-card\[data-lifted="true"\]/)
+    expect(styles).toMatch(/\.kanban__placeholder/)
+    expect(board).toMatch(/kanban-drop-placeholder/)
+  })
+
+  it('disables the added drag flourish when the operator prefers reduced motion', () => {
+    expect(styles).toMatch(
+      /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*\.kanban-card\s*\{[^}]*transition:\s*none/s,
+    )
+    expect(styles).toMatch(
+      /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*\.kanban-card\[data-lifted="true"\]\s*\{[^}]*transform:\s*none/s,
+    )
   })
 })
