@@ -83,7 +83,12 @@ Work is **UI-first**. The useful surface is proven against realistic mock
 Colony data before the PostgreSQL model and HTTP contract are frozen.
 
 The workplace is a **Vue 3 + TypeScript** application. Most of it is written
-here, and since 2026-08-27 some of it may come from
+here. Trello is the visual and interaction reference: rebuild it from
+[`docs/trello-reference.md`](docs/trello-reference.md), and do not copy
+Trello source, CSS, assets, logos or proprietary copy. Hermes Kanban is the
+lifecycle reference only — the six lanes stay fixed.
+
+Since 2026-08-27 some of it may come from
 [Vikunja](https://github.com/go-vikunja/vikunja): this repository is
 AGPL-3.0-or-later and so is Vikunja, so **its source may be copied or adapted
 with attribution** where that is cheaper and clearer than rebuilding it. Every
@@ -206,6 +211,7 @@ kolonie-workplace/
   CONTRIBUTING.md     issue-first contribution path
   LICENSE             AGPL-3.0-or-later
   NOTICE              copyright and attribution
+  docs/trello-reference.md  measured Trello MVP baseline for package #73
   index.html          Vite entry document
   Dockerfile          two-stage build: Node 22 → nginx
   nginx.conf          static serving, SPA fallback and /health
