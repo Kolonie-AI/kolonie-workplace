@@ -53,6 +53,12 @@ describe('kanban source — lane moves without a drag library', () => {
     }
   })
 
+  it('judges due dates from the clock that is handed in, never from a Date it constructs', () => {
+    expect(card).toMatch(/relativeDueDate/)
+    expect(card).not.toMatch(/new Date\s*\(/)
+    expect(board).not.toMatch(/new Date\s*\(/)
+  })
+
   it('moves a card with the browser drag events and a labelled lane control', () => {
     expect(card).toMatch(/draggable="true"/)
     expect(board).toMatch(/@drop/)

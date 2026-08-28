@@ -11,6 +11,8 @@
  *   frontend/src/components/tasks/partials/AssigneeList.vue
  *   frontend/src/components/tasks/partials/PriorityLabel.vue
  *   frontend/src/components/tasks/partials/ChecklistSummary.vue
+ *   frontend/src/components/tasks/partials/DateTableCell.vue
+ *   frontend/src/components/misc/ProgressBar.vue
  *
  * Composer styles are adapted from:
  *   frontend/src/components/project/views/ProjectKanban.vue
@@ -266,6 +268,39 @@
 .kanban-card__due[data-due-state="overdue"] {
   background: var(--color-blocked-soft);
   color: var(--color-blocked);
+}
+
+.kanban-card__progress {
+  display: block;
+  inline-size: 100%;
+  block-size: 0.5rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  accent-color: var(--color-accent);
+}
+
+.kanban-card__progress::-webkit-progress-bar {
+  background: var(--color-canvas);
+  border-radius: var(--radius-pill);
+}
+
+.kanban-card__progress::-webkit-progress-value {
+  background: var(--color-accent);
+  border-radius: var(--radius-pill);
+}
+
+.kanban-card__progress::-moz-progress-bar {
+  background: var(--color-accent);
+  border-radius: var(--radius-pill);
+}
+
+.kanban-card__priority[data-priority="low"] {
+  color: var(--color-accent);
+}
+
+.kanban-card__priority[data-priority="medium"] {
+  color: var(--color-warning);
 }
 
 .kanban-card__counts {

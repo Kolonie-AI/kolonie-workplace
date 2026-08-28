@@ -15,6 +15,7 @@
  * component only through TaskGateway.
  */
 import { computed, ref, useTemplateRef, watch } from 'vue'
+import { useWorkplaceClock } from '@/clock/workplace-clock'
 import {
   WORKPLACE_VIEWS,
   WORKPLACE_VIEW_LABELS,
@@ -72,6 +73,8 @@ const mobileMenuOpen = ref(false)
 const human = useSignedInHuman()
 const humanId = computed(() => human.value?.id ?? null)
 const gateway = useTaskGateway()
+const clock = useWorkplaceClock()
+const now = computed(() => clock())
 const showsPreviewData = isPreviewDataGateway(gateway)
 const boardList = useBoardList(gateway, humanId)
 const activeBoardId = computed(() => boardList.activeBoard.value?.id ?? null)
@@ -499,6 +502,7 @@ async function updateDetail(input: UpdateWorkItemInput): Promise<WorkItemDetail 
               :moving-item-id="items.movingItemId.value"
               :move-error="items.moveError.value"
               :create-error="items.createError.value"
+              :now="now"
               @select="items.selectItem"
               @move="items.moveItem"
               @create="items.createItem"
@@ -526,6 +530,7 @@ async function updateDetail(input: UpdateWorkItemInput): Promise<WorkItemDetail 
             :update-error="detail.updateError.value"
             :available-labels="availableLabels"
             :available-assignees="availableAssignees"
+            :now="now"
             @update="updateDetail"
             @close="items.clearSelection"
           />
