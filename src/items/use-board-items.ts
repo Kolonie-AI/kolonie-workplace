@@ -174,6 +174,7 @@ export function useBoardItems(
         attachments: [],
         coverColour: null,
         coverImageUrl: null,
+        coverAttachmentId: null,
         position: loaded.value.length,
       }
 

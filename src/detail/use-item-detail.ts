@@ -1,7 +1,9 @@
 import { ref, watch, type Ref } from 'vue'
 import type {
+  AttachmentId,
   ChecklistItemId,
   CommentId,
+  CreateAttachmentInput,
   HumanId,
   UpdateChecklistItemInput,
   UpdateWorkItemInput,
@@ -46,6 +48,8 @@ export interface ItemDetail {
   createComment(author: string, body: string): Promise<WorkItemDetail | null>
   updateComment(commentId: CommentId, body: string): Promise<WorkItemDetail | null>
   deleteComment(commentId: CommentId): Promise<WorkItemDetail | null>
+  addAttachment(input: CreateAttachmentInput): Promise<WorkItemDetail | null>
+  deleteAttachment(attachmentId: AttachmentId): Promise<WorkItemDetail | null>
 }
 
 export function useItemDetail(
@@ -251,6 +255,32 @@ export function useItemDetail(
     )
   }
 
+  async function addAttachment(input: CreateAttachmentInput): Promise<WorkItemDetail | null> {
+    const currentHumanId = humanId.value
+    const current = item.value
+
+    if (currentHumanId === null || current === null) {
+      return null
+    }
+
+    return writeDetail(current, currentHumanId, () =>
+      gateway.addAttachment(currentHumanId, current.id, input),
+    )
+  }
+
+  async function deleteAttachment(attachmentId: AttachmentId): Promise<WorkItemDetail | null> {
+    const currentHumanId = humanId.value
+    const current = item.value
+
+    if (currentHumanId === null || current === null) {
+      return null
+    }
+
+    return writeDetail(current, currentHumanId, () =>
+      gateway.deleteAttachment(currentHumanId, current.id, attachmentId),
+    )
+  }
+
   return {
     status,
     item,
@@ -263,5 +293,7 @@ export function useItemDetail(
     createComment,
     updateComment,
     deleteComment,
+    addAttachment,
+    deleteAttachment,
   }
 }

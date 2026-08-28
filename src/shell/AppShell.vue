@@ -6,7 +6,7 @@
  *
  * Data reaches this component only through TaskGateway.
  */
-import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, useTemplateRef, watch } from 'vue'
 import { useWorkplaceClock } from '@/clock/workplace-clock'
 import {
   WORKPLACE_VIEWS,
@@ -15,9 +15,11 @@ import {
   type WorkplaceView,
 } from '@/shell/views'
 import type {
+  AttachmentId,
   BoardId,
   ChecklistItemId,
   CommentId,
+  CreateAttachmentInput,
   UpdateChecklistItemInput,
   UpdateWorkItemInput,
   WorkItemAssignee,
@@ -39,6 +41,7 @@ import {
   type BoardFilter,
 } from '@/items/board-filter'
 import DetailPane from '@/detail/DetailPane.vue'
+import { revokeAllPreviews } from '@/detail/attachment-previews'
 import { useItemDetail } from '@/detail/use-item-detail'
 import { useTaskGateway } from '@/gateway/provide-gateway'
 import { isPreviewDataGateway } from '@/gateway/task-gateway'
@@ -85,6 +88,10 @@ const boardFilter = ref<BoardFilter>(
 )
 const items = useBoardItems(gateway, humanId, activeBoardId, boardFilter)
 const detail = useItemDetail(gateway, humanId, items.selectedItemId)
+
+onUnmounted(() => {
+  revokeAllPreviews()
+})
 
 const filterOwners = computed(() => ownersOf(items.loadedItems.value))
 const isFiltered = computed(() => isBoardFilterActive(boardFilter.value))
@@ -301,6 +308,14 @@ async function updateComment(commentId: CommentId, body: string): Promise<WorkIt
 
 async function deleteComment(commentId: CommentId): Promise<WorkItemDetail | null> {
   return applyDetail(await detail.deleteComment(commentId))
+}
+
+async function addAttachment(input: CreateAttachmentInput): Promise<WorkItemDetail | null> {
+  return applyDetail(await detail.addAttachment(input))
+}
+
+async function deleteAttachment(attachmentId: AttachmentId): Promise<WorkItemDetail | null> {
+  return applyDetail(await detail.deleteAttachment(attachmentId))
 }
 
 function openItem(itemId: string): void {
@@ -611,6 +626,7 @@ async function closeDetail(): Promise<void> {
             :available-assignees="availableAssignees"
             :now="now"
             :current-human-name="human?.name ?? null"
+            :shows-preview-data="showsPreviewData"
             @update="updateDetail"
             @create-checklist-item="createChecklistItem"
             @update-checklist-item="updateChecklistItem"
@@ -620,6 +636,8 @@ async function closeDetail(): Promise<void> {
             @create-comment="createComment"
             @update-comment="updateComment"
             @delete-comment="deleteComment"
+            @add-attachment="addAttachment"
+            @delete-attachment="deleteAttachment"
             @close="closeDetail"
           />
         </div>

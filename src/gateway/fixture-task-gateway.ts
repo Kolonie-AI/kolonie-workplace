@@ -81,6 +81,7 @@ function toSummary(item: WorkItemDetail): WorkItemSummary {
     attachments: item.attachments,
     coverColour: item.coverColour,
     coverImageUrl: item.coverImageUrl,
+    coverAttachmentId: item.coverAttachmentId,
     position: item.position,
   }
 }
@@ -97,6 +98,54 @@ function nextId(prefix: string, existing: readonly string[]): string {
 
 function reindexChecklist(items: readonly ChecklistItem[]): ChecklistItem[] {
   return items.map((item, index) => ({ ...item, position: index }))
+}
+
+function isImageAttachment(attachment: WorkItemAttachment): boolean {
+  return attachment.mimeType.startsWith('image/')
+}
+
+function withCoverInvariant(
+  current: WorkItemDetail,
+  input: UpdateWorkItemInput,
+): WorkItemDetail {
+  const next = { ...current, ...input }
+  const requestedAttachmentId = input.coverAttachmentId
+  const requestedColour = input.coverColour
+
+  if (requestedAttachmentId) {
+    const cover = next.attachments.find((attachment) => attachment.id === requestedAttachmentId)
+
+    if (cover === undefined || !isImageAttachment(cover)) {
+      throw new WorkItemAccessRefused(current.id)
+    }
+
+    return {
+      ...next,
+      coverAttachmentId: requestedAttachmentId,
+      coverColour: null,
+      coverImageUrl: input.coverImageUrl ?? next.coverImageUrl,
+    }
+  }
+
+  if (requestedColour) {
+    return {
+      ...next,
+      coverAttachmentId: null,
+      coverColour: requestedColour,
+      coverImageUrl: null,
+    }
+  }
+
+  if (requestedAttachmentId === null && requestedColour === null) {
+    return {
+      ...next,
+      coverAttachmentId: null,
+      coverColour: null,
+      coverImageUrl: null,
+    }
+  }
+
+  return next
 }
 
 /**
@@ -178,6 +227,7 @@ export class FixtureTaskGateway implements TaskGateway {
       attachments: [],
       coverColour: null,
       coverImageUrl: null,
+      coverAttachmentId: null,
       position: input.position ?? boardItems.length,
       externalReferences: [],
     }
@@ -191,7 +241,7 @@ export class FixtureTaskGateway implements TaskGateway {
     input: UpdateWorkItemInput,
   ): Promise<WorkItemDetail> {
     const item = this.requireItem(humanId, itemId)
-    return this.replace(item.id, { ...item, ...input })
+    return this.replace(item.id, withCoverInvariant(item, input))
   }
 
   async deleteWorkItem(humanId: HumanId, itemId: WorkItemId): Promise<void> {
@@ -288,9 +338,15 @@ export class FixtureTaskGateway implements TaskGateway {
     if (!item.attachments.some((attachment) => attachment.id === attachmentId)) {
       throw new WorkItemAccessRefused(itemId)
     }
+    const remaining = item.attachments.filter((attachment) => attachment.id !== attachmentId)
+    const clearingCover = item.coverAttachmentId === attachmentId
+
     return this.replace(item.id, {
       ...item,
-      attachments: item.attachments.filter((attachment) => attachment.id !== attachmentId),
+      attachments: remaining,
+      ...(clearingCover
+        ? { coverAttachmentId: null, coverColour: null, coverImageUrl: null }
+        : {}),
     })
   }
 

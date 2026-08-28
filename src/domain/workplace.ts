@@ -113,6 +113,7 @@ export interface WorkItemSummary {
   readonly attachments: readonly WorkItemAttachment[]
   readonly coverColour: string | null
   readonly coverImageUrl: string | null
+  readonly coverAttachmentId: AttachmentId | null
   readonly position: number
 }
 
@@ -145,6 +146,7 @@ export type UpdateWorkItemInput = Partial<
     | 'percentDone'
     | 'coverColour'
     | 'coverImageUrl'
+    | 'coverAttachmentId'
     | 'position'
     | 'blocker'
     | 'handover'
