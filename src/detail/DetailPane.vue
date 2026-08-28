@@ -661,6 +661,7 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
 
             <AttachmentSection
               ref="attachmentSection"
+              :item-id="item.id"
               :attachments="item.attachments"
               :cover-attachment-id="item.coverAttachmentId"
               :shows-preview-data="showsPreviewData"

@@ -4,19 +4,20 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
-import { computed, useTemplateRef, watch } from 'vue'
+import { computed, useTemplateRef } from 'vue'
 import type {
   AttachmentId,
   CreateAttachmentInput,
   WorkItemAttachment,
+  WorkItemId,
 } from '@/domain/workplace'
 import {
   isImageAttachment,
   previewUrlFor,
-  revokeUnusedPreviews,
 } from '@/detail/attachment-previews'
 
 const props = defineProps<{
+  itemId: WorkItemId
   attachments: readonly WorkItemAttachment[]
   coverAttachmentId: AttachmentId | null
   showsPreviewData: boolean
@@ -33,18 +34,10 @@ const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
 const rows = computed(() =>
   props.attachments.map((attachment) => ({
     attachment,
-    previewUrl: previewUrlFor(attachment),
+    previewUrl: previewUrlFor(props.itemId, attachment),
     isCover: props.coverAttachmentId === attachment.id,
     isImage: isImageAttachment(attachment),
   })),
-)
-
-watch(
-  () => props.attachments,
-  (attachments) => {
-    revokeUnusedPreviews(attachments)
-  },
-  { immediate: true },
 )
 
 function openPicker(): void {

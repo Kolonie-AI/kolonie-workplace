@@ -1,46 +1,45 @@
-import type { AttachmentId, WorkItemAttachment } from '@/domain/workplace'
+import type { AttachmentId, WorkItemAttachment, WorkItemId } from '@/domain/workplace'
 
-const previewUrls = new Map<AttachmentId, string>()
+const previewUrls = new Map<string, string>()
+
+function previewKey(itemId: WorkItemId, attachmentId: AttachmentId): string {
+  return `${itemId}:${attachmentId}`
+}
 
 export function isImageAttachment(attachment: WorkItemAttachment): boolean {
   return attachment.mimeType.startsWith('image/')
 }
 
-export function previewUrlFor(attachment: WorkItemAttachment): string | null {
+export function previewUrlFor(
+  itemId: WorkItemId,
+  attachment: WorkItemAttachment,
+): string | null {
   if (attachment.file === undefined || !isImageAttachment(attachment)) {
     return null
   }
 
-  const existing = previewUrls.get(attachment.id)
+  const key = previewKey(itemId, attachment.id)
+  const existing = previewUrls.get(key)
 
   if (existing !== undefined) {
     return existing
   }
 
   const url = URL.createObjectURL(attachment.file)
-  previewUrls.set(attachment.id, url)
+  previewUrls.set(key, url)
   return url
 }
 
-export function revokePreview(attachmentId: AttachmentId): void {
-  const url = previewUrls.get(attachmentId)
+export function revokePreview(itemId: WorkItemId, attachmentId: AttachmentId): void {
+  const key = previewKey(itemId, attachmentId)
+  const url = previewUrls.get(key)
 
   if (url === undefined) {
     return
   }
 
   URL.revokeObjectURL(url)
-  previewUrls.delete(attachmentId)
-}
-
-export function revokeUnusedPreviews(attachments: readonly WorkItemAttachment[]): void {
-  const keep = new Set(attachments.map((attachment) => attachment.id))
-
-  for (const attachmentId of [...previewUrls.keys()]) {
-    if (!keep.has(attachmentId)) {
-      revokePreview(attachmentId)
-    }
-  }
+  previewUrls.delete(key)
 }
 
 export function revokeAllPreviews(): void {

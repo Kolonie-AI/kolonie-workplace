@@ -41,7 +41,7 @@ import {
   type BoardFilter,
 } from '@/items/board-filter'
 import DetailPane from '@/detail/DetailPane.vue'
-import { revokeAllPreviews } from '@/detail/attachment-previews'
+import { revokeAllPreviews, revokePreview } from '@/detail/attachment-previews'
 import { useItemDetail } from '@/detail/use-item-detail'
 import { useTaskGateway } from '@/gateway/provide-gateway'
 import { isPreviewDataGateway } from '@/gateway/task-gateway'
@@ -315,7 +315,14 @@ async function addAttachment(input: CreateAttachmentInput): Promise<WorkItemDeta
 }
 
 async function deleteAttachment(attachmentId: AttachmentId): Promise<WorkItemDetail | null> {
-  return applyDetail(await detail.deleteAttachment(attachmentId))
+  const itemId = detail.item.value?.id
+  const updated = applyDetail(await detail.deleteAttachment(attachmentId))
+
+  if (updated !== null && itemId !== undefined) {
+    revokePreview(itemId, attachmentId)
+  }
+
+  return updated
 }
 
 function openItem(itemId: string): void {
