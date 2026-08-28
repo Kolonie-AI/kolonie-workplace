@@ -1,9 +1,20 @@
 <script setup lang="ts">
+/*
+ * Copyright 2018-present Vikunja and contributors. All rights reserved.
+ * Copyright 2026 Kolonie AI FZ-LLC.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Per-lane composer placement is adapted for Kolonie Workplace on 2026-08-27
+ * from Vikunja 2.5.0 (ef2200e9429c5cc42f5c1811433418bfcc72b3aa):
+ *   frontend/src/components/project/views/ProjectKanban.vue
+ */
 import { WORKPLACE_LANE_LABELS, type Lane } from '@/domain/lanes'
 import type { WorkItemId } from '@/domain/workplace'
 import type { InvalidLaneItem, LaneColumn } from '@/items/lane-columns'
 import type { BoardItemsStatus } from '@/items/use-board-items'
 import KanbanCard from '@/kanban/KanbanCard.vue'
+import LaneComposer from '@/kanban/LaneComposer.vue'
 import '@/kanban/kanban-board.css'
 
 /**
@@ -13,7 +24,8 @@ import '@/kanban/kanban-board.css'
  *
  * A card moves between those fixed lanes by being dropped on a target lane, or
  * through the labelled keyboard control on the card. Within-lane order is not
- * modelled. Selecting a card still writes nothing.
+ * modelled. Selecting a card still writes nothing. Creating a card is emitted
+ * to the shell so TaskGateway remains the only write seam.
  */
 defineProps<{
   status: BoardItemsStatus
@@ -24,11 +36,13 @@ defineProps<{
   selectedItemId: WorkItemId | null
   movingItemId: WorkItemId | null
   moveError: string | null
+  createError: string | null
 }>()
 
 const emit = defineEmits<{
   select: [itemId: WorkItemId]
   move: [itemId: WorkItemId, lane: Lane]
+  create: [title: string, lane: Lane]
 }>()
 
 function onDrop(event: DragEvent, lane: Lane): void {
@@ -85,6 +99,15 @@ function onCardMove(itemId: WorkItemId, lane: Lane): void {
         role="alert"
       >
         {{ moveError }}
+      </p>
+
+      <p
+        v-if="createError !== null"
+        class="kanban__state kanban__state--error"
+        data-testid="kanban-create-error"
+        role="alert"
+      >
+        {{ createError }}
       </p>
 
       <p
@@ -178,6 +201,11 @@ function onCardMove(itemId: WorkItemId, lane: Lane): void {
               />
             </li>
           </ul>
+
+          <LaneComposer
+            :lane="column.lane"
+            @create="emit('create', $event, column.lane)"
+          />
         </section>
       </div>
     </template>

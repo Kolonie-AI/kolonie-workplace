@@ -458,8 +458,10 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
               :selected-item-id="items.selectedItemId.value"
               :moving-item-id="items.movingItemId.value"
               :move-error="items.moveError.value"
+              :create-error="items.createError.value"
               @select="items.selectItem"
               @move="items.moveItem"
+              @create="items.createItem"
             />
 
             <ListView

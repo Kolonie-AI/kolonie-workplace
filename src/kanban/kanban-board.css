@@ -11,6 +11,10 @@
  *   frontend/src/components/tasks/partials/AssigneeList.vue
  *   frontend/src/components/tasks/partials/PriorityLabel.vue
  *   frontend/src/components/tasks/partials/ChecklistSummary.vue
+ *
+ * Composer styles are adapted from:
+ *   frontend/src/components/project/views/ProjectKanban.vue
+ *   frontend/src/components/tasks/AddTask.vue
  */
 
 .kanban {
@@ -293,6 +297,44 @@
 .kanban-card__move-control:focus-visible {
   outline: var(--focus-ring);
   outline-offset: var(--focus-offset);
+}
+
+.lane-composer {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.lane-composer__add,
+.lane-composer__input {
+  inline-size: 100%;
+  min-block-size: 2.25rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-small);
+  text-align: start;
+}
+
+.lane-composer__add:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.lane-composer__add:focus-visible,
+.lane-composer__input:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.lane-composer__input {
+  border-style: solid;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: text;
 }
 
 @media (max-width: 48rem) {

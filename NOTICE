@@ -56,6 +56,13 @@ Imported or adapted from Vikunja:
       frontend/src/components/tasks/partials/ChecklistSummary.vue
       frontend/src/components/tasks/partials/DateTableCell.vue
 
+  src/kanban/KanbanBoard.vue
+  src/kanban/LaneComposer.vue
+  src/kanban/kanban-board.css
+    adapted from
+      frontend/src/components/project/views/ProjectKanban.vue
+      frontend/src/components/tasks/AddTask.vue
+
   src/kanban/card-facets.ts
     adapted from
       frontend/src/helpers/color/colorIsDark.ts
