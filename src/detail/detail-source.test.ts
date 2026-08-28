@@ -27,6 +27,9 @@ const styles = withoutComments(
 const activity = withoutComments(
   readFileSync(resolve(root, 'src/detail/ActivitySection.vue'), 'utf8'),
 )
+const attachments = withoutComments(
+  readFileSync(resolve(root, 'src/detail/AttachmentSection.vue'), 'utf8'),
+)
 
 describe('detail source — writes through the parent, never a gateway of its own', () => {
   it('emits an update and never talks to a gateway', () => {
@@ -44,6 +47,13 @@ describe('detail source — writes through the parent, never a gateway of its ow
     expect(activity).toMatch(/Write a comment…/)
   })
 
+  it('attaches through parent emits and never reaches for a gateway of its own', () => {
+    expect(attachments).toMatch(/emit\('add'/)
+    expect(attachments).not.toMatch(/useTaskGateway|gateway\./)
+    expect(attachments).toMatch(/previewUrlFor/)
+    expect(attachments).toMatch(/Attachments/)
+  })
+
   it('judges due dates from the clock that is handed in, never from a Date it constructs', () => {
     expect(pane).toMatch(/relativeDueDate/)
     expect(pane).not.toMatch(/new Date\s*\(/)
@@ -59,7 +69,7 @@ describe('detail source — the detail is fetched, never taken from the board pa
 
 describe('detail source — original Colony code', () => {
   it('names no third-party task model, file, class or asset', () => {
-    for (const source of [pane, composable, styles, activity]) {
+    for (const source of [pane, composable, styles, activity, attachments]) {
       expect(source).not.toMatch(/TaskDetailView/i)
       expect(source).not.toMatch(/\bis-(loading|active|done)\b/)
       expect(source).not.toMatch(/\bbucket\b|\btask-id\b|\bITask\b/i)
@@ -77,7 +87,7 @@ describe('detail source — original Colony code', () => {
     expect(pane).toMatch(/detail-overlay/)
     expect(pane).toMatch(/in list/)
     expect(pane).toMatch(/Checklist/)
-    expect(pane).toMatch(/Attachments/)
+    expect(pane).toMatch(/Attachment/)
     expect(pane).toMatch(/Activity/)
     expect(pane).toMatch(/Add to card/)
   })

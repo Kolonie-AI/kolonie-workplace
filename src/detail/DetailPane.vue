@@ -7,8 +7,10 @@
 import { computed, nextTick, onMounted, ref, useId, useTemplateRef, watch } from 'vue'
 import { WORKPLACE_LANE_LABELS } from '@/domain/lanes'
 import type {
+  AttachmentId,
   ChecklistItemId,
   CommentId,
+  CreateAttachmentInput,
   UpdateChecklistItemInput,
   UpdateWorkItemInput,
   WorkItemAssignee,
@@ -17,6 +19,7 @@ import type {
 } from '@/domain/workplace'
 import type { ItemDetailStatus } from '@/detail/use-item-detail'
 import ActivitySection from '@/detail/ActivitySection.vue'
+import AttachmentSection from '@/detail/AttachmentSection.vue'
 import ChecklistSection from '@/detail/ChecklistSection.vue'
 import { renderHandover } from '@/detail/handover-parts'
 import { sanitizeDescription } from '@/detail/sanitize-description'
@@ -38,6 +41,7 @@ const props = defineProps<{
   availableAssignees: readonly WorkItemAssignee[]
   now: Date
   currentHumanName: string | null
+  showsPreviewData: boolean
 }>()
 
 const emit = defineEmits<{
@@ -51,15 +55,19 @@ const emit = defineEmits<{
   createComment: [body: string]
   updateComment: [commentId: CommentId, body: string]
   deleteComment: [commentId: CommentId]
+  addAttachment: [input: CreateAttachmentInput]
+  deleteAttachment: [attachmentId: AttachmentId]
 }>()
 
-type RailPopover = 'labels' | 'members' | 'dates' | 'priority' | null
+type RailPopover = 'labels' | 'members' | 'dates' | 'priority' | 'cover' | null
 
 const titleDraft = ref('')
 const descriptionDraft = ref('')
 const descriptionEditor = useTemplateRef<HTMLElement>('descriptionEditor')
 const dialogEl = useTemplateRef<HTMLElement>('dialogEl')
 const checklistSection = useTemplateRef<{ focusAdd: () => void }>('checklistSection')
+const attachmentSection = useTemplateRef<{ openPicker: () => void }>('attachmentSection')
+const coverColours = ['#1973ff', '#00db60', '#ff4136', '#8338ec'] as const
 const railPopover = ref<RailPopover>(null)
 const labelQuery = ref('')
 const assigneeQuery = ref('')
@@ -380,6 +388,52 @@ function onPercentDoneChange(event: Event): void {
   emit('update', { percentDone: Math.min(100, Math.max(0, Math.round(percentDone))) })
 }
 
+function setColourCover(colour: string): void {
+  if (colour === props.item?.coverColour) {
+    return
+  }
+
+  emit('update', {
+    coverColour: colour,
+    coverAttachmentId: null,
+    coverImageUrl: null,
+  })
+}
+
+function setImageCover(attachmentId: AttachmentId, imageUrl: string): void {
+  emit('update', {
+    coverAttachmentId: attachmentId,
+    coverColour: null,
+    coverImageUrl: imageUrl,
+  })
+}
+
+function removeCover(): void {
+  emit('update', {
+    coverAttachmentId: null,
+    coverColour: null,
+    coverImageUrl: null,
+  })
+}
+
+function onDrop(event: DragEvent): void {
+  event.preventDefault()
+  const files = event.dataTransfer?.files
+
+  if (files === undefined || files.length === 0) {
+    return
+  }
+
+  for (const file of files) {
+    emit('addAttachment', {
+      name: file.name,
+      size: file.size,
+      mimeType: file.type === '' ? 'application/octet-stream' : file.type,
+      file,
+    })
+  }
+}
+
 function onAssigneeKeydown(event: KeyboardEvent): void {
   if (event.key === 'ArrowDown') {
     event.preventDefault()
@@ -423,6 +477,8 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
       :aria-label="dialogName"
       tabindex="-1"
       @keydown="onDialogKeydown"
+      @dragover.prevent
+      @drop="onDrop"
     >
       <header class="detail-pane__header">
         <p
@@ -494,6 +550,14 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
             alt=""
           >
         </span>
+        <button
+          v-if="coverKind !== null"
+          class="detail-pane__remove-cover"
+          type="button"
+          @click="removeCover"
+        >
+          Remove cover
+        </button>
 
         <h2
           class="detail-pane__title"
@@ -595,14 +659,16 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
               @remove-all="emit('deleteChecklist')"
             />
 
-            <section
-              class="detail-pane__section"
-              aria-label="Attachments"
-            >
-              <h3 class="detail-pane__section-title">
-                Attachments
-              </h3>
-            </section>
+            <AttachmentSection
+              ref="attachmentSection"
+              :item-id="item.id"
+              :attachments="item.attachments"
+              :cover-attachment-id="item.coverAttachmentId"
+              :shows-preview-data="showsPreviewData"
+              @add="emit('addAttachment', $event)"
+              @remove="emit('deleteAttachment', $event)"
+              @set-cover="setImageCover"
+            />
 
             <ActivitySection
               :comments="item.comments"
@@ -782,6 +848,52 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
             >
               Checklist
             </button>
+            <button
+              class="detail-pane__rail-button"
+              type="button"
+              @click="attachmentSection?.openPicker()"
+            >
+              Attachment
+            </button>
+            <button
+              class="detail-pane__rail-button"
+              type="button"
+              :aria-expanded="railPopover === 'cover' ? 'true' : 'false'"
+              @click="toggleRail('cover')"
+            >
+              Cover
+            </button>
+            <div
+              v-if="railPopover === 'cover'"
+              class="detail-pane__popover"
+              role="dialog"
+              aria-label="Cover"
+            >
+              <div
+                class="detail-pane__palette"
+                aria-label="Cover colours"
+              >
+                <button
+                  v-for="(colour, index) in coverColours"
+                  :key="colour"
+                  class="detail-pane__swatch"
+                  :class="{ 'detail-pane__swatch--selected': colour === item.coverColour }"
+                  type="button"
+                  :aria-label="`Choose cover colour ${index + 1}`"
+                  :aria-pressed="colour === item.coverColour"
+                  :style="{ background: colour }"
+                  @click="setColourCover(colour)"
+                />
+              </div>
+              <button
+                v-if="coverKind !== null"
+                class="detail-pane__rail-button"
+                type="button"
+                @click="removeCover"
+              >
+                Remove cover
+              </button>
+            </div>
             <button
               class="detail-pane__rail-button"
               type="button"

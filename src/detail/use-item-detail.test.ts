@@ -181,6 +181,27 @@ describe('item detail — writes update the open item', () => {
     expect(detail.item.value?.comments).toHaveLength(1)
     expect(detail.updateError.value).toMatch(/failed/i)
   })
+
+  it('adds and deletes an attachment through the gateway', async () => {
+    const gateway = createFixtureTaskGateway()
+    const selectedItemId = ref<WorkItemId | null>(FIXTURE_ITEMS.ready)
+    const detail = useItemDetail(gateway, ref(FIXTURE_HUMANS.wren), selectedItemId)
+    await settled()
+    const file = new File(['fictional notes'], 'fictional-notes.txt', { type: 'text/plain' })
+
+    const added = await detail.addAttachment({
+      name: file.name,
+      size: file.size,
+      mimeType: file.type,
+      file,
+    })
+    expect(added?.attachments).toHaveLength(1)
+    expect(detail.item.value?.attachments[0]?.name).toBe('fictional-notes.txt')
+
+    const removed = await detail.deleteAttachment(added!.attachments[0]!.id)
+    expect(removed?.attachments).toEqual([])
+    expect(detail.item.value?.attachments).toEqual([])
+  })
 })
 
 describe('item detail — rejection: an item on a board this human may not open', () => {

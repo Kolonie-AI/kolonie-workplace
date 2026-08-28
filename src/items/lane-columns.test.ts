@@ -20,6 +20,7 @@ function item(overrides: Partial<WorkItemSummary> & { id: string }): WorkItemSum
     attachments: [],
     coverColour: null,
     coverImageUrl: null,
+    coverAttachmentId: null,
     position: 0,
     ...overrides,
   }

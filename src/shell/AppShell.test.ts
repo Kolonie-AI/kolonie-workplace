@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
-import type { TaskGateway } from '@/gateway/task-gateway'
+import { PREVIEW_DATA_GATEWAY, type TaskGateway } from '@/gateway/task-gateway'
 import { TASK_GATEWAY } from '@/gateway/provide-gateway'
-import { FIXTURE_HUMANS } from '@/fixtures/catalogue'
+import { FIXTURE_BOARDS, FIXTURE_HUMANS, FIXTURE_ITEMS } from '@/fixtures/catalogue'
 import { createFixtureWorkplaceSession } from '@/session/fixture-workplace-session'
 import { WORKPLACE_SESSION } from '@/session/workplace-session'
 import AppShell from '@/shell/AppShell.vue'
@@ -200,6 +200,44 @@ describe('AppShell — preview data derives from the active gateway', () => {
 
     expect(screen.queryByTestId('preview-data-indication')).toBeNull()
     expect(screen.queryByText('Example data')).toBeNull()
+  })
+
+  it('drives the attachment preview notice from the gateway flag, not a constant', async () => {
+    const session = createFixtureWorkplaceSession()
+    await session.signIn({ humanId: FIXTURE_HUMANS.wren })
+    const inner = createFixtureTaskGateway()
+    const live = new Proxy(inner, {
+      get(target, prop, receiver) {
+        if (prop === PREVIEW_DATA_GATEWAY) {
+          return undefined
+        }
+
+        const value = Reflect.get(target, prop, receiver)
+        return typeof value === 'function' ? value.bind(target) : value
+      },
+    })
+
+    render(AppShell, {
+      props: { initialBoardId: FIXTURE_BOARDS.quillDelivery },
+      global: {
+        provide: {
+          [WORKPLACE_SESSION]: session,
+          [TASK_GATEWAY]: live,
+        },
+      },
+    })
+
+    const card = (await screen.findAllByTestId('kanban-card')).find(
+      (candidate) => candidate.getAttribute('data-item-id') === FIXTURE_ITEMS.inProgress,
+    )
+    if (card === undefined) {
+      throw new Error('Expected the in-progress fixture card.')
+    }
+    await fireEvent.click(card)
+
+    expect(await screen.findByTestId('detail-pane')).toBeTruthy()
+    expect(screen.queryByTestId('preview-data-indication')).toBeNull()
+    expect(screen.queryByTestId('detail-attachment-preview-notice')).toBeNull()
   })
 
   it('stays put across a board change and an opened detail pane', async () => {

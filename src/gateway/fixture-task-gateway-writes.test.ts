@@ -95,6 +95,70 @@ describe('fixture gateway writes', () => {
     expect(removed.attachments).toEqual([])
   })
 
+  it('keeps attachment and colour covers exclusive and clears a deleted cover attachment', async () => {
+    const gateway = createFixtureTaskGateway()
+    const image = new File(['fictional image'], 'fictional-cover.png', { type: 'image/png' })
+    const added = await gateway.addAttachment(FIXTURE_HUMANS.wren, FIXTURE_ITEMS.inProgress, {
+      name: image.name,
+      size: image.size,
+      mimeType: image.type,
+      file: image,
+    })
+    const attachmentId = added.attachments.at(-1)!.id
+
+    const imageCovered = await gateway.updateWorkItem(
+      FIXTURE_HUMANS.wren,
+      FIXTURE_ITEMS.inProgress,
+      {
+        coverAttachmentId: attachmentId,
+        coverImageUrl: 'blob:fictional-cover',
+      },
+    )
+    expect(imageCovered).toMatchObject({
+      coverAttachmentId: attachmentId,
+      coverColour: null,
+      coverImageUrl: 'blob:fictional-cover',
+    })
+
+    const colourCovered = await gateway.updateWorkItem(
+      FIXTURE_HUMANS.wren,
+      FIXTURE_ITEMS.inProgress,
+      { coverColour: '#00db60' },
+    )
+    expect(colourCovered).toMatchObject({
+      coverAttachmentId: null,
+      coverColour: '#00db60',
+      coverImageUrl: null,
+    })
+
+    await gateway.updateWorkItem(FIXTURE_HUMANS.wren, FIXTURE_ITEMS.inProgress, {
+      coverAttachmentId: attachmentId,
+      coverImageUrl: 'blob:fictional-cover',
+    })
+    const removed = await gateway.deleteAttachment(
+      FIXTURE_HUMANS.wren,
+      FIXTURE_ITEMS.inProgress,
+      attachmentId,
+    )
+    expect(removed).toMatchObject({
+      coverAttachmentId: null,
+      coverColour: null,
+      coverImageUrl: null,
+    })
+  })
+
+  it('refuses a non-image attachment as an image cover', async () => {
+    const gateway = createFixtureTaskGateway()
+    const item = await gateway.getItemDetail(FIXTURE_HUMANS.wren, FIXTURE_ITEMS.inProgress)
+
+    await expect(
+      gateway.updateWorkItem(FIXTURE_HUMANS.wren, FIXTURE_ITEMS.inProgress, {
+        coverAttachmentId: item.attachments[0]!.id,
+        coverImageUrl: 'blob:not-an-image',
+      }),
+    ).rejects.toBeInstanceOf(WorkItemAccessRefused)
+  })
+
   it('adds, updates, reorders and deletes checklist items', async () => {
     const gateway = createFixtureTaskGateway()
     const added = await gateway.createChecklistItem(

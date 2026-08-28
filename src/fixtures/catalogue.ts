@@ -150,6 +150,7 @@ const emptyBoardFields = {
   attachments: [] as const,
   coverColour: null,
   coverImageUrl: null,
+  coverAttachmentId: null,
 }
 
 export const fixtureWorkItems: readonly WorkItemDetail[] = [

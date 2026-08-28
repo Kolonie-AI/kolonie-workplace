@@ -63,7 +63,9 @@ function pane(): HTMLElement {
   return screen.getByTestId('detail-pane')
 }
 
-async function openRail(name: 'Labels' | 'Members' | 'Dates' | 'Priority'): Promise<void> {
+async function openRail(
+  name: 'Labels' | 'Members' | 'Dates' | 'Priority' | 'Cover',
+): Promise<void> {
   await fireEvent.click(within(pane()).getByRole('button', { name }))
 }
 
@@ -119,7 +121,8 @@ describe('detail pane — opened from the board, over it', () => {
     expect(within(pane()).getByRole('heading', { name: 'Attachments' })).toBeTruthy()
     expect(within(pane()).getByRole('heading', { name: 'Comments and activity' })).toBeTruthy()
     expect(within(pane()).getByRole('button', { name: 'Checklist' })).toBeTruthy()
-    expect(within(pane()).queryByRole('button', { name: /attachment/i })).toBeNull()
+    expect(within(pane()).getByRole('button', { name: 'Attachment' })).toBeTruthy()
+    expect(within(pane()).getByRole('button', { name: 'Cover' })).toBeTruthy()
   })
 
   it('opens from a List row through the same selection, not a second one', async () => {
@@ -1080,6 +1083,257 @@ describe('detail pane — comments and activity', () => {
     expect(composer.value).toBe('<p>Please review the fictional outline.</p>')
     expect(within(activity).getByTestId('detail-activity-empty').textContent).toMatch(/no comments yet/i)
     expect(within(pane()).getByRole('alert').textContent).not.toMatch(/no comments yet/i)
+  })
+})
+
+describe('detail pane — attachments and covers', () => {
+  function cardFor(itemId: string): HTMLElement {
+    const card = screen
+      .getAllByTestId('kanban-card')
+      .find((candidate) => candidate.getAttribute('data-item-id') === itemId)
+
+    if (card === undefined) {
+      throw new Error(`Kolonie Workplace: no card rendered for ${itemId}.`)
+    }
+
+    return card
+  }
+
+  function imageFile(): File {
+    return new File(['fictional png'], 'fictional-cover.png', { type: 'image/png' })
+  }
+
+  function noteFile(): File {
+    return new File(['fictional notes'], 'fictional-notes.txt', { type: 'text/plain' })
+  }
+
+  it('lists existing files with name, size and icon, and shows the preview notice from the gateway flag', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    await openItem(FIXTURE_ITEMS.inProgress)
+    const attachments = within(pane()).getByTestId('detail-attachments')
+
+    expect(within(attachments).getByRole('heading', { name: 'Attachments' })).toBeTruthy()
+    expect(within(attachments).getByRole('heading', { name: 'Files' })).toBeTruthy()
+    expect(within(attachments).getByTestId('detail-attachment').textContent).toContain(
+      'fictional-outline.txt',
+    )
+    expect(within(attachments).getByTestId('detail-attachment').textContent).toMatch(/128/)
+    expect(within(attachments).getByTestId('detail-attachment-preview-notice').textContent).toMatch(
+      /preview|example|session-local/i,
+    )
+    expect(within(cardFor(FIXTURE_ITEMS.inProgress)).getByLabelText('1 attachment')).toBeTruthy()
+  })
+
+  it('adds from the rail picker and from a drop, and both bump the card badge', async () => {
+    const gateway = createFixtureTaskGateway()
+    const adds = vi.spyOn(gateway, 'addAttachment')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.ready)
+    const attachments = within(pane()).getByTestId('detail-attachments')
+
+    expect(within(attachments).getByTestId('detail-attachments-empty').textContent).toMatch(
+      /no attachments/i,
+    )
+    expect(within(cardFor(FIXTURE_ITEMS.ready)).queryByTestId('kanban-card-attachments')).toBeNull()
+
+    const picker = within(attachments).getByLabelText('Attach a file') as HTMLInputElement
+    await fireEvent.change(picker, { target: { files: [noteFile()] } })
+
+    await waitFor(() => {
+      expect(adds).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.ready,
+        expect.objectContaining({
+          name: 'fictional-notes.txt',
+          mimeType: 'text/plain',
+        }),
+      )
+    })
+    await waitFor(() => {
+      expect(within(cardFor(FIXTURE_ITEMS.ready)).getByLabelText('1 attachment')).toBeTruthy()
+    })
+
+    await fireEvent.drop(within(pane()).getByTestId('detail-attachments'), {
+      dataTransfer: { files: [imageFile()] },
+    })
+
+    await waitFor(() => {
+      expect(adds).toHaveBeenCalledTimes(2)
+    })
+    await waitFor(() => {
+      expect(within(cardFor(FIXTURE_ITEMS.ready)).getByLabelText('2 attachments')).toBeTruthy()
+    })
+    expect(within(attachments).queryByTestId('detail-attachments-empty')).toBeNull()
+  })
+
+  it('previews an image with an object URL and revokes every created URL on unmount', async () => {
+    const created: string[] = []
+    const revoked: string[] = []
+    const originalCreate = URL.createObjectURL.bind(URL)
+    const originalRevoke = URL.revokeObjectURL.bind(URL)
+    vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
+      const url = originalCreate(blob)
+      created.push(url)
+      return url
+    })
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation((url) => {
+      revoked.push(url)
+      originalRevoke(url)
+    })
+
+    const view = await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    await openItem(FIXTURE_ITEMS.ready)
+    const picker = within(pane()).getByLabelText('Attach a file') as HTMLInputElement
+    await fireEvent.change(picker, { target: { files: [imageFile()] } })
+
+    await waitFor(() => {
+      expect(within(pane()).getByTestId('detail-attachment-preview')).toBeTruthy()
+    })
+    expect(created.length).toBeGreaterThan(0)
+    expect(within(pane()).getByTestId('detail-attachment-preview').getAttribute('src')).toBe(
+      created[0],
+    )
+
+    await fireEvent.click(within(pane()).getByTestId('detail-close'))
+    await waitFor(() => {
+      expect(screen.queryByTestId('detail-pane')).toBeNull()
+    })
+    view.unmount()
+
+    expect(revoked).toEqual(created)
+  })
+
+  it('sets an image cover from an attachment, paints the board card, and removing cover clears both', async () => {
+    const gateway = createFixtureTaskGateway()
+    const updates = vi.spyOn(gateway, 'updateWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.ready)
+    await fireEvent.change(within(pane()).getByLabelText('Attach a file'), {
+      target: { files: [imageFile()] },
+    })
+    await waitFor(() => {
+      expect(within(pane()).getByTestId('detail-attachment')).toBeTruthy()
+    })
+
+    await fireEvent.click(within(pane()).getByRole('button', { name: 'Set as cover' }))
+    await waitFor(() => {
+      expect(updates).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.ready,
+        expect.objectContaining({
+          coverAttachmentId: expect.any(String),
+          coverColour: null,
+        }),
+      )
+    })
+    await waitFor(() => {
+      expect(within(pane()).getByTestId('detail-cover').getAttribute('data-cover-kind')).toBe(
+        'image',
+      )
+      expect(
+        within(cardFor(FIXTURE_ITEMS.ready)).getByTestId('kanban-card-cover').getAttribute(
+          'data-cover-kind',
+        ),
+      ).toBe('image')
+    })
+    expect(within(pane()).getByRole('button', { name: 'Remove cover' })).toBeTruthy()
+    expect(within(pane()).getByTestId('detail-attachment').textContent).toMatch(/cover/i)
+
+    await fireEvent.click(within(pane()).getByRole('button', { name: 'Remove cover' }))
+    await waitFor(() => {
+      expect(updates).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.ready,
+        expect.objectContaining({
+          coverAttachmentId: null,
+          coverColour: null,
+          coverImageUrl: null,
+        }),
+      )
+    })
+    await waitFor(() => {
+      expect(within(pane()).queryByTestId('detail-cover')).toBeNull()
+      expect(within(cardFor(FIXTURE_ITEMS.ready)).queryByTestId('kanban-card-cover')).toBeNull()
+    })
+  })
+
+  it('sets a colour cover from the rail and clears an image cover', async () => {
+    const gateway = createFixtureTaskGateway()
+    const updates = vi.spyOn(gateway, 'updateWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.inProgress)
+
+    expect(within(pane()).getByTestId('detail-cover').getAttribute('data-cover-kind')).toBe(
+      'colour',
+    )
+
+    await openRail('Cover')
+    await fireEvent.click(within(pane()).getByRole('button', { name: 'Choose cover colour 2' }))
+    await waitFor(() => {
+      expect(updates).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.inProgress,
+        expect.objectContaining({
+          coverColour: expect.stringMatching(/^#/),
+          coverAttachmentId: null,
+          coverImageUrl: null,
+        }),
+      )
+    })
+    await waitFor(() => {
+      expect(
+        within(cardFor(FIXTURE_ITEMS.inProgress)).getByTestId('kanban-card-cover').getAttribute(
+          'data-cover-kind',
+        ),
+      ).toBe('colour')
+    })
+  })
+
+  it('clears the cover when the selected cover attachment is deleted', async () => {
+    const gateway = createFixtureTaskGateway()
+    const deletes = vi.spyOn(gateway, 'deleteAttachment')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.ready)
+    await fireEvent.change(within(pane()).getByLabelText('Attach a file'), {
+      target: { files: [imageFile()] },
+    })
+    await waitFor(() => {
+      expect(within(pane()).getByRole('button', { name: 'Set as cover' })).toBeTruthy()
+    })
+    await fireEvent.click(within(pane()).getByRole('button', { name: 'Set as cover' }))
+    await waitFor(() => {
+      expect(within(pane()).getByTestId('detail-cover')).toBeTruthy()
+    })
+
+    await fireEvent.click(within(pane()).getByRole('button', { name: 'Remove attachment' }))
+    await waitFor(() => {
+      expect(deletes).toHaveBeenCalled()
+    })
+    await waitFor(() => {
+      expect(within(pane()).queryByTestId('detail-cover')).toBeNull()
+      expect(within(cardFor(FIXTURE_ITEMS.ready)).queryByTestId('kanban-card-cover')).toBeNull()
+      expect(within(cardFor(FIXTURE_ITEMS.ready)).queryByTestId('kanban-card-attachments')).toBeNull()
+    })
+  })
+
+  it('does not show the preview notice when the gateway is not a preview gateway', async () => {
+    const inner = createFixtureTaskGateway()
+    const { PREVIEW_DATA_GATEWAY } = await import('@/gateway/task-gateway')
+    const live = new Proxy(inner, {
+      get(target, prop, receiver) {
+        if (prop === PREVIEW_DATA_GATEWAY) {
+          return undefined
+        }
+
+        const value = Reflect.get(target, prop, receiver)
+        return typeof value === 'function' ? value.bind(target) : value
+      },
+    })
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, live)
+    await openItem(FIXTURE_ITEMS.inProgress)
+
+    expect(within(pane()).queryByTestId('detail-attachment-preview-notice')).toBeNull()
+    expect(within(pane()).getByTestId('detail-attachment')).toBeTruthy()
   })
 })
 

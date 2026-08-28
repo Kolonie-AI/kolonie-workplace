@@ -329,6 +329,7 @@ function createdItem(id: string, title: string, lane: 'ready' | 'blocked' = 'rea
     attachments: [],
     coverColour: null,
     coverImageUrl: null,
+    coverAttachmentId: null,
     position: 0,
     externalReferences: [],
   }
