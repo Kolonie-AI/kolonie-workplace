@@ -16,6 +16,8 @@ import {
 } from '@/shell/views'
 import type {
   BoardId,
+  ChecklistItemId,
+  UpdateChecklistItemInput,
   UpdateWorkItemInput,
   WorkItemAssignee,
   WorkItemDetail,
@@ -228,14 +230,58 @@ const availableAssignees = computed<readonly WorkItemAssignee[]>(() => {
   return [...assignees.values()].sort((left, right) => left.name.localeCompare(right.name))
 })
 
-async function updateDetail(input: UpdateWorkItemInput): Promise<WorkItemDetail | null> {
-  const updated = await detail.updateItem(input)
-
+function applyDetail(updated: WorkItemDetail | null): WorkItemDetail | null {
   if (updated !== null) {
     items.replaceItem(updated)
   }
 
   return updated
+}
+
+async function updateDetail(input: UpdateWorkItemInput): Promise<WorkItemDetail | null> {
+  return applyDetail(await detail.updateItem(input))
+}
+
+async function createChecklistItem(title: string): Promise<WorkItemDetail | null> {
+  return applyDetail(await detail.createChecklistItem(title))
+}
+
+async function updateChecklistItem(
+  checklistItemId: ChecklistItemId,
+  input: UpdateChecklistItemInput,
+): Promise<WorkItemDetail | null> {
+  return applyDetail(await detail.updateChecklistItem(checklistItemId, input))
+}
+
+async function reorderChecklistItem(
+  checklistItemId: ChecklistItemId,
+  position: number,
+): Promise<WorkItemDetail | null> {
+  return applyDetail(await detail.reorderChecklistItem(checklistItemId, position))
+}
+
+async function deleteChecklistItem(
+  checklistItemId: ChecklistItemId,
+): Promise<WorkItemDetail | null> {
+  return applyDetail(await detail.deleteChecklistItem(checklistItemId))
+}
+
+async function deleteChecklist(): Promise<void> {
+  const current = detail.item.value
+
+  if (current === null) {
+    return
+  }
+
+  for (const entry of [...current.checklist].sort((left, right) => right.position - left.position)) {
+    const updated = await detail.deleteChecklistItem(entry.id)
+
+    if (updated === null) {
+      return
+    }
+
+    items.replaceItem(updated)
+  }
 }
 
 function openItem(itemId: string): void {
@@ -546,6 +592,11 @@ async function closeDetail(): Promise<void> {
             :available-assignees="availableAssignees"
             :now="now"
             @update="updateDetail"
+            @create-checklist-item="createChecklistItem"
+            @update-checklist-item="updateChecklistItem"
+            @reorder-checklist-item="reorderChecklistItem"
+            @delete-checklist-item="deleteChecklistItem"
+            @delete-checklist="deleteChecklist"
             @close="closeDetail"
           />
         </div>
