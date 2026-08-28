@@ -20,6 +20,7 @@ function item(overrides: Partial<WorkItemSummary> = {}): WorkItemSummary {
     comments: [],
     attachments: [],
     coverColour: null,
+    coverImageUrl: null,
     position: 0,
     ...overrides,
   }
@@ -38,67 +39,141 @@ function renderCard(overrides: Partial<WorkItemSummary> = {}, now: Date = FIXED_
   })
 }
 
-describe('KanbanCard — seven facets render only when their data is present', () => {
+function denseItem(): Partial<WorkItemSummary> {
+  return {
+    coverColour: '#1973ff',
+    description: '<p>Outline the fictional delivery.</p>',
+    labels: [
+      { id: 'label-a', title: 'Delivery', colour: '#00db60' },
+      { id: 'label-b', title: 'Research', colour: '#8338ec' },
+    ],
+    assignees: [{ id: 'human-wren', name: 'Fictional Human Wren' }],
+    dueDate: '2026-09-04',
+    checklist: [
+      { id: 'check-a', title: 'One', done: true, position: 0 },
+      { id: 'check-b', title: 'Two', done: false, position: 1 },
+    ],
+    comments: [
+      {
+        id: 'comment-a',
+        author: 'Fictional Human Wren',
+        body: 'A note',
+        createdAt: '2026-08-26T09:00:00.000Z',
+        updatedAt: '2026-08-26T09:00:00.000Z',
+      },
+      {
+        id: 'comment-b',
+        author: 'Fictional Operator Ember',
+        body: 'Another note',
+        createdAt: '2026-08-26T12:00:00.000Z',
+        updatedAt: '2026-08-26T12:00:00.000Z',
+      },
+      {
+        id: 'comment-c',
+        author: 'Fictional Human Wren',
+        body: 'A third note',
+        createdAt: '2026-08-26T15:00:00.000Z',
+        updatedAt: '2026-08-26T15:00:00.000Z',
+      },
+    ],
+    attachments: [{ id: 'file-a', name: 'notes.txt', size: 12, mimeType: 'text/plain' }],
+  }
+}
+
+describe('KanbanCard — the resting face is title and badges, not a form', () => {
   it('leaves no empty boxes on a card that carries only a title', () => {
     renderCard()
 
-    expect(screen.queryByTestId('kanban-card-cover')).toBeNull()
-    expect(screen.queryByTestId('kanban-card-label')).toBeNull()
-    expect(screen.queryByTestId('kanban-card-assignee')).toBeNull()
-    expect(screen.queryByTestId('kanban-card-priority')).toBeNull()
-    expect(screen.queryByTestId('kanban-card-due')).toBeNull()
-    expect(screen.queryByTestId('kanban-card-checklist')).toBeNull()
-    expect(screen.queryByTestId('kanban-card-counts')).toBeNull()
-    expect(screen.getByTestId('kanban-card').textContent).toContain('A fictional card')
+    const card = screen.getByTestId('kanban-card')
+    expect(card.textContent).toContain('A fictional card')
+    expect(card.textContent).not.toContain('Fictional Agent Quill')
+    expect(within(card).queryByTestId('kanban-card-cover')).toBeNull()
+    expect(within(card).queryByTestId('kanban-card-label')).toBeNull()
+    expect(within(card).queryByTestId('kanban-card-assignee')).toBeNull()
+    expect(within(card).queryByTestId('kanban-card-priority')).toBeNull()
+    expect(within(card).queryByTestId('kanban-card-due')).toBeNull()
+    expect(within(card).queryByTestId('kanban-card-checklist')).toBeNull()
+    expect(within(card).queryByTestId('kanban-card-badges')).toBeNull()
+    expect(within(card).queryByText('0/0')).toBeNull()
+    expect(within(card).queryByLabelText(/checklist/i)).toBeNull()
+    expect(within(card).queryByLabelText('Move to lane')).toBeNull()
+    expect(within(card).queryByRole('progressbar')).toBeNull()
   })
 
-  it('renders a colour stripe, labels, assignees, priority, due date, checklist and counts together', () => {
-    renderCard({
-      coverColour: '#1973ff',
-      labels: [{ id: 'label-a', title: 'Delivery', colour: '#00db60' }],
-      assignees: [{ id: 'human-wren', name: 'Fictional Human Wren' }],
-      priority: 'high',
-      dueDate: '2026-09-04',
-      checklist: [
-        { id: 'check-a', title: 'One', done: true, position: 0 },
-        { id: 'check-b', title: 'Two', done: false, position: 1 },
-      ],
-      comments: [
-        {
-          id: 'comment-a',
-          author: 'Fictional Human Wren',
-          body: 'A note',
-          createdAt: '2026-08-26T09:00:00.000Z',
-          updatedAt: '2026-08-26T09:00:00.000Z',
-        },
-      ],
-      attachments: [{ id: 'file-a', name: 'notes.txt', size: 12, mimeType: 'text/plain' }],
-    })
+  it('renders cover, labels, due, checklist, comments, attachment and assignee by accessible name', () => {
+    renderCard(denseItem())
 
     const card = screen.getByTestId('kanban-card')
-    expect(card.getAttribute('data-cover-colour')).toBe('#1973ff')
-    expect(screen.getByTestId('kanban-card-cover')).toBeTruthy()
-    expect(screen.getByTestId('kanban-card-label').textContent).toContain('Delivery')
-    expect(screen.getByTestId('kanban-card-assignee').textContent).toContain('FW')
-    expect(screen.getByTestId('kanban-card-priority').textContent).toMatch(/high/i)
-    expect(screen.getByTestId('kanban-card-due').textContent).toBe('in 8 days')
-    expect(screen.getByTestId('kanban-card-due').getAttribute('datetime')).toBe('2026-09-04')
-    expect(screen.getByTestId('kanban-card-checklist').textContent).toMatch(/1\/2/)
-    expect(screen.getByTestId('kanban-card-counts').textContent).toMatch(/1/)
+    expect(within(card).getByTestId('kanban-card-cover')).toBeTruthy()
+    expect(within(card).getByRole('img', { name: 'Delivery' })).toBeTruthy()
+    expect(within(card).getByRole('img', { name: 'Research' })).toBeTruthy()
+    expect(within(card).getByLabelText('Has a description')).toBeTruthy()
+    expect(within(card).getByLabelText(/due in 8 days/i)).toBeTruthy()
+    expect(within(card).getByLabelText('Checklist 1/2')).toBeTruthy()
+    expect(within(card).getByLabelText('3 comments')).toBeTruthy()
+    expect(within(card).getByLabelText('1 attachment')).toBeTruthy()
+    expect(within(card).getByLabelText('Fictional Human Wren')).toBeTruthy()
+    expect(card.textContent).not.toContain('Fictional Agent Quill')
+    expect(within(card).queryByTestId('kanban-card-priority')).toBeNull()
+    expect(within(card).queryByRole('progressbar')).toBeNull()
   })
 
-  it('shows percent-done as a progress bar when it is above zero', () => {
+  it('does not show a 0/0 checklist badge when there is no checklist', () => {
     renderCard({ percentDone: 40 })
 
-    const progress = screen.getByTestId('kanban-card-progress')
-    expect(progress.getAttribute('value')).toBe('40')
-    expect(progress.textContent).toContain('40%')
+    expect(screen.queryByText('0/0')).toBeNull()
+    expect(screen.queryByLabelText(/checklist/i)).toBeNull()
+    expect(screen.queryByTestId('kanban-card-progress')).toBeNull()
   })
 
-  it('leaves the progress bar off a card that has not started', () => {
-    renderCard({ percentDone: 0 })
+  it('shows 0/n when a checklist exists and nothing is done', () => {
+    renderCard({
+      checklist: [{ id: 'check-a', title: 'One', done: false, position: 0 }],
+    })
 
-    expect(screen.queryByTestId('kanban-card-progress')).toBeNull()
+    expect(screen.getByLabelText('Checklist 0/1')).toBeTruthy()
+    expect(screen.getByTestId('kanban-card-checklist').textContent).toMatch(/0\/1/)
+  })
+
+  it('paints a colour cover when there is no image, and an image cover when the fixture URL is set', () => {
+    const colour = renderCard({ coverColour: '#1973ff' })
+    const colourCover = colour.getByTestId('kanban-card-cover')
+    expect(colourCover.getAttribute('data-cover-kind')).toBe('colour')
+    expect(colourCover.querySelector('img')).toBeNull()
+    colour.unmount()
+
+    renderCard({
+      coverColour: '#1973ff',
+      coverImageUrl: '/fictional-covers/outline.svg',
+    })
+    const imageCover = screen.getByTestId('kanban-card-cover')
+    expect(imageCover.getAttribute('data-cover-kind')).toBe('image')
+    expect(imageCover.querySelector('img')?.getAttribute('src')).toBe(
+      '/fictional-covers/outline.svg',
+    )
+  })
+
+  it('names a blocked card and a review card for assistive tech, not only by lane', () => {
+    const blocked = renderCard({ lane: 'blocked' })
+    expect(blocked.getByTestId('kanban-card').getAttribute('data-blocked')).toBe('true')
+    expect(blocked.getByRole('status', { name: 'Blocked' })).toBeTruthy()
+    blocked.unmount()
+
+    renderCard({ lane: 'review' })
+    expect(screen.getByRole('status', { name: 'Review' })).toBeTruthy()
+    expect(screen.queryByRole('status', { name: 'Blocked' })).toBeNull()
+  })
+
+  it('keeps Move to lane off the resting face, reachable through a disclosure', async () => {
+    const view = renderCard({ lane: 'ready' })
+    const card = screen.getByTestId('kanban-card')
+
+    expect(within(card).queryByLabelText('Move to lane')).toBeNull()
+    expect(screen.queryByRole('checkbox')).toBeNull()
+
+    await fireEvent.click(screen.getByTestId('kanban-card-move-disclosure').querySelector('summary') as HTMLElement)
+    await fireEvent.update(screen.getByLabelText('Move to lane'), 'done')
+    expect(view.emitted('move')[0]).toEqual(['fictional-card', 'done'])
   })
 
   it('paints a dark label with light text and a light label with dark text', () => {
@@ -109,13 +184,12 @@ describe('KanbanCard — seven facets render only when their data is present', (
       ],
     })
 
-    const chips = screen.getAllByTestId('kanban-card-label')
-    const dark = chips.find((chip) => chip.textContent?.includes('Dark'))
-    const light = chips.find((chip) => chip.textContent?.includes('Light'))
+    const dark = screen.getByRole('img', { name: 'Dark' })
+    const light = screen.getByRole('img', { name: 'Light' })
 
-    expect(dark?.style.color).toBe('var(--color-contrast-light)')
-    expect(light?.style.color).toBe('var(--color-contrast-dark)')
-    expect(dark?.style.color).not.toBe(light?.style.color)
+    expect(dark.style.color).toBe('var(--color-contrast-light)')
+    expect(light.style.color).toBe('var(--color-contrast-dark)')
+    expect(dark.style.color).not.toBe(light.style.color)
   })
 
   it('marks an overdue date from a fixed clock and leaves an upcoming one unmarked', () => {
@@ -140,7 +214,7 @@ describe('KanbanCard — seven facets render only when their data is present', (
     expect(avatar.querySelector('img')).toBeNull()
   })
 
-  it('still selects, still drags, and still moves via the labelled lane control', async () => {
+  it('still selects and still drags from the face', async () => {
     const view = renderCard({ lane: 'ready' })
     const card = screen.getByTestId('kanban-card')
     await fireEvent.click(card)
@@ -152,8 +226,5 @@ describe('KanbanCard — seven facets render only when their data is present', (
     })
     card.dispatchEvent(drag)
     expect(card.getAttribute('draggable')).toBe('true')
-
-    await fireEvent.update(screen.getByTestId('kanban-card-move'), 'done')
-    expect(view.emitted('move')[0]).toEqual(['fictional-card', 'done'])
   })
 })

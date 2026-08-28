@@ -80,6 +80,7 @@ function toSummary(item: WorkItemDetail): WorkItemSummary {
     comments: item.comments,
     attachments: item.attachments,
     coverColour: item.coverColour,
+    coverImageUrl: item.coverImageUrl,
     position: item.position,
   }
 }
@@ -176,6 +177,7 @@ export class FixtureTaskGateway implements TaskGateway {
       comments: [],
       attachments: [],
       coverColour: null,
+      coverImageUrl: null,
       position: input.position ?? boardItems.length,
       externalReferences: [],
     }

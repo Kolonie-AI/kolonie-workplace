@@ -173,6 +173,7 @@ export function useBoardItems(
         comments: [],
         attachments: [],
         coverColour: null,
+        coverImageUrl: null,
         position: loaded.value.length,
       }
 

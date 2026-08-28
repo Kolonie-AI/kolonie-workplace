@@ -62,10 +62,11 @@ describe('kanban source — lane moves without a drag library', () => {
     expect(board).not.toMatch(/new Date\s*\(/)
   })
 
-  it('moves a card with the browser drag events and a labelled lane control', () => {
+  it('moves a card with the browser drag events and a labelled lane control off the face', () => {
     expect(card).toMatch(/draggable="true"/)
     expect(board).toMatch(/@drop/)
     expect(card).toMatch(/Move to lane/)
+    expect(card).toMatch(/<details\b/)
     expect(board).not.toMatch(/v-model/)
     expect(card).not.toMatch(/v-model/)
     expect(board).not.toMatch(/contenteditable/i)
