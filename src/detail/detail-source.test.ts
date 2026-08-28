@@ -67,7 +67,7 @@ describe('detail source — original Colony code', () => {
     expect(pane).toMatch(/aria-modal="true"/)
     expect(pane).toMatch(/detail-overlay/)
     expect(pane).toMatch(/in list/)
-    expect(pane).toMatch(/Checklists/)
+    expect(pane).toMatch(/Checklist/)
     expect(pane).toMatch(/Attachments/)
     expect(pane).toMatch(/Activity/)
     expect(pane).toMatch(/Add to card/)

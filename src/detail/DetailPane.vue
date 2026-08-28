@@ -7,12 +7,15 @@
 import { computed, nextTick, onMounted, ref, useId, useTemplateRef, watch } from 'vue'
 import { WORKPLACE_LANE_LABELS } from '@/domain/lanes'
 import type {
+  ChecklistItemId,
+  UpdateChecklistItemInput,
   UpdateWorkItemInput,
   WorkItemAssignee,
   WorkItemDetail,
   WorkItemLabel,
 } from '@/domain/workplace'
 import type { ItemDetailStatus } from '@/detail/use-item-detail'
+import ChecklistSection from '@/detail/ChecklistSection.vue'
 import { renderHandover } from '@/detail/handover-parts'
 import { sanitizeDescription } from '@/detail/sanitize-description'
 import {
@@ -37,6 +40,11 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   update: [input: UpdateWorkItemInput]
+  createChecklistItem: [title: string]
+  updateChecklistItem: [checklistItemId: ChecklistItemId, input: UpdateChecklistItemInput]
+  reorderChecklistItem: [checklistItemId: ChecklistItemId, position: number]
+  deleteChecklistItem: [checklistItemId: ChecklistItemId]
+  deleteChecklist: []
 }>()
 
 type RailPopover = 'labels' | 'members' | 'dates' | 'priority' | null
@@ -45,6 +53,7 @@ const titleDraft = ref('')
 const descriptionDraft = ref('')
 const descriptionEditor = useTemplateRef<HTMLElement>('descriptionEditor')
 const dialogEl = useTemplateRef<HTMLElement>('dialogEl')
+const checklistSection = useTemplateRef<{ focusAdd: () => void }>('checklistSection')
 const railPopover = ref<RailPopover>(null)
 const labelQuery = ref('')
 const assigneeQuery = ref('')
@@ -570,14 +579,15 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
               />
             </section>
 
-            <section
-              class="detail-pane__section"
-              aria-label="Checklists"
-            >
-              <h3 class="detail-pane__section-title">
-                Checklists
-              </h3>
-            </section>
+            <ChecklistSection
+              ref="checklistSection"
+              :items="item.checklist"
+              @create="emit('createChecklistItem', $event)"
+              @update="(id, input) => emit('updateChecklistItem', id, input)"
+              @reorder="(id, position) => emit('reorderChecklistItem', id, position)"
+              @remove="emit('deleteChecklistItem', $event)"
+              @remove-all="emit('deleteChecklist')"
+            />
 
             <section
               class="detail-pane__section"
@@ -759,6 +769,13 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
             class="detail-pane__rail"
             aria-label="Add to card"
           >
+            <button
+              class="detail-pane__rail-button"
+              type="button"
+              @click="checklistSection?.focusAdd()"
+            >
+              Checklist
+            </button>
             <button
               class="detail-pane__rail-button"
               type="button"

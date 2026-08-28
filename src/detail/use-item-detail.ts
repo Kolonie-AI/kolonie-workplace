@@ -1,6 +1,8 @@
 import { ref, watch, type Ref } from 'vue'
 import type {
+  ChecklistItemId,
   HumanId,
+  UpdateChecklistItemInput,
   UpdateWorkItemInput,
   WorkItemDetail,
   WorkItemId,
@@ -30,6 +32,16 @@ export interface ItemDetail {
   readonly item: Readonly<Ref<WorkItemDetail | null>>
   readonly updateError: Readonly<Ref<string | null>>
   updateItem(input: UpdateWorkItemInput): Promise<WorkItemDetail | null>
+  createChecklistItem(title: string): Promise<WorkItemDetail | null>
+  updateChecklistItem(
+    checklistItemId: ChecklistItemId,
+    input: UpdateChecklistItemInput,
+  ): Promise<WorkItemDetail | null>
+  reorderChecklistItem(
+    checklistItemId: ChecklistItemId,
+    position: number,
+  ): Promise<WorkItemDetail | null>
+  deleteChecklistItem(checklistItemId: ChecklistItemId): Promise<WorkItemDetail | null>
 }
 
 export function useItemDetail(
@@ -78,6 +90,37 @@ export function useItemDetail(
 
   watch([humanId, selectedItemId], () => void load(), { immediate: true })
 
+  async function writeDetail(
+    current: WorkItemDetail,
+    currentHumanId: HumanId,
+    run: () => Promise<WorkItemDetail>,
+    optimistic?: WorkItemDetail,
+  ): Promise<WorkItemDetail | null> {
+    const previous = current
+    updateError.value = null
+
+    if (optimistic !== undefined) {
+      item.value = optimistic
+    }
+
+    try {
+      const updated = await run()
+
+      if (humanId.value === currentHumanId && selectedItemId.value === current.id) {
+        item.value = updated
+      }
+
+      return updated
+    } catch {
+      if (humanId.value === currentHumanId && selectedItemId.value === current.id) {
+        item.value = previous
+      }
+
+      updateError.value = 'Updating this work item failed.'
+      return null
+    }
+  }
+
   async function updateItem(input: UpdateWorkItemInput): Promise<WorkItemDetail | null> {
     const currentHumanId = humanId.value
     const current = item.value
@@ -86,21 +129,91 @@ export function useItemDetail(
       return null
     }
 
-    updateError.value = null
-
-    try {
-      const updated = await gateway.updateWorkItem(currentHumanId, current.id, input)
-
-      if (humanId.value === currentHumanId && selectedItemId.value === current.id) {
-        item.value = updated
-      }
-
-      return updated
-    } catch {
-      updateError.value = 'Updating this work item failed.'
-      return null
-    }
+    return writeDetail(current, currentHumanId, () =>
+      gateway.updateWorkItem(currentHumanId, current.id, input),
+    )
   }
 
-  return { status, item, updateError, updateItem }
+  async function createChecklistItem(title: string): Promise<WorkItemDetail | null> {
+    const currentHumanId = humanId.value
+    const current = item.value
+    const trimmed = title.trim()
+
+    if (currentHumanId === null || current === null || trimmed === '') {
+      return null
+    }
+
+    return writeDetail(current, currentHumanId, () =>
+      gateway.createChecklistItem(currentHumanId, current.id, trimmed),
+    )
+  }
+
+  async function updateChecklistItem(
+    checklistItemId: ChecklistItemId,
+    input: UpdateChecklistItemInput,
+  ): Promise<WorkItemDetail | null> {
+    const currentHumanId = humanId.value
+    const current = item.value
+
+    if (currentHumanId === null || current === null) {
+      return null
+    }
+
+    const optimistic: WorkItemDetail = {
+      ...current,
+      checklist: current.checklist.map((entry) =>
+        entry.id === checklistItemId ? { ...entry, ...input } : entry,
+      ),
+    }
+
+    return writeDetail(
+      current,
+      currentHumanId,
+      () =>
+        gateway.updateChecklistItem(currentHumanId, current.id, checklistItemId, input),
+      optimistic,
+    )
+  }
+
+  async function reorderChecklistItem(
+    checklistItemId: ChecklistItemId,
+    position: number,
+  ): Promise<WorkItemDetail | null> {
+    const currentHumanId = humanId.value
+    const current = item.value
+
+    if (currentHumanId === null || current === null) {
+      return null
+    }
+
+    return writeDetail(current, currentHumanId, () =>
+      gateway.reorderChecklistItem(currentHumanId, current.id, checklistItemId, position),
+    )
+  }
+
+  async function deleteChecklistItem(
+    checklistItemId: ChecklistItemId,
+  ): Promise<WorkItemDetail | null> {
+    const currentHumanId = humanId.value
+    const current = item.value
+
+    if (currentHumanId === null || current === null) {
+      return null
+    }
+
+    return writeDetail(current, currentHumanId, () =>
+      gateway.deleteChecklistItem(currentHumanId, current.id, checklistItemId),
+    )
+  }
+
+  return {
+    status,
+    item,
+    updateError,
+    updateItem,
+    createChecklistItem,
+    updateChecklistItem,
+    reorderChecklistItem,
+    deleteChecklistItem,
+  }
 }
