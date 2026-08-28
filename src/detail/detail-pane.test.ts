@@ -117,7 +117,7 @@ describe('detail pane — opened from the board, over it', () => {
     )
     expect(within(pane()).getByRole('heading', { name: 'Checklist' })).toBeTruthy()
     expect(within(pane()).getByRole('heading', { name: 'Attachments' })).toBeTruthy()
-    expect(within(pane()).getByRole('heading', { name: 'Activity' })).toBeTruthy()
+    expect(within(pane()).getByRole('heading', { name: 'Comments and activity' })).toBeTruthy()
     expect(within(pane()).getByRole('button', { name: 'Checklist' })).toBeTruthy()
     expect(within(pane()).queryByRole('button', { name: /attachment/i })).toBeNull()
   })
@@ -911,6 +911,175 @@ describe('detail pane — one unnamed checklist', () => {
     expect(within(pane()).getByTestId('detail-checklist-empty')).toBeTruthy()
     expect(within(pane()).queryByRole('checkbox', { name: /parse this/i })).toBeNull()
     expect(within(cardFor(FIXTURE_ITEMS.ready)).queryByTestId('kanban-card-checklist')).toBeNull()
+  })
+})
+
+describe('detail pane — comments and activity', () => {
+  function cardFor(itemId: string): HTMLElement {
+    const card = screen
+      .getAllByTestId('kanban-card')
+      .find((candidate) => candidate.getAttribute('data-item-id') === itemId)
+
+    if (card === undefined) {
+      throw new Error(`Kolonie Workplace: no card rendered for ${itemId}.`)
+    }
+
+    return card
+  }
+
+  it('lists comments oldest first with the composer last, and never fakes system lines', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    await openItem(FIXTURE_ITEMS.inProgress)
+    const activity = within(pane()).getByTestId('detail-activity')
+    const comments = within(activity).getAllByTestId('detail-comment')
+
+    expect(within(activity).getByRole('heading', { name: 'Comments and activity' })).toBeTruthy()
+    expect(comments.map((entry) => entry.getAttribute('data-comment-id'))).toEqual([
+      'fictional-comment-start',
+      'fictional-comment-mid',
+      'fictional-comment-ask',
+    ])
+    expect(activity.textContent).not.toMatch(/added this card/i)
+    expect(within(comments[0] as HTMLElement).getByText('1 day ago')).toBeTruthy()
+    const composer = within(activity).getByPlaceholderText('Write a comment…')
+    expect(composer.compareDocumentPosition(comments[2] as HTMLElement) & Node.DOCUMENT_POSITION_PRECEDING).toBe(
+      Node.DOCUMENT_POSITION_PRECEDING,
+    )
+    expect(within(cardFor(FIXTURE_ITEMS.inProgress)).getByLabelText('3 comments')).toBeTruthy()
+  })
+
+  it('writes a comment through the gateway and updates the face badge', async () => {
+    const gateway = createFixtureTaskGateway()
+    const creates = vi.spyOn(gateway, 'createComment')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.ready)
+    const activity = within(pane()).getByTestId('detail-activity')
+
+    expect(within(activity).getByTestId('detail-activity-empty').textContent).toMatch(/no comments yet/i)
+    expect(within(cardFor(FIXTURE_ITEMS.ready)).queryByTestId('kanban-card-comments')).toBeNull()
+
+    const composer = within(activity).getByPlaceholderText('Write a comment…')
+    await fireEvent.update(composer, '<p>Please review the fictional outline.</p>')
+    await fireEvent.click(within(activity).getByRole('button', { name: 'Save comment' }))
+
+    await waitFor(() => {
+      expect(creates).toHaveBeenCalledWith(FIXTURE_HUMANS.wren, FIXTURE_ITEMS.ready, {
+        author: 'Fictional Human Wren',
+        body: '<p>Please review the fictional outline.</p>',
+      })
+    })
+    expect(within(activity).getByTestId('detail-comment').textContent).toContain(
+      'Please review the fictional outline.',
+    )
+    expect(within(activity).queryByTestId('detail-activity-empty')).toBeNull()
+    await waitFor(() => {
+      expect(within(cardFor(FIXTURE_ITEMS.ready)).getByLabelText('1 comment')).toBeTruthy()
+    })
+    expect((composer as HTMLTextAreaElement).value).toBe('')
+  })
+
+  it('edits and deletes an own comment, and cancel writes nothing', async () => {
+    const gateway = createFixtureTaskGateway()
+    const updates = vi.spyOn(gateway, 'updateComment')
+    const deletes = vi.spyOn(gateway, 'deleteComment')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.inProgress)
+    const activity = within(pane()).getByTestId('detail-activity')
+    const own = within(activity)
+      .getAllByTestId('detail-comment')
+      .find((entry) => entry.getAttribute('data-comment-id') === 'fictional-comment-ask') as HTMLElement
+
+    await fireEvent.click(within(own).getByRole('button', { name: 'Edit comment' }))
+    const editor = within(own).getByRole('textbox', { name: 'Edit comment' })
+    await fireEvent.update(editor, '<p>Need a fictional close instead.</p>')
+    await fireEvent.click(within(own).getByRole('button', { name: 'Cancel edit' }))
+    expect(updates).not.toHaveBeenCalled()
+    expect(own.textContent).toContain('Need a fictional example for the close.')
+
+    await fireEvent.click(within(own).getByRole('button', { name: 'Edit comment' }))
+    const again = within(own).getByRole('textbox', { name: 'Edit comment' })
+    await fireEvent.update(again, '<p>Need a fictional close instead.</p>')
+    await fireEvent.click(within(own).getByRole('button', { name: 'Save edit' }))
+    await waitFor(() => {
+      expect(updates).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.inProgress,
+        'fictional-comment-ask',
+        '<p>Need a fictional close instead.</p>',
+      )
+    })
+
+    await fireEvent.click(within(own).getByRole('button', { name: 'Delete comment' }))
+    expect(deletes).not.toHaveBeenCalled()
+    await fireEvent.click(within(own).getByRole('button', { name: 'Cancel delete' }))
+    expect(deletes).not.toHaveBeenCalled()
+    await fireEvent.click(within(own).getByRole('button', { name: 'Delete comment' }))
+    await fireEvent.click(within(own).getByRole('button', { name: 'Confirm delete comment' }))
+    await waitFor(() => {
+      expect(deletes).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.inProgress,
+        'fictional-comment-ask',
+      )
+    })
+    await waitFor(() => {
+      expect(within(cardFor(FIXTURE_ITEMS.inProgress)).getByLabelText('2 comments')).toBeTruthy()
+    })
+  })
+
+  it('does not offer edit or delete on a comment this human did not write', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    await openItem(FIXTURE_ITEMS.review)
+    const comment = within(pane()).getByTestId('detail-comment')
+
+    expect(comment.textContent).toContain('The fictional summaries look complete.')
+    expect(within(comment).queryByRole('button', { name: 'Edit comment' })).toBeNull()
+    expect(within(comment).queryByRole('button', { name: 'Delete comment' })).toBeNull()
+  })
+
+  it('strips a script tag so it does not survive into the DOM', async () => {
+    const gateway = createFixtureTaskGateway()
+    const originalCreate = gateway.createComment.bind(gateway)
+    vi.spyOn(gateway, 'createComment').mockImplementation(async (humanId, itemId, input) =>
+      originalCreate(humanId, itemId, {
+        ...input,
+        body: '<p>Safe<script>alert(1)</script></p>',
+      }),
+    )
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.ready)
+    const activity = within(pane()).getByTestId('detail-activity')
+    await fireEvent.update(
+      within(activity).getByPlaceholderText('Write a comment…'),
+      '<p>Safe<script>alert(1)</script></p>',
+    )
+    await fireEvent.click(within(activity).getByRole('button', { name: 'Save comment' }))
+
+    await waitFor(() => {
+      expect(within(activity).getByTestId('detail-comment')).toBeTruthy()
+    })
+    const comment = within(activity).getByTestId('detail-comment')
+    expect(comment.querySelector('script')).toBeNull()
+    expect(comment.textContent).toContain('Safe')
+    expect(comment.innerHTML).not.toMatch(/<script/i)
+  })
+
+  it('keeps the composer text and shows an error distinct from the empty state when send fails', async () => {
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'createComment').mockRejectedValueOnce(new Error('fixture rejection'))
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.ready)
+    const activity = within(pane()).getByTestId('detail-activity')
+    const composer = within(activity).getByPlaceholderText('Write a comment…') as HTMLTextAreaElement
+    await fireEvent.update(composer, '<p>Please review the fictional outline.</p>')
+    await fireEvent.click(within(activity).getByRole('button', { name: 'Save comment' }))
+
+    await waitFor(() => {
+      expect(within(pane()).getByRole('alert').textContent).toMatch(/updating/i)
+    })
+    expect(composer.value).toBe('<p>Please review the fictional outline.</p>')
+    expect(within(activity).getByTestId('detail-activity-empty').textContent).toMatch(/no comments yet/i)
+    expect(within(pane()).getByRole('alert').textContent).not.toMatch(/no comments yet/i)
   })
 })
 

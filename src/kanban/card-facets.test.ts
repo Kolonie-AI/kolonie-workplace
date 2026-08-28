@@ -6,6 +6,7 @@ import {
   initialsOf,
   readableTextOn,
   relativeDueDate,
+  relativeTimestamp,
 } from '@/kanban/card-facets'
 
 describe('card facets — label contrast is computed from the label colour', () => {
@@ -53,6 +54,13 @@ describe('card facets — a due date is judged against a clock that is handed in
     expect(relativeDueDate('2026-08-28', now)).toBe('in 1 day')
     expect(relativeDueDate('2026-08-26', now)).toBe('1 day ago')
     expect(relativeDueDate(null, now)).toBe(null)
+  })
+
+  it('renders comment timestamps from the same clock', () => {
+    expect(relativeTimestamp('2026-08-26T12:00:00.000Z', now)).toBe('1 day ago')
+    expect(relativeTimestamp('2026-08-27T11:00:00.000Z', now)).toBe('1 hour ago')
+    expect(relativeTimestamp('2026-08-27T11:44:00.000Z', now)).toBe('16 minutes ago')
+    expect(relativeTimestamp('2026-08-27T12:00:00.000Z', now)).toBe('just now')
   })
 })
 

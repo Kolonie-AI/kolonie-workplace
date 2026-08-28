@@ -119,6 +119,46 @@ export function relativeDueDate(dueDate: string | null, now: Date): string | nul
   return `${-days} days ago`
 }
 
+export function relativeTimestamp(iso: string, now: Date): string {
+  const then = Date.parse(iso)
+
+  if (!Number.isFinite(then)) {
+    return iso
+  }
+
+  const minutes = Math.round((now.getTime() - then) / 60_000)
+
+  if (minutes < 1) {
+    return 'just now'
+  }
+
+  if (minutes === 1) {
+    return '1 minute ago'
+  }
+
+  if (minutes < 60) {
+    return `${minutes} minutes ago`
+  }
+
+  const hours = Math.round(minutes / 60)
+
+  if (hours === 1) {
+    return '1 hour ago'
+  }
+
+  if (hours < 24) {
+    return `${hours} hours ago`
+  }
+
+  const days = Math.round(hours / 24)
+
+  if (days === 1) {
+    return '1 day ago'
+  }
+
+  return `${days} days ago`
+}
+
 export function isWorkItemPriority(value: string): value is WorkItemPriority {
   return (WORK_ITEM_PRIORITIES as readonly string[]).includes(value)
 }

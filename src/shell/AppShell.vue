@@ -17,6 +17,7 @@ import {
 import type {
   BoardId,
   ChecklistItemId,
+  CommentId,
   UpdateChecklistItemInput,
   UpdateWorkItemInput,
   WorkItemAssignee,
@@ -282,6 +283,24 @@ async function deleteChecklist(): Promise<void> {
 
     items.replaceItem(updated)
   }
+}
+
+async function createComment(body: string): Promise<WorkItemDetail | null> {
+  const author = human.value?.name
+
+  if (author === undefined) {
+    return null
+  }
+
+  return applyDetail(await detail.createComment(author, body))
+}
+
+async function updateComment(commentId: CommentId, body: string): Promise<WorkItemDetail | null> {
+  return applyDetail(await detail.updateComment(commentId, body))
+}
+
+async function deleteComment(commentId: CommentId): Promise<WorkItemDetail | null> {
+  return applyDetail(await detail.deleteComment(commentId))
 }
 
 function openItem(itemId: string): void {
@@ -591,12 +610,16 @@ async function closeDetail(): Promise<void> {
             :available-labels="availableLabels"
             :available-assignees="availableAssignees"
             :now="now"
+            :current-human-name="human?.name ?? null"
             @update="updateDetail"
             @create-checklist-item="createChecklistItem"
             @update-checklist-item="updateChecklistItem"
             @reorder-checklist-item="reorderChecklistItem"
             @delete-checklist-item="deleteChecklistItem"
             @delete-checklist="deleteChecklist"
+            @create-comment="createComment"
+            @update-comment="updateComment"
+            @delete-comment="deleteComment"
             @close="closeDetail"
           />
         </div>

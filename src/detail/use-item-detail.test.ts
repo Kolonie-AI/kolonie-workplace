@@ -157,6 +157,30 @@ describe('item detail — writes update the open item', () => {
     expect(detail.item.value?.checklist[0]?.done).toBe(false)
     expect(detail.updateError.value).toMatch(/failed/i)
   })
+
+  it('creates a comment and restores the thread when the write fails', async () => {
+    const gateway = createFixtureTaskGateway()
+    const selectedItemId = ref<WorkItemId | null>(FIXTURE_ITEMS.ready)
+    const detail = useItemDetail(gateway, ref(FIXTURE_HUMANS.wren), selectedItemId)
+    await settled()
+
+    const added = await detail.createComment(
+      'Fictional Human Wren',
+      '<p>Please review the fictional outline.</p>',
+    )
+    expect(added?.comments).toHaveLength(1)
+    expect(detail.item.value?.comments[0]?.body).toContain('Please review')
+
+    vi.spyOn(gateway, 'createComment').mockRejectedValueOnce(new Error('write unavailable'))
+    const failed = await detail.createComment(
+      'Fictional Human Wren',
+      '<p>This write fails.</p>',
+    )
+
+    expect(failed).toBeNull()
+    expect(detail.item.value?.comments).toHaveLength(1)
+    expect(detail.updateError.value).toMatch(/failed/i)
+  })
 })
 
 describe('item detail — rejection: an item on a board this human may not open', () => {
