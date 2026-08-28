@@ -7,6 +7,7 @@
 .kanban {
   display: grid;
   gap: var(--space-4);
+  min-block-size: 24rem;
   min-inline-size: 0;
 }
 
@@ -24,6 +25,7 @@
  * skeleton, so no state can survive as a shimmer after the read has finished.
  */
 .kanban__state--loading {
+  min-block-size: 24rem;
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-medium);
@@ -51,6 +53,7 @@
   gap: var(--space-3);
   grid-auto-columns: var(--lane-width);
   grid-auto-flow: column;
+  min-block-size: 18rem;
   min-inline-size: 0;
   overflow-x: auto;
   padding-block-end: var(--space-2);

@@ -1,13 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/vue'
+import { WORKPLACE_CLOCK } from '@/clock/workplace-clock'
 import type { BoardId, WorkItemSummary } from '@/domain/workplace'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import { TASK_GATEWAY } from '@/gateway/provide-gateway'
 import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
-import { FIXTURE_BOARDS, FIXTURE_HUMANS, FIXTURE_ITEMS } from '@/fixtures/catalogue'
+import {
+  FIXTURE_BOARDS,
+  FIXTURE_HUMANS,
+  FIXTURE_ITEMS,
+  FIXTURE_LABELS,
+} from '@/fixtures/catalogue'
 import AppShell from '@/shell/AppShell.vue'
 import { createFixtureWorkplaceSession } from '@/session/fixture-workplace-session'
 import { WORKPLACE_SESSION, type WorkplaceSession } from '@/session/workplace-session'
+
+const FIXED_NOW = new Date('2026-08-31T12:00:00.000Z')
 
 afterEach(() => {
   window.history.replaceState(null, '', '/')
@@ -28,7 +36,13 @@ async function renderShell(
   const session = await signedInSession(humanId)
   const view = render(AppShell, {
     props: { ...(boardId === undefined ? {} : { initialBoardId: boardId }), ...props },
-    global: { provide: { [WORKPLACE_SESSION]: session, [TASK_GATEWAY]: gateway } },
+    global: {
+      provide: {
+        [WORKPLACE_SESSION]: session,
+        [TASK_GATEWAY]: gateway,
+        [WORKPLACE_CLOCK]: () => FIXED_NOW,
+      },
+    },
   })
 
   await waitFor(() => {
@@ -59,16 +73,49 @@ async function showKanban(): Promise<void> {
   })
 }
 
+async function openFilter(): Promise<HTMLElement> {
+  const already = screen.queryByTestId('filter-popover')
+
+  if (already !== null) {
+    return already
+  }
+
+  await fireEvent.click(screen.getByTestId('filter-open'))
+  await waitFor(() => {
+    expect(screen.getByTestId('filter-popover')).toBeTruthy()
+  })
+
+  return screen.getByTestId('filter-popover')
+}
+
 async function search(term: string): Promise<void> {
+  await openFilter()
   await fireEvent.update(screen.getByTestId('filter-search'), term)
 }
 
 async function chooseLane(lane: string): Promise<void> {
+  await openFilter()
   await fireEvent.click(screen.getByTestId(`filter-lane-${lane}`))
 }
 
 async function chooseOwner(owner: string): Promise<void> {
+  await openFilter()
   await fireEvent.update(screen.getByTestId('filter-owner'), owner)
+}
+
+async function chooseAssignee(assignee: string): Promise<void> {
+  await openFilter()
+  await fireEvent.update(screen.getByTestId('filter-assignee'), assignee)
+}
+
+async function chooseLabel(label: string): Promise<void> {
+  await openFilter()
+  await fireEvent.update(screen.getByTestId('filter-label'), label)
+}
+
+async function chooseDue(due: string): Promise<void> {
+  await openFilter()
+  await fireEvent.update(screen.getByTestId('filter-due'), due)
 }
 
 describe('board filtering — one filter, both views', () => {
@@ -86,6 +133,73 @@ describe('board filtering — one filter, both views', () => {
     })
     expect(screen.getAllByTestId('kanban-lane')).toHaveLength(6)
     expect(screen.getAllByTestId('kanban-lane-empty')).toHaveLength(5)
+  })
+
+  it('hides cards assigned to anyone else and keeps all six lanes', async () => {
+    await renderShell(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+
+    await waitFor(() => {
+      expect(renderedIds('kanban-card')).toHaveLength(6)
+    })
+
+    await chooseAssignee(FIXTURE_HUMANS.wren)
+
+    await waitFor(() => {
+      expect(renderedIds('kanban-card')).toEqual([
+        FIXTURE_ITEMS.inbox,
+        FIXTURE_ITEMS.inProgress,
+        FIXTURE_ITEMS.review,
+      ])
+    })
+    expect(screen.getAllByTestId('kanban-lane')).toHaveLength(6)
+  })
+
+  it('narrows to one fixture label', async () => {
+    await renderShell(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+
+    await waitFor(() => {
+      expect(renderedIds('kanban-card')).toHaveLength(6)
+    })
+
+    await chooseLabel(FIXTURE_LABELS.research.id)
+
+    await waitFor(() => {
+      expect(renderedIds('kanban-card')).toEqual([
+        FIXTURE_ITEMS.inProgress,
+        FIXTURE_ITEMS.review,
+      ])
+    })
+  })
+
+  it('narrows overdue cards from the injected clock', async () => {
+    await renderShell(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+
+    await waitFor(() => {
+      expect(renderedIds('kanban-card')).toHaveLength(6)
+    })
+
+    await chooseDue('overdue')
+
+    await waitFor(() => {
+      expect(renderedIds('kanban-card')).toEqual([
+        FIXTURE_ITEMS.inProgress,
+        FIXTURE_ITEMS.blocked,
+      ])
+    })
+  })
+
+  it('matches a description keyword after stripping markup', async () => {
+    await renderShell(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+
+    await waitFor(() => {
+      expect(renderedIds('kanban-card')).toHaveLength(6)
+    })
+
+    await search('three sections')
+
+    await waitFor(() => {
+      expect(renderedIds('kanban-card')).toEqual([FIXTURE_ITEMS.ready])
+    })
   })
 
   it('narrows to one of the owners the board actually carries', async () => {
@@ -222,6 +336,8 @@ describe('board filtering — one filter, both views', () => {
       expect(renderedIds('kanban-card')).toHaveLength(1)
     })
 
+    await openFilter()
+
     const owners = () =>
       Array.from(screen.getByTestId('filter-owner').querySelectorAll('option'))
         .map((option) => option.getAttribute('value'))
@@ -235,6 +351,59 @@ describe('board filtering — one filter, both views', () => {
       expect(screen.getByTestId('kanban-board-empty')).toBeTruthy()
     })
     expect(owners()).toEqual([])
+  })
+})
+
+describe('board filtering — the filter lives in a toolbar popover', () => {
+  it('opens a Filter popover from the board toolbar and keeps the board visible', async () => {
+    await renderShell(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+
+    await waitFor(() => {
+      expect(renderedIds('kanban-card')).toHaveLength(6)
+    })
+
+    expect(screen.queryByTestId('filter-popover')).toBeNull()
+    expect(screen.queryByTestId('board-filters')).toBeNull()
+
+    const opener = screen.getByTestId('filter-open')
+    expect(opener.getAttribute('title')).toMatch(/Filter cards F/i)
+
+    await fireEvent.click(opener)
+
+    const popover = await screen.findByTestId('filter-popover')
+    expect(within(popover).getByRole('heading', { name: 'Filter' })).toBeTruthy()
+    expect(within(popover).getByTestId('filter-close')).toBeTruthy()
+    expect(within(popover).getByTestId('filter-search')).toBeTruthy()
+    expect(within(popover).getByTestId('filter-assignee')).toBeTruthy()
+    expect(within(popover).getByTestId('filter-label')).toBeTruthy()
+    expect(within(popover).getByTestId('filter-due')).toBeTruthy()
+    expect(renderedIds('kanban-card')).toHaveLength(6)
+  })
+
+  it('closes on Escape and on the close control without clearing criteria', async () => {
+    await renderShell(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+
+    await waitFor(() => {
+      expect(renderedIds('kanban-card')).toHaveLength(6)
+    })
+
+    await chooseAssignee(FIXTURE_HUMANS.wren)
+    await waitFor(() => {
+      expect(renderedIds('kanban-card')).toHaveLength(3)
+    })
+
+    await fireEvent.keyDown(screen.getByTestId('filter-popover'), { key: 'Escape' })
+    await waitFor(() => {
+      expect(screen.queryByTestId('filter-popover')).toBeNull()
+    })
+    expect(renderedIds('kanban-card')).toHaveLength(3)
+
+    await openFilter()
+    await fireEvent.click(screen.getByTestId('filter-close'))
+    await waitFor(() => {
+      expect(screen.queryByTestId('filter-popover')).toBeNull()
+    })
+    expect(renderedIds('kanban-card')).toHaveLength(3)
   })
 })
 
@@ -327,6 +496,7 @@ describe('board filtering — the URL carries the filter', () => {
       expect(renderedIds('kanban-card')).toEqual([FIXTURE_ITEMS.review])
     })
 
+    await openFilter()
     expect((screen.getByTestId('filter-search') as HTMLInputElement).value).toBe('catalogue')
     expect((screen.getByTestId('filter-owner') as HTMLSelectElement).value).toBe(
       'Fictional Agent Quill',
@@ -334,6 +504,25 @@ describe('board filtering — the URL carries the filter', () => {
     expect(
       screen.getByTestId('filter-lane-review').getAttribute('aria-pressed'),
     ).toBe('true')
+  })
+
+  it('restores assignee, label and due from the query string on load', async () => {
+    await renderShell(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, {
+      initialQuery: `?assignee=${FIXTURE_HUMANS.wren}&label=${FIXTURE_LABELS.research.id}&due=overdue`,
+    })
+
+    await waitFor(() => {
+      expect(renderedIds('kanban-card')).toEqual([FIXTURE_ITEMS.inProgress])
+    })
+
+    await openFilter()
+    expect((screen.getByTestId('filter-assignee') as HTMLSelectElement).value).toBe(
+      FIXTURE_HUMANS.wren,
+    )
+    expect((screen.getByTestId('filter-label') as HTMLSelectElement).value).toBe(
+      FIXTURE_LABELS.research.id,
+    )
+    expect((screen.getByTestId('filter-due') as HTMLSelectElement).value).toBe('overdue')
   })
 
   it('writes the active filter into the query string as it changes', async () => {
@@ -382,6 +571,7 @@ describe('board filtering — clearing', () => {
       expect(renderedIds('kanban-card')).toHaveLength(6)
     })
 
+    await openFilter()
     expect((screen.getByTestId('filter-search') as HTMLInputElement).value).toBe('')
     expect((screen.getByTestId('filter-owner') as HTMLSelectElement).value).toBe('')
     expect(screen.getByTestId('filter-lane-review').getAttribute('aria-pressed')).toBe('false')
@@ -390,6 +580,24 @@ describe('board filtering — clearing', () => {
     expect(query.has('lane')).toBe(false)
     expect(query.has('owner')).toBe(false)
     expect(query.has('q')).toBe(false)
+  })
+
+  it('restores every card after clearing an assignee filter', async () => {
+    await renderShell(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+
+    await waitFor(() => {
+      expect(renderedIds('kanban-card')).toHaveLength(6)
+    })
+
+    await chooseAssignee(FIXTURE_HUMANS.wren)
+    await waitFor(() => {
+      expect(renderedIds('kanban-card')).toHaveLength(3)
+    })
+
+    await fireEvent.click(screen.getByTestId('filter-clear'))
+    await waitFor(() => {
+      expect(renderedIds('kanban-card')).toHaveLength(6)
+    })
   })
 
   it('offers the clear action only while something is filtered', async () => {

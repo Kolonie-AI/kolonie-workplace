@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/vue'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/vue'
 import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
 import { PREVIEW_DATA_GATEWAY, type TaskGateway } from '@/gateway/task-gateway'
 import { TASK_GATEWAY } from '@/gateway/provide-gateway'
@@ -371,6 +371,61 @@ describe('AppShell — responsive application chrome', () => {
     await fireEvent.click((await screen.findAllByTestId('board-link'))[0]!)
     await fireEvent.click(screen.getByRole('button', { name: 'Search this board' }))
     expect(document.activeElement).toBe(await screen.findByTestId('filter-search'))
+  })
+
+  it('opens the shortcut overlay from ? and lists the registered set', async () => {
+    const session = createFixtureWorkplaceSession()
+    await session.signIn({ humanId: FIXTURE_HUMANS.wren })
+    render(AppShell, {
+      global: {
+        provide: {
+          [WORKPLACE_SESSION]: session,
+          [TASK_GATEWAY]: createFixtureTaskGateway(),
+        },
+      },
+    })
+
+    await fireEvent.keyDown(window, { key: '?' })
+    const overlay = await screen.findByTestId('shortcut-overlay')
+    expect(overlay.textContent).toMatch(/Filter cards/)
+    expect(overlay.textContent).toMatch(/Show keyboard shortcuts/)
+    expect(overlay.querySelectorAll('kbd')).toHaveLength(2)
+
+    await fireEvent.click(screen.getByTestId('shortcut-close'))
+    await waitFor(() => {
+      expect(screen.queryByTestId('shortcut-overlay')).toBeNull()
+    })
+  })
+
+  it('restores focus to Filter cards after the popover closes', async () => {
+    const session = createFixtureWorkplaceSession()
+    await session.signIn({ humanId: FIXTURE_HUMANS.wren })
+    render(AppShell, {
+      props: { initialBoardId: FIXTURE_BOARDS.quillDelivery },
+      global: {
+        provide: {
+          [WORKPLACE_SESSION]: session,
+          [TASK_GATEWAY]: createFixtureTaskGateway(),
+        },
+      },
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('filter-open')).toBeTruthy()
+    })
+
+    const opener = screen.getByTestId('filter-open')
+    opener.focus()
+    await fireEvent.click(opener)
+    await waitFor(() => {
+      expect(screen.getByTestId('filter-popover')).toBeTruthy()
+    })
+
+    await fireEvent.click(screen.getByTestId('filter-close'))
+    await waitFor(() => {
+      expect(screen.queryByTestId('filter-popover')).toBeNull()
+    })
+    expect(document.activeElement).toBe(opener)
   })
 })
 
