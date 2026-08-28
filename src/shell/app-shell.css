@@ -366,7 +366,7 @@
 }
 
 .app-shell__board-area[data-detail-open="true"] {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .app-shell__canvas {
@@ -462,9 +462,5 @@
 
   .app-shell__board-area[data-detail-open="true"] {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .app-shell__board-area[data-detail-open="true"] > .detail-pane {
-    order: -1;
   }
 }
