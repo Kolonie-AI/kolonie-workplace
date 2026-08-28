@@ -45,6 +45,8 @@ describe('visual integration — a visible keyboard focus state on every control
     ['src/list/list-view.css', '.list-row'],
     ['src/detail/detail-pane.css', '.detail-pane__close'],
     ['src/detail/detail-pane.css', '.detail-pane__reference'],
+    ['src/detail/detail-pane.css', '.detail-overlay'],
+    ['src/detail/detail-pane.css', '.detail-pane__rail-button'],
     ['src/shell/app-shell.css', '.app-shell__tab'],
     ['src/shell/app-shell.css', '.app-shell__sidebar-toggle'],
     ['src/shell/app-shell.css', '.app-shell__menu-button'],
@@ -198,16 +200,13 @@ describe('visual integration — the narrow viewport keeps the whole journey rea
   })
 
   /**
-   * Measured at 390×844 in Chromium: with the pane stacked after the board,
-   * its close control landed at y≈956 — a hundred pixels below the fold, so
-   * the one control that gets you back to the board was off screen at the
-   * moment it was needed. Ordering the pane first when it is open puts the
-   * opened item directly under the board header, where it was opened from.
+   * The card back is a fixed overlay, not a stacked column. Close sits in the
+   * dialog header, so the fold that used to hide it cannot hide it now.
    */
-  it('brings the opened pane above the board so its close is not below the fold', () => {
-    expect(shell).toMatch(
-      /\.app-shell__board-area\[data-detail-open="true"\]\s*>\s*\.detail-pane\s*\{[^}]*order:\s*-1/s,
-    )
+  it('opens the card back as a fixed overlay rather than a stacked column', () => {
+    const pane = sheets['src/detail/detail-pane.css']
+    expect(pane).toMatch(/\.detail-layer\s*\{[^}]*position:\s*fixed/s)
+    expect(pane).toMatch(/\.detail-overlay\s*\{[^}]*position:\s*absolute/s)
   })
 })
 

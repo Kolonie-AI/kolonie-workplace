@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
-import { computed, nextTick, ref, useId, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, useId, useTemplateRef, watch } from 'vue'
 import { WORKPLACE_LANE_LABELS } from '@/domain/lanes'
 import type {
   UpdateWorkItemInput,
@@ -39,9 +39,13 @@ const emit = defineEmits<{
   update: [input: UpdateWorkItemInput]
 }>()
 
+type RailPopover = 'labels' | 'members' | 'dates' | 'priority' | null
+
 const titleDraft = ref('')
 const descriptionDraft = ref('')
 const descriptionEditor = useTemplateRef<HTMLElement>('descriptionEditor')
+const dialogEl = useTemplateRef<HTMLElement>('dialogEl')
+const railPopover = ref<RailPopover>(null)
 const labelQuery = ref('')
 const assigneeQuery = ref('')
 const labelActive = ref(-1)
@@ -98,6 +102,52 @@ const dueRelative = computed(() =>
 const handoverParts = computed(() =>
   props.item?.handover === undefined ? null : renderHandover(props.item.handover),
 )
+const dialogName = computed(() => props.item?.title ?? 'Work item detail')
+const coverKind = computed<'image' | 'colour' | null>(() => {
+  if (props.item?.coverImageUrl) {
+    return 'image'
+  }
+
+  if (props.item?.coverColour) {
+    return 'colour'
+  }
+
+  return null
+})
+
+onMounted(async () => {
+  await nextTick()
+  dialogEl.value?.focus()
+})
+
+function closeDialog(): void {
+  emit('close')
+}
+
+function toggleRail(kind: Exclude<RailPopover, null>): void {
+  const next = railPopover.value === kind ? null : kind
+  railPopover.value = next
+  labelOpen.value = next === 'labels'
+  assigneeOpen.value = next === 'members'
+}
+
+function onDialogKeydown(event: KeyboardEvent): void {
+  if (event.key !== 'Escape' || event.isComposing) {
+    return
+  }
+
+  if (railPopover.value !== null) {
+    event.preventDefault()
+    event.stopPropagation()
+    railPopover.value = null
+    labelOpen.value = false
+    assigneeOpen.value = false
+    return
+  }
+
+  event.preventDefault()
+  closeDialog()
+}
 
 watch(
   () => props.item,
@@ -111,6 +161,23 @@ watch(
     }
   },
   { immediate: true },
+)
+
+watch(
+  () => props.updateError,
+  async (error) => {
+    if (error === null || props.item === null) {
+      return
+    }
+
+    titleDraft.value = props.item.title
+    descriptionDraft.value = sanitizeDescription(props.item.description)
+    await nextTick()
+
+    if (descriptionEditor.value !== null) {
+      descriptionEditor.value.innerHTML = descriptionDraft.value
+    }
+  },
 )
 
 function onTitleInput(event: Event): void {
@@ -148,6 +215,7 @@ function onTitleKeydown(event: KeyboardEvent): void {
 
   if (event.key === 'Escape') {
     event.preventDefault()
+    event.stopPropagation()
     const element = event.target as HTMLElement
     titleDraft.value = props.item?.title ?? ''
     element.textContent = titleDraft.value
@@ -262,8 +330,11 @@ function onLabelKeydown(event: KeyboardEvent): void {
     const last = props.item?.labels.at(-1)
     if (last !== undefined) removeLabel(last)
   } else if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
     labelOpen.value = false
     labelActive.value = -1
+    railPopover.value = null
   }
 }
 
@@ -310,464 +381,590 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
     const last = props.item?.assignees.at(-1)
     if (last !== undefined) removeAssignee(last)
   } else if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
     assigneeOpen.value = false
     assigneeActive.value = -1
+    railPopover.value = null
   }
 }
 </script>
 
 <template>
-  <aside
-    class="detail-pane"
-    data-testid="detail-pane"
-    aria-label="Work item detail"
-  >
-    <header class="detail-pane__header">
-      <p class="detail-pane__eyebrow">
-        Work item
-      </p>
-      <button
-        class="detail-pane__close"
-        type="button"
-        data-testid="detail-close"
-        aria-label="Close the work item detail"
-        @click="emit('close')"
-      >
-        Close
-      </button>
-    </header>
-
-    <p
-      v-if="status === 'loading'"
-      class="detail-pane__state"
-      data-testid="detail-loading"
+  <div class="detail-layer">
+    <button
+      class="detail-overlay"
+      type="button"
+      data-testid="detail-overlay"
+      aria-label="Close the work item"
+      @click="closeDialog"
+    />
+    <div
+      ref="dialogEl"
+      class="detail-pane"
+      data-testid="detail-pane"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="dialogName"
+      tabindex="-1"
+      @keydown="onDialogKeydown"
     >
-      Loading this work item…
-    </p>
+      <header class="detail-pane__header">
+        <p
+          class="detail-pane__lane"
+          data-testid="detail-lane"
+        >
+          in list {{ laneLabel }}
+        </p>
+        <button
+          class="detail-pane__close"
+          type="button"
+          data-testid="detail-close"
+          aria-label="Close the work item"
+          @click="closeDialog"
+        >
+          Close
+        </button>
+      </header>
 
-    <p
-      v-else-if="status === 'refused'"
-      class="detail-pane__state detail-pane__state--error"
-      data-testid="detail-refused"
-      role="alert"
-    >
-      This work item is not available to you. It belongs to a board you may not
-      open, so none of it is shown here.
-    </p>
-
-    <p
-      v-else-if="status === 'error'"
-      class="detail-pane__state detail-pane__state--error"
-      data-testid="detail-error"
-      role="alert"
-    >
-      This work item could not be read. This is a failure to read it, not a
-      statement about what it holds.
-    </p>
-
-    <template v-else-if="item !== null">
       <p
-        v-if="updateError !== null"
+        v-if="status === 'loading'"
+        class="detail-pane__state"
+        data-testid="detail-loading"
+      >
+        Loading this work item…
+      </p>
+
+      <p
+        v-else-if="status === 'refused'"
         class="detail-pane__state detail-pane__state--error"
-        data-testid="detail-update-error"
+        data-testid="detail-refused"
         role="alert"
       >
-        {{ updateError }}
+        This work item is not available to you. It belongs to a board you may not
+        open, so none of it is shown here.
       </p>
 
-      <h2
-        class="detail-pane__title"
-        data-testid="detail-title"
-        contenteditable="true"
-        spellcheck="false"
-        role="textbox"
-        aria-label="Work item title"
-        @input="onTitleInput"
-        @blur="saveTitle"
-        @keydown="onTitleKeydown"
+      <p
+        v-else-if="status === 'error'"
+        class="detail-pane__state detail-pane__state--error"
+        data-testid="detail-error"
+        role="alert"
       >
-        {{ titleDraft }}
-      </h2>
+        This work item could not be read. This is a failure to read it, not a
+        statement about what it holds.
+      </p>
 
-      <section
-        class="detail-pane__section"
-        aria-label="Description"
-      >
-        <h3 class="detail-pane__section-title">
-          Description
-        </h3>
-        <div
-          class="detail-pane__toolbar"
-          role="toolbar"
-          aria-label="Description formatting"
-        >
-          <button
-            class="detail-pane__format"
-            type="button"
-            aria-label="Bold"
-            @mousedown.prevent="formatDescription('bold')"
-          >
-            Bold
-          </button>
-          <button
-            class="detail-pane__format"
-            type="button"
-            aria-label="Italic"
-            @mousedown.prevent="formatDescription('italic')"
-          >
-            Italic
-          </button>
-          <button
-            class="detail-pane__format"
-            type="button"
-            aria-label="Bulleted list"
-            @mousedown.prevent="formatDescription('insertUnorderedList')"
-          >
-            List
-          </button>
-          <button
-            class="detail-pane__format"
-            type="button"
-            aria-label="Numbered list"
-            @mousedown.prevent="formatDescription('insertOrderedList')"
-          >
-            Numbered
-          </button>
-          <button
-            class="detail-pane__format"
-            type="button"
-            aria-label="Link"
-            @mousedown.prevent="addLink"
-          >
-            Link
-          </button>
-          <button
-            class="detail-pane__format"
-            type="button"
-            aria-label="Code"
-            @mousedown.prevent="formatDescription('formatBlock', 'pre')"
-          >
-            Code
-          </button>
-        </div>
-        <div
-          ref="descriptionEditor"
-          class="detail-pane__description"
-          data-testid="detail-description"
-          contenteditable="true"
-          role="textbox"
-          aria-label="Work item description"
-          aria-multiline="true"
-          @input="onDescriptionInput"
-          @blur="saveDescription"
-        />
-      </section>
-
-      <dl class="detail-pane__facts">
-        <div class="detail-pane__fact">
-          <dt>Lane</dt>
-          <dd data-testid="detail-lane">
-            {{ laneLabel }}
-          </dd>
-        </div>
-        <div class="detail-pane__fact">
-          <dt>Owner</dt>
-          <dd data-testid="detail-owner">
-            {{ item.owner }}
-          </dd>
-        </div>
-        <div class="detail-pane__fact">
-          <dt>Priority</dt>
-          <dd data-testid="detail-priority">
-            <select
-              class="detail-pane__control"
-              :class="`detail-pane__priority--${item.priority}`"
-              aria-label="Priority"
-              :value="item.priority"
-              @change="onPriorityChange"
-            >
-              <option
-                v-for="priority in WORK_ITEM_PRIORITIES"
-                :key="priority"
-                :value="priority"
-              >
-                {{ WORK_ITEM_PRIORITY_LABELS[priority] }}
-              </option>
-            </select>
-          </dd>
-        </div>
-        <div class="detail-pane__fact">
-          <dt>Due date</dt>
-          <dd
-            data-testid="detail-due-date"
-            :data-due-state="dueState ?? undefined"
-          >
-            <input
-              class="detail-pane__control"
-              type="date"
-              aria-label="Due date"
-              :value="item.dueDate ?? ''"
-              @input="onDueDateChange"
-            >
-            <p
-              v-if="dueRelative !== null"
-              class="detail-pane__due-relative"
-              data-testid="detail-due-relative"
-            >
-              {{ dueRelative }}
-            </p>
-          </dd>
-        </div>
-        <div class="detail-pane__fact">
-          <dt>Progress</dt>
-          <dd data-testid="detail-percent-done">
-            <input
-              class="detail-pane__progress"
-              type="range"
-              min="0"
-              max="100"
-              step="10"
-              aria-label="Percent done"
-              :value="item.percentDone"
-              @input="onPercentDoneChange"
-            >
-            <span class="detail-pane__progress-value">{{ item.percentDone }}%</span>
-          </dd>
-        </div>
-        <div class="detail-pane__fact">
-          <dt>Labels</dt>
-          <dd data-testid="detail-labels">
-            <div class="detail-pane__chips">
-              <span
-                v-for="label in item.labels"
-                :key="label.id"
-                class="detail-pane__chip"
-                :style="labelStyle(label.colour)"
-              >
-                {{ label.title }}
-                <button
-                  class="detail-pane__chip-remove"
-                  type="button"
-                  :aria-label="`Remove label ${label.title}`"
-                  @click="removeLabel(label)"
-                >×</button>
-              </span>
-            </div>
-            <div class="detail-pane__multiselect">
-              <input
-                v-model="labelQuery"
-                class="detail-pane__search"
-                type="text"
-                role="combobox"
-                aria-label="Search labels"
-                aria-autocomplete="list"
-                :aria-expanded="labelOpen && (filteredLabels.length > 0 || canCreateLabel)"
-                :aria-controls="labelListId"
-                :aria-activedescendant="activeLabelId"
-                @focus="labelOpen = true"
-                @input="labelOpen = true; labelActive = -1"
-                @keydown="onLabelKeydown"
-              >
-              <div
-                class="detail-pane__palette"
-                aria-label="Label colours"
-              >
-                <button
-                  v-for="(colour, index) in labelColours"
-                  :key="colour"
-                  class="detail-pane__swatch"
-                  :class="{ 'detail-pane__swatch--selected': colour === selectedLabelColour }"
-                  type="button"
-                  :aria-label="`Choose label colour ${index + 1}`"
-                  :aria-pressed="colour === selectedLabelColour"
-                  :style="{ background: colour }"
-                  @click="selectedLabelColour = colour"
-                />
-              </div>
-              <ul
-                v-if="labelOpen && (filteredLabels.length > 0 || canCreateLabel)"
-                :id="labelListId"
-                class="detail-pane__options"
-                role="listbox"
-                aria-label="Label suggestions"
-              >
-                <li
-                  v-for="(label, index) in filteredLabels"
-                  :id="`${labelListId}-${index}`"
-                  :key="label.id"
-                  class="detail-pane__option"
-                  :class="{ 'detail-pane__option--active': index === labelActive }"
-                  role="option"
-                  :aria-selected="index === labelActive"
-                  :aria-label="label.title"
-                  @click="addLabel(label)"
-                >
-                  {{ label.title }}
-                </li>
-                <li
-                  v-if="canCreateLabel"
-                  class="detail-pane__option"
-                  role="option"
-                  :aria-label="`Create label ${labelQuery.trim()}`"
-                  aria-selected="false"
-                  @click="createLabel"
-                >
-                  Create “{{ labelQuery.trim() }}”
-                </li>
-              </ul>
-            </div>
-          </dd>
-        </div>
-        <div class="detail-pane__fact">
-          <dt>Assignees</dt>
-          <dd data-testid="detail-assignees">
-            <div class="detail-pane__chips">
-              <span
-                v-for="assignee in item.assignees"
-                :key="assignee.id"
-                class="detail-pane__chip detail-pane__chip--plain"
-              >
-                {{ assignee.name }}
-                <button
-                  class="detail-pane__chip-remove"
-                  type="button"
-                  :aria-label="`Remove assignee ${assignee.name}`"
-                  @click="removeAssignee(assignee)"
-                >×</button>
-              </span>
-            </div>
-            <div class="detail-pane__multiselect">
-              <input
-                v-model="assigneeQuery"
-                class="detail-pane__search"
-                type="text"
-                role="combobox"
-                aria-label="Search assignees"
-                aria-autocomplete="list"
-                :aria-expanded="assigneeOpen && filteredAssignees.length > 0"
-                :aria-controls="assigneeListId"
-                :aria-activedescendant="activeAssigneeId"
-                @focus="assigneeOpen = true"
-                @input="assigneeOpen = true; assigneeActive = -1"
-                @keydown="onAssigneeKeydown"
-              >
-              <ul
-                v-if="assigneeOpen && filteredAssignees.length > 0"
-                :id="assigneeListId"
-                class="detail-pane__options"
-                role="listbox"
-                aria-label="Assignee suggestions"
-              >
-                <li
-                  v-for="(assignee, index) in filteredAssignees"
-                  :id="`${assigneeListId}-${index}`"
-                  :key="assignee.id"
-                  class="detail-pane__option"
-                  :class="{ 'detail-pane__option--active': index === assigneeActive }"
-                  role="option"
-                  :aria-selected="index === assigneeActive"
-                  :aria-label="assignee.name"
-                  @click="addAssignee(assignee)"
-                >
-                  {{ assignee.name }}
-                </li>
-              </ul>
-            </div>
-          </dd>
-        </div>
-      </dl>
-
-      <section
-        v-if="item.blocker !== undefined"
-        class="detail-pane__section detail-pane__section--blocked"
-        data-testid="detail-blocker"
-        aria-label="Blocker"
-      >
-        <h3 class="detail-pane__section-title">
-          Blocker
-        </h3>
-        <dl class="detail-pane__facts">
-          <div class="detail-pane__fact">
-            <dt>Waiting on</dt>
-            <dd data-testid="detail-blocker-actor">
-              {{ item.blocker.actor }}
-            </dd>
-          </div>
-          <div class="detail-pane__fact">
-            <dt>Smallest unblock</dt>
-            <dd data-testid="detail-blocker-unblock">
-              {{ item.blocker.smallestUnblock }}
-            </dd>
-          </div>
-        </dl>
-      </section>
-
-      <section
-        class="detail-pane__section"
-        aria-label="Handover"
-      >
-        <h3 class="detail-pane__section-title">
-          Handover
-        </h3>
-
+      <template v-else-if="item !== null">
         <p
-          v-if="handoverParts === null"
-          class="detail-pane__empty"
-          data-testid="detail-handover-absent"
+          v-if="updateError !== null"
+          class="detail-pane__state detail-pane__state--error"
+          data-testid="detail-update-error"
+          role="alert"
         >
-          No handover recorded for this work item yet. Nothing has been written
-          here, which is not the same as nothing having happened.
+          {{ updateError }}
         </p>
 
-        <dl
-          v-else
-          class="detail-pane__handover"
-          data-testid="detail-handover"
+        <span
+          v-if="coverKind !== null"
+          class="detail-pane__cover"
+          data-testid="detail-cover"
+          :data-cover-kind="coverKind"
+          :style="coverKind === 'colour' ? { background: item.coverColour ?? undefined } : undefined"
         >
-          <div
-            v-for="entry in handoverParts"
-            :key="entry.part"
-            class="detail-pane__fact"
-            :data-testid="`detail-handover-${entry.part}`"
+          <img
+            v-if="coverKind === 'image' && item.coverImageUrl !== null"
+            class="detail-pane__cover-image"
+            :src="item.coverImageUrl"
+            alt=""
           >
-            <dt>{{ entry.label }}</dt>
-            <dd>
-              <span v-if="entry.text !== null">{{ entry.text }}</span>
-              <a
-                v-for="link in entry.links"
-                :key="link.href"
-                class="detail-pane__reference"
-                data-testid="detail-evidence"
-                :href="link.href"
-                rel="noreferrer"
-              >{{ link.label }}</a>
-            </dd>
-          </div>
-        </dl>
-      </section>
+        </span>
 
-      <section
-        v-if="item.externalReferences.length > 0"
-        class="detail-pane__section"
-        aria-label="References"
-      >
-        <h3 class="detail-pane__section-title">
-          References
-        </h3>
-        <ul class="detail-pane__references">
-          <li
-            v-for="reference in item.externalReferences"
-            :key="reference.href"
+        <h2
+          class="detail-pane__title"
+          data-testid="detail-title"
+          contenteditable="true"
+          spellcheck="false"
+          role="textbox"
+          aria-label="Work item title"
+          @input="onTitleInput"
+          @blur="saveTitle"
+          @keydown="onTitleKeydown"
+        >
+          {{ titleDraft }}
+        </h2>
+
+        <div class="detail-pane__layout">
+          <div class="detail-pane__main">
+            <section
+              class="detail-pane__section"
+              aria-label="Description"
+            >
+              <h3 class="detail-pane__section-title">
+                Description
+              </h3>
+              <div
+                class="detail-pane__toolbar"
+                role="toolbar"
+                aria-label="Description formatting"
+              >
+                <button
+                  class="detail-pane__format"
+                  type="button"
+                  aria-label="Bold"
+                  @mousedown.prevent="formatDescription('bold')"
+                >
+                  Bold
+                </button>
+                <button
+                  class="detail-pane__format"
+                  type="button"
+                  aria-label="Italic"
+                  @mousedown.prevent="formatDescription('italic')"
+                >
+                  Italic
+                </button>
+                <button
+                  class="detail-pane__format"
+                  type="button"
+                  aria-label="Bulleted list"
+                  @mousedown.prevent="formatDescription('insertUnorderedList')"
+                >
+                  List
+                </button>
+                <button
+                  class="detail-pane__format"
+                  type="button"
+                  aria-label="Numbered list"
+                  @mousedown.prevent="formatDescription('insertOrderedList')"
+                >
+                  Numbered
+                </button>
+                <button
+                  class="detail-pane__format"
+                  type="button"
+                  aria-label="Link"
+                  @mousedown.prevent="addLink"
+                >
+                  Link
+                </button>
+                <button
+                  class="detail-pane__format"
+                  type="button"
+                  aria-label="Code"
+                  @mousedown.prevent="formatDescription('formatBlock', 'pre')"
+                >
+                  Code
+                </button>
+              </div>
+              <div
+                ref="descriptionEditor"
+                class="detail-pane__description"
+                data-testid="detail-description"
+                contenteditable="true"
+                role="textbox"
+                aria-label="Work item description"
+                aria-multiline="true"
+                @input="onDescriptionInput"
+                @blur="saveDescription"
+              />
+            </section>
+
+            <section
+              class="detail-pane__section"
+              aria-label="Checklists"
+            >
+              <h3 class="detail-pane__section-title">
+                Checklists
+              </h3>
+            </section>
+
+            <section
+              class="detail-pane__section"
+              aria-label="Attachments"
+            >
+              <h3 class="detail-pane__section-title">
+                Attachments
+              </h3>
+            </section>
+
+            <section
+              class="detail-pane__section"
+              aria-label="Activity"
+            >
+              <h3 class="detail-pane__section-title">
+                Activity
+              </h3>
+            </section>
+
+            <dl class="detail-pane__facts">
+              <div class="detail-pane__fact">
+                <dt>Owner</dt>
+                <dd data-testid="detail-owner">
+                  {{ item.owner }}
+                </dd>
+              </div>
+              <div class="detail-pane__fact">
+                <dt>Labels</dt>
+                <dd data-testid="detail-labels">
+                  <div class="detail-pane__chips">
+                    <span
+                      v-for="label in item.labels"
+                      :key="label.id"
+                      class="detail-pane__chip"
+                      :style="labelStyle(label.colour)"
+                    >
+                      {{ label.title }}
+                      <button
+                        class="detail-pane__chip-remove"
+                        type="button"
+                        :aria-label="`Remove label ${label.title}`"
+                        @click="removeLabel(label)"
+                      >×</button>
+                    </span>
+                  </div>
+                </dd>
+              </div>
+              <div class="detail-pane__fact">
+                <dt>Assignees</dt>
+                <dd data-testid="detail-assignees">
+                  <div class="detail-pane__chips">
+                    <span
+                      v-for="assignee in item.assignees"
+                      :key="assignee.id"
+                      class="detail-pane__chip detail-pane__chip--plain"
+                    >
+                      {{ assignee.name }}
+                      <button
+                        class="detail-pane__chip-remove"
+                        type="button"
+                        :aria-label="`Remove assignee ${assignee.name}`"
+                        @click="removeAssignee(assignee)"
+                      >×</button>
+                    </span>
+                  </div>
+                </dd>
+              </div>
+              <div class="detail-pane__fact">
+                <dt>Due date</dt>
+                <dd
+                  data-testid="detail-due-date"
+                  :data-due-state="dueState ?? undefined"
+                >
+                  <p
+                    v-if="dueRelative !== null"
+                    class="detail-pane__due-relative"
+                    data-testid="detail-due-relative"
+                  >
+                    {{ dueRelative }}
+                  </p>
+                </dd>
+              </div>
+            </dl>
+
+            <section
+              v-if="item.blocker !== undefined"
+              class="detail-pane__section detail-pane__section--blocked"
+              data-testid="detail-blocker"
+              aria-label="Blocker"
+            >
+              <h3 class="detail-pane__section-title">
+                Blocker
+              </h3>
+              <dl class="detail-pane__facts">
+                <div class="detail-pane__fact">
+                  <dt>Waiting on</dt>
+                  <dd data-testid="detail-blocker-actor">
+                    {{ item.blocker.actor }}
+                  </dd>
+                </div>
+                <div class="detail-pane__fact">
+                  <dt>Smallest unblock</dt>
+                  <dd data-testid="detail-blocker-unblock">
+                    {{ item.blocker.smallestUnblock }}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            <section
+              class="detail-pane__section"
+              aria-label="Handover"
+            >
+              <h3 class="detail-pane__section-title">
+                Handover
+              </h3>
+
+              <p
+                v-if="handoverParts === null"
+                class="detail-pane__empty"
+                data-testid="detail-handover-absent"
+              >
+                No handover recorded for this work item yet. Nothing has been written
+                here, which is not the same as nothing having happened.
+              </p>
+
+              <dl
+                v-else
+                class="detail-pane__handover"
+                data-testid="detail-handover"
+              >
+                <div
+                  v-for="entry in handoverParts"
+                  :key="entry.part"
+                  class="detail-pane__fact"
+                  :data-testid="`detail-handover-${entry.part}`"
+                >
+                  <dt>{{ entry.label }}</dt>
+                  <dd>
+                    <span v-if="entry.text !== null">{{ entry.text }}</span>
+                    <a
+                      v-for="link in entry.links"
+                      :key="link.href"
+                      class="detail-pane__reference"
+                      data-testid="detail-evidence"
+                      :href="link.href"
+                      rel="noreferrer"
+                    >{{ link.label }}</a>
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            <section
+              v-if="item.externalReferences.length > 0"
+              class="detail-pane__section"
+              aria-label="References"
+            >
+              <h3 class="detail-pane__section-title">
+                References
+              </h3>
+              <ul class="detail-pane__references">
+                <li
+                  v-for="reference in item.externalReferences"
+                  :key="reference.href"
+                >
+                  <a
+                    class="detail-pane__reference"
+                    data-testid="detail-reference"
+                    :href="reference.href"
+                    rel="noreferrer"
+                  >{{ reference.label }}</a>
+                </li>
+              </ul>
+            </section>
+          </div>
+
+          <aside
+            class="detail-pane__rail"
+            aria-label="Add to card"
           >
-            <a
-              class="detail-pane__reference"
-              data-testid="detail-reference"
-              :href="reference.href"
-              rel="noreferrer"
-            >{{ reference.label }}</a>
-          </li>
-        </ul>
-      </section>
-    </template>
-  </aside>
+            <button
+              class="detail-pane__rail-button"
+              type="button"
+              :aria-expanded="railPopover === 'labels' ? 'true' : 'false'"
+              @click="toggleRail('labels')"
+            >
+              Labels
+            </button>
+            <div
+              v-if="railPopover === 'labels'"
+              class="detail-pane__popover"
+              role="dialog"
+              aria-label="Labels"
+            >
+              <div class="detail-pane__multiselect">
+                <input
+                  v-model="labelQuery"
+                  class="detail-pane__search"
+                  type="text"
+                  role="combobox"
+                  aria-label="Search labels"
+                  aria-autocomplete="list"
+                  :aria-expanded="labelOpen && (filteredLabels.length > 0 || canCreateLabel)"
+                  :aria-controls="labelListId"
+                  :aria-activedescendant="activeLabelId"
+                  @focus="labelOpen = true"
+                  @input="labelOpen = true; labelActive = -1"
+                  @keydown="onLabelKeydown"
+                >
+                <div
+                  class="detail-pane__palette"
+                  aria-label="Label colours"
+                >
+                  <button
+                    v-for="(colour, index) in labelColours"
+                    :key="colour"
+                    class="detail-pane__swatch"
+                    :class="{ 'detail-pane__swatch--selected': colour === selectedLabelColour }"
+                    type="button"
+                    :aria-label="`Choose label colour ${index + 1}`"
+                    :aria-pressed="colour === selectedLabelColour"
+                    :style="{ background: colour }"
+                    @click="selectedLabelColour = colour"
+                  />
+                </div>
+                <ul
+                  v-if="labelOpen && (filteredLabels.length > 0 || canCreateLabel)"
+                  :id="labelListId"
+                  class="detail-pane__options"
+                  role="listbox"
+                  aria-label="Label suggestions"
+                >
+                  <li
+                    v-for="(label, index) in filteredLabels"
+                    :id="`${labelListId}-${index}`"
+                    :key="label.id"
+                    class="detail-pane__option"
+                    :class="{ 'detail-pane__option--active': index === labelActive }"
+                    role="option"
+                    :aria-selected="index === labelActive"
+                    :aria-label="label.title"
+                    @click="addLabel(label)"
+                  >
+                    {{ label.title }}
+                  </li>
+                  <li
+                    v-if="canCreateLabel"
+                    class="detail-pane__option"
+                    role="option"
+                    :aria-label="`Create label ${labelQuery.trim()}`"
+                    aria-selected="false"
+                    @click="createLabel"
+                  >
+                    Create “{{ labelQuery.trim() }}”
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <button
+              class="detail-pane__rail-button"
+              type="button"
+              :aria-expanded="railPopover === 'members' ? 'true' : 'false'"
+              @click="toggleRail('members')"
+            >
+              Members
+            </button>
+            <div
+              v-if="railPopover === 'members'"
+              class="detail-pane__popover"
+              role="dialog"
+              aria-label="Members"
+            >
+              <div class="detail-pane__multiselect">
+                <input
+                  v-model="assigneeQuery"
+                  class="detail-pane__search"
+                  type="text"
+                  role="combobox"
+                  aria-label="Search assignees"
+                  aria-autocomplete="list"
+                  :aria-expanded="assigneeOpen && filteredAssignees.length > 0"
+                  :aria-controls="assigneeListId"
+                  :aria-activedescendant="activeAssigneeId"
+                  @focus="assigneeOpen = true"
+                  @input="assigneeOpen = true; assigneeActive = -1"
+                  @keydown="onAssigneeKeydown"
+                >
+                <ul
+                  v-if="assigneeOpen && filteredAssignees.length > 0"
+                  :id="assigneeListId"
+                  class="detail-pane__options"
+                  role="listbox"
+                  aria-label="Assignee suggestions"
+                >
+                  <li
+                    v-for="(assignee, index) in filteredAssignees"
+                    :id="`${assigneeListId}-${index}`"
+                    :key="assignee.id"
+                    class="detail-pane__option"
+                    :class="{ 'detail-pane__option--active': index === assigneeActive }"
+                    role="option"
+                    :aria-selected="index === assigneeActive"
+                    :aria-label="assignee.name"
+                    @click="addAssignee(assignee)"
+                  >
+                    {{ assignee.name }}
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <button
+              class="detail-pane__rail-button"
+              type="button"
+              :aria-expanded="railPopover === 'dates' ? 'true' : 'false'"
+              @click="toggleRail('dates')"
+            >
+              Dates
+            </button>
+            <div
+              v-if="railPopover === 'dates'"
+              class="detail-pane__popover"
+              role="dialog"
+              aria-label="Dates"
+            >
+              <label class="detail-pane__move-label">
+                Due date
+                <input
+                  class="detail-pane__control"
+                  type="date"
+                  aria-label="Due date"
+                  :value="item.dueDate ?? ''"
+                  @input="onDueDateChange"
+                >
+              </label>
+            </div>
+
+            <button
+              class="detail-pane__rail-button"
+              type="button"
+              :aria-expanded="railPopover === 'priority' ? 'true' : 'false'"
+              @click="toggleRail('priority')"
+            >
+              Priority
+            </button>
+            <div
+              v-if="railPopover === 'priority'"
+              class="detail-pane__popover"
+              role="dialog"
+              aria-label="Priority"
+              data-testid="detail-priority"
+            >
+              <select
+                class="detail-pane__control"
+                :class="`detail-pane__priority--${item.priority}`"
+                aria-label="Priority"
+                :value="item.priority"
+                @change="onPriorityChange"
+              >
+                <option
+                  v-for="priority in WORK_ITEM_PRIORITIES"
+                  :key="priority"
+                  :value="priority"
+                >
+                  {{ WORK_ITEM_PRIORITY_LABELS[priority] }}
+                </option>
+              </select>
+              <label class="detail-pane__progress-label">
+                Percent done
+                <input
+                  class="detail-pane__progress"
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="10"
+                  aria-label="Percent done"
+                  :value="item.percentDone"
+                  @input="onPercentDoneChange"
+                >
+                <span class="detail-pane__progress-value">{{ item.percentDone }}%</span>
+              </label>
+            </div>
+          </aside>
+        </div>
+      </template>
+    </div>
+  </div>
 </template>

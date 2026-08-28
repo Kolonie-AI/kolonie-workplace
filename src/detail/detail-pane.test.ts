@@ -63,7 +63,11 @@ function pane(): HTMLElement {
   return screen.getByTestId('detail-pane')
 }
 
-describe('detail pane — opened from the board, beside it', () => {
+async function openRail(name: 'Labels' | 'Members' | 'Dates' | 'Priority'): Promise<void> {
+  await fireEvent.click(within(pane()).getByRole('button', { name }))
+}
+
+describe('detail pane — opened from the board, over it', () => {
   it('renders no pane until an item is opened', async () => {
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
 
@@ -96,11 +100,13 @@ describe('detail pane — opened from the board, beside it', () => {
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
     await openItem(FIXTURE_ITEMS.review)
 
+    expect(pane().getAttribute('role')).toBe('dialog')
+    expect(pane().getAttribute('aria-modal')).toBe('true')
     expect(within(pane()).getByTestId('detail-title').textContent).toContain(
       'Review the fictional catalogue summary',
     )
-    expect(within(pane()).getByTestId('detail-lane').textContent).toContain(
-      WORKPLACE_LANE_LABELS.review,
+    expect(within(pane()).getByTestId('detail-lane').textContent).toMatch(
+      new RegExp(`in list ${WORKPLACE_LANE_LABELS.review}`, 'i'),
     )
 
     const owners = within(pane()).queryAllByTestId('detail-owner')
@@ -109,6 +115,11 @@ describe('detail pane — opened from the board, beside it', () => {
     expect(within(pane()).getByTestId('detail-assignees').textContent).toContain(
       'Fictional Human Wren',
     )
+    expect(within(pane()).getByRole('heading', { name: 'Checklists' })).toBeTruthy()
+    expect(within(pane()).getByRole('heading', { name: 'Attachments' })).toBeTruthy()
+    expect(within(pane()).getByRole('heading', { name: 'Activity' })).toBeTruthy()
+    expect(within(pane()).queryByRole('button', { name: /checklist/i })).toBeNull()
+    expect(within(pane()).queryByRole('button', { name: /attachment/i })).toBeNull()
   })
 
   it('opens from a List row through the same selection, not a second one', async () => {
@@ -164,6 +175,60 @@ describe('detail pane — opened from the board, beside it', () => {
         .queryAllByTestId('kanban-card')
         .filter((card) => card.getAttribute('data-selected') === 'true'),
     ).toEqual([])
+  })
+
+  it('restores focus to the card that opened it', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    const card = screen
+      .getAllByTestId('kanban-card')
+      .find((candidate) => candidate.getAttribute('data-item-id') === FIXTURE_ITEMS.review)
+
+    if (card === undefined) {
+      throw new Error('Kolonie Workplace: no card rendered for the review item.')
+    }
+
+    card.focus()
+    await fireEvent.click(card)
+    await waitFor(() => {
+      expect(screen.queryByTestId('detail-pane')).toBeTruthy()
+    })
+    expect(pane().contains(document.activeElement)).toBe(true)
+
+    await fireEvent.click(within(pane()).getByTestId('detail-close'))
+    await waitFor(() => {
+      expect(screen.queryByTestId('detail-pane')).toBeNull()
+    })
+    expect(document.activeElement).toBe(card)
+  })
+
+  it('closes on Escape and on overlay click', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    await openItem(FIXTURE_ITEMS.review)
+
+    await fireEvent.keyDown(pane(), { key: 'Escape' })
+    await waitFor(() => {
+      expect(screen.queryByTestId('detail-pane')).toBeNull()
+    })
+
+    await openItem(FIXTURE_ITEMS.review)
+    await fireEvent.click(screen.getByTestId('detail-overlay'))
+    await waitFor(() => {
+      expect(screen.queryByTestId('detail-pane')).toBeNull()
+    })
+  })
+
+  it('keeps unused add-to-card actions in popovers rather than a stacked form', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    await openItem(FIXTURE_ITEMS.review)
+
+    expect(within(pane()).queryByRole('combobox', { name: 'Search labels' })).toBeNull()
+    expect(within(pane()).queryByRole('combobox', { name: 'Search assignees' })).toBeNull()
+    expect(within(pane()).queryByLabelText('Due date')).toBeNull()
+    expect(within(pane()).queryByRole('combobox', { name: 'Priority' })).toBeNull()
+
+    await openRail('Labels')
+    expect(within(pane()).getByRole('dialog', { name: 'Labels' })).toBeTruthy()
+    expect(within(pane()).getByRole('combobox', { name: 'Search labels' })).toBeTruthy()
   })
 })
 
@@ -378,6 +443,24 @@ describe('detail pane — rich-text description', () => {
     expect(description.querySelector('[onerror]')).toBeNull()
     expect(description.innerHTML).toBe('<p>Safe</p>')
   })
+
+  it('restores the previous description when the gateway rejects the write', async () => {
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'updateWorkItem').mockRejectedValueOnce(new Error('fixture rejection'))
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.review)
+    const description = within(pane()).getByRole('textbox', { name: 'Work item description' })
+    const previous = description.innerHTML
+
+    description.innerHTML = '<p>Rejected fictional body</p>'
+    await fireEvent.input(description)
+    await fireEvent.blur(description)
+
+    await waitFor(() => {
+      expect(within(pane()).getByRole('alert').textContent).toMatch(/updating/i)
+    })
+    expect(description.innerHTML).toBe(previous)
+  })
 })
 
 describe('detail pane — labels and assignees', () => {
@@ -388,6 +471,7 @@ describe('detail pane — labels and assignees', () => {
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
     await openItem(FIXTURE_ITEMS.review)
     const readsBeforeEdit = boardReads.mock.calls.length
+    await openRail('Labels')
     const input = within(pane()).getByRole('combobox', { name: 'Search labels' })
 
     await fireEvent.focus(input)
@@ -423,6 +507,7 @@ describe('detail pane — labels and assignees', () => {
     const updates = vi.spyOn(gateway, 'updateWorkItem')
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
     await openItem(FIXTURE_ITEMS.review)
+    await openRail('Labels')
     const input = within(pane()).getByRole('combobox', { name: 'Search labels' })
 
     await fireEvent.update(input, 'Needs copy')
@@ -458,6 +543,7 @@ describe('detail pane — labels and assignees', () => {
       )
     })
 
+    await openRail('Members')
     const assigneeInput = within(pane()).getByRole('combobox', { name: 'Search assignees' })
     await fireEvent.keyDown(assigneeInput, { key: 'Backspace' })
     await waitFor(() => {
@@ -474,6 +560,7 @@ describe('detail pane — labels and assignees', () => {
     const updates = vi.spyOn(gateway, 'updateWorkItem')
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
     await openItem(FIXTURE_ITEMS.review)
+    await openRail('Members')
     const input = within(pane()).getByRole('combobox', { name: 'Search assignees' })
 
     await fireEvent.update(input, 'ember')
@@ -499,6 +586,7 @@ describe('detail pane — labels and assignees', () => {
     vi.spyOn(gateway, 'updateWorkItem').mockRejectedValueOnce(new Error('fixture rejection'))
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
     await openItem(FIXTURE_ITEMS.review)
+    await openRail('Labels')
     const input = within(pane()).getByRole('combobox', { name: 'Search labels' })
 
     await fireEvent.update(input, 'del')
@@ -520,11 +608,14 @@ describe('detail pane — metadata', () => {
 
     expect(within(pane()).getByTestId('detail-lane').textContent).toContain('Review')
     expect(within(pane()).getByTestId('detail-owner').textContent).toContain('Fictional Agent Quill')
-    expect(within(pane()).getByRole('combobox', { name: 'Priority' })).toHaveProperty('value', 'medium')
-    expect(within(pane()).getByLabelText('Due date')).toHaveProperty('value', '2026-09-10')
     expect(within(pane()).getByTestId('detail-due-relative').textContent).toBe('in 14 days')
     expect(within(pane()).getByTestId('detail-labels').textContent).toContain('Research')
     expect(within(pane()).getByTestId('detail-assignees').textContent).toContain('Fictional Human Wren')
+
+    await openRail('Priority')
+    expect(within(pane()).getByRole('combobox', { name: 'Priority' })).toHaveProperty('value', 'medium')
+    await openRail('Dates')
+    expect(within(pane()).getByLabelText('Due date')).toHaveProperty('value', '2026-09-10')
   })
 })
 
@@ -537,6 +628,7 @@ describe('detail pane — priority, due date and progress', () => {
     await openItem(FIXTURE_ITEMS.review)
     const readsBeforeEdit = boardReads.mock.calls.length
 
+    await openRail('Priority')
     await fireEvent.update(within(pane()).getByRole('combobox', { name: 'Priority' }), 'urgent')
     await waitFor(() => {
       expect(updates).toHaveBeenCalledWith(
@@ -546,6 +638,7 @@ describe('detail pane — priority, due date and progress', () => {
       )
     })
 
+    await openRail('Dates')
     await fireEvent.update(within(pane()).getByLabelText('Due date'), '2026-08-24')
     await waitFor(() => {
       expect(updates).toHaveBeenCalledWith(
@@ -555,6 +648,7 @@ describe('detail pane — priority, due date and progress', () => {
       )
     })
 
+    await openRail('Priority')
     await fireEvent.update(within(pane()).getByRole('slider', { name: 'Percent done' }), '50')
     await waitFor(() => {
       expect(updates).toHaveBeenCalledWith(
@@ -592,6 +686,7 @@ describe('detail pane — priority, due date and progress', () => {
   it('offers every Colony priority level without importing a numeric constant table', async () => {
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
     await openItem(FIXTURE_ITEMS.review)
+    await openRail('Priority')
     const select = within(pane()).getByRole('combobox', { name: 'Priority' })
     const values = [...select.querySelectorAll('option')].map((option) => option.getAttribute('value'))
 

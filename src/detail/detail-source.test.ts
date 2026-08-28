@@ -61,6 +61,17 @@ describe('detail source — original Colony code', () => {
     expect(pane).toMatch(/owner/i)
     expect(pane).toMatch(/assignee/i)
   })
+
+  it('opens as a dialog over the board, not a stacked side pane', () => {
+    expect(pane).toMatch(/role="dialog"/)
+    expect(pane).toMatch(/aria-modal="true"/)
+    expect(pane).toMatch(/detail-overlay/)
+    expect(pane).toMatch(/in list/)
+    expect(pane).toMatch(/Checklists/)
+    expect(pane).toMatch(/Attachments/)
+    expect(pane).toMatch(/Activity/)
+    expect(pane).toMatch(/Add to card/)
+  })
 })
 
 describe('detail styles', () => {

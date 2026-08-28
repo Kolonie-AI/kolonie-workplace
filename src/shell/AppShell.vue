@@ -6,7 +6,7 @@
  *
  * Data reaches this component only through TaskGateway.
  */
-import { computed, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { useWorkplaceClock } from '@/clock/workplace-clock'
 import {
   WORKPLACE_VIEWS,
@@ -236,6 +236,28 @@ async function updateDetail(input: UpdateWorkItemInput): Promise<WorkItemDetail 
   }
 
   return updated
+}
+
+function openItem(itemId: string): void {
+  items.selectItem(itemId)
+}
+
+async function closeDetail(): Promise<void> {
+  const itemId = items.selectedItemId.value
+  items.clearSelection()
+  await nextTick()
+
+  if (itemId === null) {
+    return
+  }
+
+  const opener = document.querySelector(
+    `[data-testid="kanban-card"][data-item-id="${itemId}"], [data-testid="list-row"][data-item-id="${itemId}"]`,
+  )
+
+  if (opener instanceof HTMLElement) {
+    opener.focus()
+  }
 }
 </script>
 
@@ -495,7 +517,7 @@ async function updateDetail(input: UpdateWorkItemInput): Promise<WorkItemDetail 
               :move-error="items.moveError.value"
               :create-error="items.createError.value"
               :now="now"
-              @select="items.selectItem"
+              @select="openItem"
               @move="items.moveItem"
               @create="items.createItem"
             />
@@ -510,7 +532,7 @@ async function updateDetail(input: UpdateWorkItemInput): Promise<WorkItemDetail 
               :selected-item-id="items.selectedItemId.value"
               :moving-item-id="items.movingItemId.value"
               :move-error="items.moveError.value"
-              @select="items.selectItem"
+              @select="openItem"
               @move="items.moveItem"
             />
           </section>
@@ -524,7 +546,7 @@ async function updateDetail(input: UpdateWorkItemInput): Promise<WorkItemDetail 
             :available-assignees="availableAssignees"
             :now="now"
             @update="updateDetail"
-            @close="items.clearSelection"
+            @close="closeDetail"
           />
         </div>
       </main>
