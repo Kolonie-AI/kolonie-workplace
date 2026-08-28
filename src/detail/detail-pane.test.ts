@@ -5,7 +5,7 @@ import type { BoardId } from '@/domain/workplace'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import { TASK_GATEWAY } from '@/gateway/provide-gateway'
 import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
-import { FIXTURE_BOARDS, FIXTURE_HUMANS, FIXTURE_ITEMS } from '@/fixtures/catalogue'
+import { FIXTURE_BOARDS, FIXTURE_HUMANS, FIXTURE_ITEMS, FIXTURE_LABELS } from '@/fixtures/catalogue'
 import AppShell from '@/shell/AppShell.vue'
 import { createFixtureWorkplaceSession } from '@/session/fixture-workplace-session'
 import { WORKPLACE_SESSION, type WorkplaceSession } from '@/session/workplace-session'
@@ -367,6 +367,139 @@ describe('detail pane — rich-text description', () => {
     expect(description.querySelector('script')).toBeNull()
     expect(description.querySelector('[onerror]')).toBeNull()
     expect(description.innerHTML).toBe('<p>Safe</p>')
+  })
+})
+
+describe('detail pane — labels and assignees', () => {
+  it('filters labels, omits attached labels, and selects with arrows and Enter', async () => {
+    const gateway = createFixtureTaskGateway()
+    const boardReads = vi.spyOn(gateway, 'getBoardItems')
+    const updates = vi.spyOn(gateway, 'updateWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.review)
+    const readsBeforeEdit = boardReads.mock.calls.length
+    const input = within(pane()).getByRole('combobox', { name: 'Search labels' })
+
+    await fireEvent.focus(input)
+    expect(within(pane()).queryByRole('option', { name: 'Research' })).toBeNull()
+    expect(within(pane()).getByRole('option', { name: 'Delivery' })).toBeTruthy()
+
+    await fireEvent.update(input, 'del')
+    expect(within(pane()).getByRole('option', { name: 'Delivery' })).toBeTruthy()
+
+    await fireEvent.keyDown(input, { key: 'ArrowDown' })
+    const activeId = input.getAttribute('aria-activedescendant')
+    expect(activeId).toBeTruthy()
+    expect(document.getElementById(activeId ?? '')?.textContent).toContain('Delivery')
+    await fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => {
+      expect(updates).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.review,
+        { labels: [FIXTURE_LABELS.research, FIXTURE_LABELS.delivery] },
+      )
+    })
+    expect(within(pane()).getByRole('button', { name: 'Remove label Delivery' })).toBeTruthy()
+    const card = screen
+      .getAllByTestId('kanban-card')
+      .find((candidate) => candidate.getAttribute('data-item-id') === FIXTURE_ITEMS.review)
+    expect(card?.textContent).toContain('Delivery')
+    expect(boardReads).toHaveBeenCalledTimes(readsBeforeEdit)
+  })
+
+  it('creates a label inline with a colour from the palette', async () => {
+    const gateway = createFixtureTaskGateway()
+    const updates = vi.spyOn(gateway, 'updateWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.review)
+    const input = within(pane()).getByRole('combobox', { name: 'Search labels' })
+
+    await fireEvent.update(input, 'Needs copy')
+    await fireEvent.click(within(pane()).getByRole('button', { name: 'Choose label colour 2' }))
+    await fireEvent.click(within(pane()).getByRole('option', { name: 'Create label Needs copy' }))
+
+    await waitFor(() => {
+      expect(updates).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.review,
+        {
+          labels: [
+            FIXTURE_LABELS.research,
+            expect.objectContaining({ title: 'Needs copy', colour: '#00db60' }),
+          ],
+        },
+      )
+    })
+  })
+
+  it('removes a label from its chip and Backspace removes the last assignee', async () => {
+    const gateway = createFixtureTaskGateway()
+    const updates = vi.spyOn(gateway, 'updateWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.review)
+
+    await fireEvent.click(within(pane()).getByRole('button', { name: 'Remove label Research' }))
+    await waitFor(() => {
+      expect(updates).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.review,
+        { labels: [] },
+      )
+    })
+
+    const assigneeInput = within(pane()).getByRole('combobox', { name: 'Search assignees' })
+    await fireEvent.keyDown(assigneeInput, { key: 'Backspace' })
+    await waitFor(() => {
+      expect(updates).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.review,
+        { assignees: [] },
+      )
+    })
+  })
+
+  it('adds an assignee with keyboard navigation', async () => {
+    const gateway = createFixtureTaskGateway()
+    const updates = vi.spyOn(gateway, 'updateWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.review)
+    const input = within(pane()).getByRole('combobox', { name: 'Search assignees' })
+
+    await fireEvent.update(input, 'ember')
+    await fireEvent.keyDown(input, { key: 'ArrowDown' })
+    await fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => {
+      expect(updates).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.review,
+        {
+          assignees: [
+            { id: FIXTURE_HUMANS.wren, name: 'Fictional Human Wren' },
+            { id: 'fictional-human-ember', name: 'Fictional Operator Ember' },
+          ],
+        },
+      )
+    })
+  })
+
+  it('leaves the chip set unchanged when the gateway rejects an update', async () => {
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'updateWorkItem').mockRejectedValueOnce(new Error('fixture rejection'))
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.review)
+    const input = within(pane()).getByRole('combobox', { name: 'Search labels' })
+
+    await fireEvent.update(input, 'del')
+    await fireEvent.keyDown(input, { key: 'ArrowDown' })
+    await fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => {
+      expect(within(pane()).getByRole('alert').textContent).toMatch(/updating/i)
+    })
+    expect(within(pane()).getByRole('button', { name: 'Remove label Research' })).toBeTruthy()
+    expect(within(pane()).queryByRole('button', { name: 'Remove label Delivery' })).toBeNull()
   })
 })
 

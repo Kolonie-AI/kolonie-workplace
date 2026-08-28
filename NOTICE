@@ -70,6 +70,9 @@ Imported or adapted from Vikunja:
       frontend/src/components/tasks/partials/Heading.vue
       frontend/src/components/tasks/partials/Description.vue
       frontend/src/components/tasks/partials/CreatedUpdated.vue
+      frontend/src/components/tasks/partials/EditLabels.vue
+      frontend/src/components/tasks/partials/EditAssignees.vue
+      frontend/src/components/input/Multiselect.vue
 
   src/kanban/card-facets.ts
     adapted from

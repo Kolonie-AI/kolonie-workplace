@@ -189,6 +189,105 @@
   line-height: 1.5;
 }
 
+.detail-pane__chip-remove:focus-visible,
+.detail-pane__search:focus-visible,
+.detail-pane__swatch:focus-visible,
+.detail-pane__option:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.detail-pane__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.detail-pane__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-small);
+}
+
+.detail-pane__chip--plain {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+.detail-pane__chip-remove {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+}
+
+.detail-pane__multiselect {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.detail-pane__search {
+  min-block-size: 2.25rem;
+  inline-size: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.detail-pane__palette {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.detail-pane__swatch {
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.detail-pane__swatch--selected {
+  border-color: var(--color-text);
+}
+
+.detail-pane__options {
+  position: absolute;
+  z-index: 2;
+  inset-block-start: 100%;
+  inset-inline: 0;
+  display: grid;
+  margin: var(--space-1) 0 0;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-medium);
+  list-style: none;
+}
+
+.detail-pane__option {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-small);
+  cursor: pointer;
+}
+
+.detail-pane__option:hover,
+.detail-pane__option--active {
+  background: var(--color-accent-soft);
+}
+
 .detail-pane__references {
   display: flex;
   flex-direction: column;

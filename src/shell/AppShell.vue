@@ -21,7 +21,13 @@ import {
   resolveWorkplaceView,
   type WorkplaceView,
 } from '@/shell/views'
-import type { BoardId, UpdateWorkItemInput, WorkItemDetail } from '@/domain/workplace'
+import type {
+  BoardId,
+  UpdateWorkItemInput,
+  WorkItemAssignee,
+  WorkItemDetail,
+  WorkItemLabel,
+} from '@/domain/workplace'
 import { WORKPLACE_LANES, WORKPLACE_LANE_LABELS, type Lane } from '@/domain/lanes'
 import BoardList from '@/boards/BoardList.vue'
 import { useBoardList } from '@/boards/use-board-list'
@@ -202,6 +208,30 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
       break
   }
 }
+
+const availableLabels = computed<readonly WorkItemLabel[]>(() => {
+  const labels = new Map<string, WorkItemLabel>()
+
+  for (const item of items.loadedItems.value) {
+    for (const label of item.labels) {
+      labels.set(label.id, label)
+    }
+  }
+
+  return [...labels.values()].sort((left, right) => left.title.localeCompare(right.title))
+})
+
+const availableAssignees = computed<readonly WorkItemAssignee[]>(() => {
+  const assignees = new Map<string, WorkItemAssignee>()
+
+  for (const item of items.loadedItems.value) {
+    for (const assignee of item.assignees) {
+      assignees.set(assignee.id, assignee)
+    }
+  }
+
+  return [...assignees.values()].sort((left, right) => left.name.localeCompare(right.name))
+})
 
 async function updateDetail(input: UpdateWorkItemInput): Promise<WorkItemDetail | null> {
   const updated = await detail.updateItem(input)
@@ -494,6 +524,8 @@ async function updateDetail(input: UpdateWorkItemInput): Promise<WorkItemDetail 
             :status="detail.status.value"
             :item="detail.item.value"
             :update-error="detail.updateError.value"
+            :available-labels="availableLabels"
+            :available-assignees="availableAssignees"
             @update="updateDetail"
             @close="items.clearSelection"
           />
