@@ -21,7 +21,7 @@ import {
   resolveWorkplaceView,
   type WorkplaceView,
 } from '@/shell/views'
-import type { BoardId } from '@/domain/workplace'
+import type { BoardId, UpdateWorkItemInput, WorkItemDetail } from '@/domain/workplace'
 import { WORKPLACE_LANES, WORKPLACE_LANE_LABELS, type Lane } from '@/domain/lanes'
 import BoardList from '@/boards/BoardList.vue'
 import { useBoardList } from '@/boards/use-board-list'
@@ -201,6 +201,16 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
     default:
       break
   }
+}
+
+async function updateDetail(input: UpdateWorkItemInput): Promise<WorkItemDetail | null> {
+  const updated = await detail.updateItem(input)
+
+  if (updated !== null) {
+    items.replaceItem(updated)
+  }
+
+  return updated
 }
 </script>
 
@@ -483,6 +493,8 @@ function onTabKeydown(event: KeyboardEvent, index: number): void {
             v-if="items.selectedItemId.value !== null"
             :status="detail.status.value"
             :item="detail.item.value"
+            :update-error="detail.updateError.value"
+            @update="updateDetail"
             @close="items.clearSelection"
           />
         </div>

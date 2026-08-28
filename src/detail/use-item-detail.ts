@@ -1,5 +1,10 @@
 import { ref, watch, type Ref } from 'vue'
-import type { HumanId, WorkItemDetail, WorkItemId } from '@/domain/workplace'
+import type {
+  HumanId,
+  UpdateWorkItemInput,
+  WorkItemDetail,
+  WorkItemId,
+} from '@/domain/workplace'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import { WorkItemAccessRefused } from '@/gateway/refusals'
 
@@ -23,6 +28,8 @@ export type ItemDetailStatus = 'idle' | 'loading' | 'ready' | 'refused' | 'error
 export interface ItemDetail {
   readonly status: Readonly<Ref<ItemDetailStatus>>
   readonly item: Readonly<Ref<WorkItemDetail | null>>
+  readonly updateError: Readonly<Ref<string | null>>
+  updateItem(input: UpdateWorkItemInput): Promise<WorkItemDetail | null>
 }
 
 export function useItemDetail(
@@ -32,12 +39,14 @@ export function useItemDetail(
 ): ItemDetail {
   const status = ref<ItemDetailStatus>('idle')
   const item = ref<WorkItemDetail | null>(null)
+  const updateError = ref<string | null>(null)
 
   async function load(): Promise<void> {
     const currentHumanId = humanId.value
     const itemId = selectedItemId.value
 
     item.value = null
+    updateError.value = null
 
     if (currentHumanId === null || itemId === null) {
       status.value = 'idle'
@@ -69,5 +78,29 @@ export function useItemDetail(
 
   watch([humanId, selectedItemId], () => void load(), { immediate: true })
 
-  return { status, item }
+  async function updateItem(input: UpdateWorkItemInput): Promise<WorkItemDetail | null> {
+    const currentHumanId = humanId.value
+    const current = item.value
+
+    if (currentHumanId === null || current === null) {
+      return null
+    }
+
+    updateError.value = null
+
+    try {
+      const updated = await gateway.updateWorkItem(currentHumanId, current.id, input)
+
+      if (humanId.value === currentHumanId && selectedItemId.value === current.id) {
+        item.value = updated
+      }
+
+      return updated
+    } catch {
+      updateError.value = 'Updating this work item failed.'
+      return null
+    }
+  }
+
+  return { status, item, updateError, updateItem }
 }

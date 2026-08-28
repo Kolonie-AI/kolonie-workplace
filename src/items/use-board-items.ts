@@ -55,6 +55,7 @@ export interface BoardItems {
   selectItem(itemId: WorkItemId): void
   moveItem(itemId: WorkItemId, lane: Lane): Promise<void>
   createItem(title: string, lane: Lane): Promise<void>
+  replaceItem(item: WorkItemSummary): void
   clearSelection(): void
 }
 
@@ -134,6 +135,11 @@ export function useBoardItems(
     movingItemId,
     moveError,
     createError,
+    replaceItem(item: WorkItemSummary): void {
+      loaded.value = loaded.value.map((current) =>
+        current.id === item.id ? item : current,
+      )
+    },
     selectItem(itemId: WorkItemId): void {
       selectedItemId.value = itemId
     },

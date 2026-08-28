@@ -1,36 +1,147 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+/*
+ * Copyright 2018-present Vikunja and contributors. All rights reserved.
+ * Copyright 2026 Kolonie AI FZ-LLC.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * The editable heading, description surface and metadata layout are adapted
+ * for Kolonie Workplace on 2026-08-27 from Vikunja 2.5.0
+ * (ef2200e9429c5cc42f5c1811433418bfcc72b3aa):
+ *   frontend/src/views/tasks/TaskDetailView.vue
+ *   frontend/src/components/tasks/partials/Heading.vue
+ *   frontend/src/components/tasks/partials/Description.vue
+ * No Vikunja store, router, i18n or task model is used.
+ */
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { WORKPLACE_LANE_LABELS } from '@/domain/lanes'
-import type { WorkItemDetail } from '@/domain/workplace'
+import type { UpdateWorkItemInput, WorkItemDetail } from '@/domain/workplace'
 import type { ItemDetailStatus } from '@/detail/use-item-detail'
 import { renderHandover } from '@/detail/handover-parts'
+import { sanitizeDescription } from '@/detail/sanitize-description'
+import { WORK_ITEM_PRIORITY_LABELS } from '@/kanban/card-facets'
 import '@/detail/detail-pane.css'
 
-/**
- * A small read surface over the fields that let a human resume work, beside a
- * board that stays visible. It is not a form: there is no edit control, no
- * comment box, no status control and no handover editor, because the first cut
- * has no write path at all. The one button closes it.
- *
- * The detail arrives as a prop from a composable that fetched it when the item
- * was opened; this component never reads a gateway and never falls back to the
- * board payload, so a field it cannot show is a field the Colony does not hold.
- */
 const props = defineProps<{
   status: ItemDetailStatus
   item: WorkItemDetail | null
+  updateError: string | null
 }>()
 
 const emit = defineEmits<{
   close: []
+  update: [input: UpdateWorkItemInput]
 }>()
+
+const titleDraft = ref('')
+const descriptionDraft = ref('')
+const descriptionEditor = useTemplateRef<HTMLElement>('descriptionEditor')
 
 const laneLabel = computed(() =>
   props.item === null ? null : WORKPLACE_LANE_LABELS[props.item.lane],
 )
+const priorityLabel = computed(() =>
+  props.item === null ? null : WORK_ITEM_PRIORITY_LABELS[props.item.priority],
+)
 const handoverParts = computed(() =>
   props.item?.handover === undefined ? null : renderHandover(props.item.handover),
 )
+
+watch(
+  () => props.item,
+  async (item) => {
+    titleDraft.value = item?.title ?? ''
+    descriptionDraft.value = sanitizeDescription(item?.description ?? '')
+    await nextTick()
+
+    if (descriptionEditor.value !== null) {
+      descriptionEditor.value.innerHTML = descriptionDraft.value
+    }
+  },
+  { immediate: true },
+)
+
+function onTitleInput(event: Event): void {
+  titleDraft.value = (event.target as HTMLElement).textContent ?? ''
+}
+
+function saveTitle(): void {
+  const previous = props.item?.title
+  const title = titleDraft.value.trim()
+
+  if (previous === undefined) {
+    return
+  }
+
+  if (title === '') {
+    titleDraft.value = previous
+    return
+  }
+
+  if (title !== previous) {
+    emit('update', { title })
+  }
+}
+
+function onTitleKeydown(event: KeyboardEvent): void {
+  if (event.isComposing) {
+    return
+  }
+
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    saveTitle()
+    return
+  }
+
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    const element = event.target as HTMLElement
+    titleDraft.value = props.item?.title ?? ''
+    element.textContent = titleDraft.value
+    element.blur()
+  }
+}
+
+function onDescriptionInput(event: Event): void {
+  descriptionDraft.value = (event.target as HTMLElement).innerHTML
+}
+
+function saveDescription(): void {
+  const previous = props.item?.description
+
+  if (previous === undefined) {
+    return
+  }
+
+  const sanitized = sanitizeDescription(descriptionDraft.value)
+  descriptionDraft.value = sanitized
+
+  if (descriptionEditor.value !== null) {
+    descriptionEditor.value.innerHTML = sanitized
+  }
+
+  if (sanitized !== previous) {
+    emit('update', { description: sanitized })
+  }
+}
+
+function formatDescription(command: string, value?: string): void {
+  descriptionEditor.value?.focus()
+  document.execCommand(command, false, value)
+
+  if (descriptionEditor.value !== null) {
+    descriptionDraft.value = descriptionEditor.value.innerHTML
+  }
+}
+
+function addLink(): void {
+  const href = window.prompt('Link address')
+
+  if (href !== null && /^(https?:|mailto:|\/|#)/i.test(href)) {
+    formatDescription('createLink', href)
+  }
+}
 </script>
 
 <template>
@@ -83,12 +194,102 @@ const handoverParts = computed(() =>
     </p>
 
     <template v-else-if="item !== null">
+      <p
+        v-if="updateError !== null"
+        class="detail-pane__state detail-pane__state--error"
+        data-testid="detail-update-error"
+        role="alert"
+      >
+        {{ updateError }}
+      </p>
+
       <h2
         class="detail-pane__title"
         data-testid="detail-title"
+        contenteditable="true"
+        spellcheck="false"
+        role="textbox"
+        aria-label="Work item title"
+        @input="onTitleInput"
+        @blur="saveTitle"
+        @keydown="onTitleKeydown"
       >
-        {{ item.title }}
+        {{ titleDraft }}
       </h2>
+
+      <section
+        class="detail-pane__section"
+        aria-label="Description"
+      >
+        <h3 class="detail-pane__section-title">
+          Description
+        </h3>
+        <div
+          class="detail-pane__toolbar"
+          role="toolbar"
+          aria-label="Description formatting"
+        >
+          <button
+            class="detail-pane__format"
+            type="button"
+            aria-label="Bold"
+            @mousedown.prevent="formatDescription('bold')"
+          >
+            Bold
+          </button>
+          <button
+            class="detail-pane__format"
+            type="button"
+            aria-label="Italic"
+            @mousedown.prevent="formatDescription('italic')"
+          >
+            Italic
+          </button>
+          <button
+            class="detail-pane__format"
+            type="button"
+            aria-label="Bulleted list"
+            @mousedown.prevent="formatDescription('insertUnorderedList')"
+          >
+            List
+          </button>
+          <button
+            class="detail-pane__format"
+            type="button"
+            aria-label="Numbered list"
+            @mousedown.prevent="formatDescription('insertOrderedList')"
+          >
+            Numbered
+          </button>
+          <button
+            class="detail-pane__format"
+            type="button"
+            aria-label="Link"
+            @mousedown.prevent="addLink"
+          >
+            Link
+          </button>
+          <button
+            class="detail-pane__format"
+            type="button"
+            aria-label="Code"
+            @mousedown.prevent="formatDescription('formatBlock', 'pre')"
+          >
+            Code
+          </button>
+        </div>
+        <div
+          ref="descriptionEditor"
+          class="detail-pane__description"
+          data-testid="detail-description"
+          contenteditable="true"
+          role="textbox"
+          aria-label="Work item description"
+          aria-multiline="true"
+          @input="onDescriptionInput"
+          @blur="saveDescription"
+        />
+      </section>
 
       <dl class="detail-pane__facts">
         <div class="detail-pane__fact">
@@ -101,6 +302,30 @@ const handoverParts = computed(() =>
           <dt>Owner</dt>
           <dd data-testid="detail-owner">
             {{ item.owner }}
+          </dd>
+        </div>
+        <div class="detail-pane__fact">
+          <dt>Priority</dt>
+          <dd data-testid="detail-priority">
+            {{ priorityLabel }}
+          </dd>
+        </div>
+        <div class="detail-pane__fact">
+          <dt>Due date</dt>
+          <dd data-testid="detail-due-date">
+            {{ item.dueDate ?? 'None' }}
+          </dd>
+        </div>
+        <div class="detail-pane__fact">
+          <dt>Labels</dt>
+          <dd data-testid="detail-labels">
+            {{ item.labels.map((label) => label.title).join(', ') || 'None' }}
+          </dd>
+        </div>
+        <div class="detail-pane__fact">
+          <dt>Assignees</dt>
+          <dd data-testid="detail-assignees">
+            {{ item.assignees.map((assignee) => assignee.name).join(', ') || 'None' }}
           </dd>
         </div>
       </dl>
