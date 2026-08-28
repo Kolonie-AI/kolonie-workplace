@@ -1,23 +1,64 @@
-:root {
-  --color-canvas: #f4f5f7;
-  --color-surface: #ffffff;
-  --color-sidebar: #1f2430;
-  --color-sidebar-text: #c3c9d5;
-  --color-sidebar-text-strong: #ffffff;
-  --color-text: #1c1f24;
-  --color-text-muted: #5a6270;
-  --color-border: #dfe2e8;
-  --color-accent: #2f6df6;
-  --color-accent-soft: #eaf0fe;
+/*
+ * Copyright 2018-present Vikunja and contributors. All rights reserved.
+ * Copyright 2026 Kolonie AI FZ-LLC.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Adapted for Kolonie Workplace on 2026-08-27 from Vikunja 2.5.0
+ * (ef2200e9429c5cc42f5c1811433418bfcc72b3aa):
+ *   frontend/src/styles/custom-properties/colors.scss
+ *   frontend/src/styles/custom-properties/shadows.scss
+ *   frontend/src/styles/theme/theme.scss
+ *   frontend/src/styles/theme/scrollbars.scss
+ *   frontend/src/styles/common-imports.scss
+ *
+ * Colony semantic names (--color-*, --space-*, --radius-*) are kept so
+ * existing components restyle without a behaviour change. Pinia, vue-router,
+ * vue-i18n and ITask are not imported.
+ */
 
-  /*
-   * Blocked is its own colour and not a second use of the accent. The accent
-   * says "this is where you are"; blocked says "this is not moving". Sharing
-   * one token made a selected card and a blocked card argue for the same
-   * attention, which is the thing a dense board can least afford.
-   */
-  --color-blocked: #b3411b;
-  --color-blocked-soft: #fdeee8;
+:root,
+:root[data-color-scheme="light"] {
+  color-scheme: light;
+
+  --grey-50-hsl: 210, 20%, 98%;
+  --grey-50: hsl(var(--grey-50-hsl));
+  --grey-100-hsl: 220, 14.3%, 95.9%;
+  --grey-100: hsl(var(--grey-100-hsl));
+  --grey-200: hsl(220, 13%, 91%);
+  --grey-300: hsl(216, 12.2%, 83.9%);
+  --grey-400: hsl(217.9, 10.6%, 64.9%);
+  --grey-500-hsl: 220, 8.9%, 46.1%;
+  --grey-500: hsl(var(--grey-500-hsl));
+  --grey-600: hsl(215, 13.8%, 34.1%);
+  --grey-700: hsl(216.9, 19.1%, 26.7%);
+  --grey-800: hsl(215, 27.9%, 16.9%);
+  --grey-900-hsl: 220.9, 39.3%, 11%;
+  --grey-900: hsl(var(--grey-900-hsl));
+
+  --color-canvas: var(--grey-100);
+  --color-surface: #ffffff;
+  --color-sidebar: var(--grey-800);
+  --color-sidebar-text: var(--grey-300);
+  --color-sidebar-text-strong: #ffffff;
+  --color-text: var(--grey-800);
+  --color-text-muted: hsl(220, 8.9%, 42%);
+  --color-border: var(--grey-200);
+  --color-accent-h: 217deg;
+  --color-accent-s: 98%;
+  --color-accent-l: 53%;
+  --color-accent: hsl(var(--color-accent-h) var(--color-accent-s) var(--color-accent-l));
+  --color-accent-soft: hsl(var(--color-accent-h) var(--color-accent-s) 96%);
+  --color-blocked: hsl(3.3deg 100% 40%);
+  --color-blocked-soft: hsl(3.3deg 100% 96%);
+  --color-success: hsl(146.3deg 100% 42.9%);
+  --color-warning: hsl(27.9deg 100% 55.3%);
+
+  --shadow-small: 0 1px 3px hsla(var(--grey-500-hsl), 0.12), 0 1px 2px hsla(var(--grey-500-hsl), 0.24);
+  --shadow-medium: 0 3px 6px hsla(var(--grey-500-hsl), 0.12), 0 2px 4px hsla(var(--grey-500-hsl), 0.1);
+  --shadow-large: 0 10px 20px hsla(var(--grey-500-hsl), 0.12), 0 3px 6px hsla(var(--grey-500-hsl), 0.08);
+  --shadow-xlarge: 0 15px 25px hsla(var(--grey-500-hsl), 0.12), 0 5px 10px hsla(var(--grey-500-hsl), 0.05);
+  --shadow-selected: inset 0 0 0 1px var(--color-accent);
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -25,26 +66,198 @@
   --space-4: 1rem;
   --space-5: 1.5rem;
   --space-6: 2rem;
+  --space-7: 2.5rem;
+  --space-8: 3rem;
 
   --radius-small: 0.25rem;
   --radius-medium: 0.5rem;
   --radius-large: 0.75rem;
+  --radius-pill: 999px;
 
+  --text-caption: 0.75rem;
   --text-small: 0.8125rem;
   --text-body: 0.9375rem;
   --text-title: 1.25rem;
+  --text-display: 1.5rem;
+
+  --motion-fast: 150ms ease;
+  --motion-slow: 300ms ease;
 
   --sidebar-width: 15rem;
   --font-stack: system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  /*
-   * One focus treatment for the whole application. Every control draws the
-   * same ring at the same offset, so the keyboard path reads as one path
-   * rather than as five components each with their own idea of focus.
-   */
   --focus-ring: 2px solid var(--color-accent);
   --focus-offset: 2px;
   --focus-ring-inverted: 2px solid var(--color-sidebar-text-strong);
+
+  --scrollbar-size: 8px;
+  --scrollbar-track: var(--grey-200);
+  --scrollbar-thumb: var(--grey-300);
+  --scrollbar-thumb-hover: var(--grey-500);
+}
+
+:root[data-color-scheme="dark"] {
+  color-scheme: dark;
+
+  --grey-50-hsl: 220.9, 39.3%, 11%;
+  --grey-50: hsl(var(--grey-50-hsl));
+  --grey-100-hsl: 215, 27.9%, 16.9%;
+  --grey-100: hsl(var(--grey-100-hsl));
+  --grey-200: hsl(216.9, 19.1%, 26.7%);
+  --grey-300: hsl(215, 13.8%, 34.1%);
+  --grey-400: hsl(220, 8.9%, 46.1%);
+  --grey-500-hsl: 217.9, 10.6%, 64.9%;
+  --grey-500: hsl(var(--grey-500-hsl));
+  --grey-600: hsl(216, 12.2%, 83.9%);
+  --grey-700: hsl(220, 13%, 91%);
+  --grey-800: hsl(220, 14.3%, 95.9%);
+  --grey-900-hsl: 210, 20%, 98%;
+  --grey-900: hsl(var(--grey-900-hsl));
+
+  --color-canvas: var(--grey-50);
+  --color-surface: var(--grey-100);
+  --color-sidebar: hsl(220.9deg 39.3% 7%);
+  --color-sidebar-text: var(--grey-600);
+  --color-sidebar-text-strong: var(--grey-900);
+  --color-text: var(--grey-800);
+  --color-text-muted: var(--grey-500);
+  --color-border: hsla(var(--grey-100-hsl), 0.3);
+  --color-accent-h: 217deg;
+  --color-accent-s: 98%;
+  --color-accent-l: 58%;
+  --color-accent: hsl(var(--color-accent-h) var(--color-accent-s) var(--color-accent-l));
+  --color-accent-soft: hsl(var(--color-accent-h) 40% 18%);
+  --color-blocked: hsl(3.3deg 100% 60.6%);
+  --color-blocked-soft: hsl(3.3deg 40% 16%);
+  --color-success: hsl(146.3deg 100% 42.9%);
+  --color-warning: hsl(27.9deg 100% 55.3%);
+
+  --shadow-small: 0 1px 3px hsla(var(--grey-50-hsl), 0.4), 0 1px 2px hsla(var(--grey-50-hsl), 0.8);
+  --shadow-medium: 0 3px 6px hsla(var(--grey-50-hsl), 0.8), 0 2px 4px hsla(var(--grey-50-hsl), 0.6);
+  --shadow-large: 0 10px 20px hsla(var(--grey-50-hsl), 0.8), 0 3px 6px hsla(var(--grey-50-hsl), 0.6);
+  --shadow-xlarge: 0 15px 25px hsla(var(--grey-50-hsl), 0.8), 0 5px 10px hsla(var(--grey-50-hsl), 0.4);
+  --shadow-selected: inset 0 0 0 1px var(--color-accent);
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 2.5rem;
+  --space-8: 3rem;
+
+  --radius-small: 0.25rem;
+  --radius-medium: 0.5rem;
+  --radius-large: 0.75rem;
+  --radius-pill: 999px;
+
+  --text-caption: 0.75rem;
+  --text-small: 0.8125rem;
+  --text-body: 0.9375rem;
+  --text-title: 1.25rem;
+  --text-display: 1.5rem;
+
+  --motion-fast: 150ms ease;
+  --motion-slow: 300ms ease;
+
+  --sidebar-width: 15rem;
+  --font-stack: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --focus-ring: 2px solid var(--color-accent);
+  --focus-offset: 2px;
+  --focus-ring-inverted: 2px solid var(--color-sidebar-text-strong);
+
+  --scrollbar-size: 8px;
+  --scrollbar-track: var(--grey-200);
+  --scrollbar-thumb: var(--grey-300);
+  --scrollbar-thumb-hover: var(--grey-500);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-color-scheme="light"]) {
+    color-scheme: dark;
+
+    --grey-50-hsl: 220.9, 39.3%, 11%;
+    --grey-50: hsl(var(--grey-50-hsl));
+    --grey-100-hsl: 215, 27.9%, 16.9%;
+    --grey-100: hsl(var(--grey-100-hsl));
+    --grey-200: hsl(216.9, 19.1%, 26.7%);
+    --grey-300: hsl(215, 13.8%, 34.1%);
+    --grey-400: hsl(220, 8.9%, 46.1%);
+    --grey-500-hsl: 217.9, 10.6%, 64.9%;
+    --grey-500: hsl(var(--grey-500-hsl));
+    --grey-600: hsl(216, 12.2%, 83.9%);
+    --grey-700: hsl(220, 13%, 91%);
+    --grey-800: hsl(220, 14.3%, 95.9%);
+    --grey-900-hsl: 210, 20%, 98%;
+    --grey-900: hsl(var(--grey-900-hsl));
+
+    --color-canvas: var(--grey-50);
+    --color-surface: var(--grey-100);
+    --color-sidebar: hsl(220.9deg 39.3% 7%);
+    --color-sidebar-text: var(--grey-600);
+    --color-sidebar-text-strong: var(--grey-900);
+    --color-text: var(--grey-800);
+    --color-text-muted: var(--grey-500);
+    --color-border: hsla(var(--grey-100-hsl), 0.3);
+    --color-accent-h: 217deg;
+    --color-accent-s: 98%;
+    --color-accent-l: 58%;
+    --color-accent: hsl(var(--color-accent-h) var(--color-accent-s) var(--color-accent-l));
+    --color-accent-soft: hsl(var(--color-accent-h) 40% 18%);
+    --color-blocked: hsl(3.3deg 100% 60.6%);
+    --color-blocked-soft: hsl(3.3deg 40% 16%);
+    --color-success: hsl(146.3deg 100% 42.9%);
+    --color-warning: hsl(27.9deg 100% 55.3%);
+
+    --shadow-small: 0 1px 3px hsla(var(--grey-50-hsl), 0.4), 0 1px 2px hsla(var(--grey-50-hsl), 0.8);
+    --shadow-medium: 0 3px 6px hsla(var(--grey-50-hsl), 0.8), 0 2px 4px hsla(var(--grey-50-hsl), 0.6);
+    --shadow-large: 0 10px 20px hsla(var(--grey-50-hsl), 0.8), 0 3px 6px hsla(var(--grey-50-hsl), 0.6);
+    --shadow-xlarge: 0 15px 25px hsla(var(--grey-50-hsl), 0.8), 0 5px 10px hsla(var(--grey-50-hsl), 0.4);
+    --shadow-selected: inset 0 0 0 1px var(--color-accent);
+
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.5rem;
+    --space-6: 2rem;
+    --space-7: 2.5rem;
+    --space-8: 3rem;
+
+    --radius-small: 0.25rem;
+    --radius-medium: 0.5rem;
+    --radius-large: 0.75rem;
+    --radius-pill: 999px;
+
+    --text-caption: 0.75rem;
+    --text-small: 0.8125rem;
+    --text-body: 0.9375rem;
+    --text-title: 1.25rem;
+    --text-display: 1.5rem;
+
+    --motion-fast: 150ms ease;
+    --motion-slow: 300ms ease;
+
+    --sidebar-width: 15rem;
+    --font-stack: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+    --focus-ring: 2px solid var(--color-accent);
+    --focus-offset: 2px;
+    --focus-ring-inverted: 2px solid var(--color-sidebar-text-strong);
+
+    --scrollbar-size: 8px;
+    --scrollbar-track: var(--grey-200);
+    --scrollbar-thumb: var(--grey-300);
+    --scrollbar-thumb-hover: var(--grey-500);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 html,
@@ -56,6 +269,40 @@ body {
   font-size: var(--text-body);
 }
 
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  text-wrap: balance;
+}
+
 #app {
   min-block-size: 100vh;
+}
+
+* {
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: var(--radius-medium);
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-medium);
+  background: var(--scrollbar-thumb);
+  transition: background var(--motion-fast);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
 }

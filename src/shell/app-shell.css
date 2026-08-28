@@ -134,6 +134,7 @@
   cursor: pointer;
   font: inherit;
   font-weight: 600;
+  transition: background var(--motion-fast), color var(--motion-fast);
 }
 
 .app-shell__tab:hover {

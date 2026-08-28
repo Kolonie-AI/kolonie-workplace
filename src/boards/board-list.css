@@ -63,6 +63,7 @@
   cursor: pointer;
   font: inherit;
   text-align: start;
+  transition: background var(--motion-fast), color var(--motion-fast);
 }
 
 .board-list__board:hover {
