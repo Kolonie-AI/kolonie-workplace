@@ -149,7 +149,7 @@ Every path maps to one package issue or an explicit “unchanged/deferred”.
 | Composer | `src/kanban/LaneComposer.vue` — open/close, Enter/Escape, single-line input, label `Add card` | Restyle to Trello inline composer (textarea + Add card + cancel) | #75 |
 | Detail | `src/detail/DetailPane.vue` (~789 lines) stacked fields | Trello two-region card-back modal; Labels / Dates / Members popovers | #77 |
 | Checklists | Gateway verbs exist; card face shows `done/total`; detail has no checklist editor | One unnamed checklist section on the card back | #78 |
-| Activity | Gateway comment verbs exist; counts on the face | “Write a comment…” region on the card back | #79 |
+| Activity | “Comments and activity” on the card back: composer at the bottom, newest-last thread, edit/delete own comment, face count | Attachments and covers | #80 |
 | Attachments / covers | Gateway attachment verbs exist; colour stripe on the face; `coverColour` on the summary | Fixture-memory attachments; cover from image or colour, exclusive | #80 |
 | Tokens / shell | `src/styles/tokens.css`, `src/shell/*` — dark sidebar, current colour story | Trello board canvas / list well / white cards. List view stays as a secondary view and is not Trello-restyled in #75 | #75 (board canvas); list view unchanged |
 | Filter | `src/items/board-filter.ts` — URL `lane` / `owner` / `q` | Trello filter popover; keep URL encoding; add label + due | #82 |

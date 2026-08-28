@@ -8,6 +8,7 @@ import { computed, nextTick, onMounted, ref, useId, useTemplateRef, watch } from
 import { WORKPLACE_LANE_LABELS } from '@/domain/lanes'
 import type {
   ChecklistItemId,
+  CommentId,
   UpdateChecklistItemInput,
   UpdateWorkItemInput,
   WorkItemAssignee,
@@ -15,6 +16,7 @@ import type {
   WorkItemLabel,
 } from '@/domain/workplace'
 import type { ItemDetailStatus } from '@/detail/use-item-detail'
+import ActivitySection from '@/detail/ActivitySection.vue'
 import ChecklistSection from '@/detail/ChecklistSection.vue'
 import { renderHandover } from '@/detail/handover-parts'
 import { sanitizeDescription } from '@/detail/sanitize-description'
@@ -35,6 +37,7 @@ const props = defineProps<{
   availableLabels: readonly WorkItemLabel[]
   availableAssignees: readonly WorkItemAssignee[]
   now: Date
+  currentHumanName: string | null
 }>()
 
 const emit = defineEmits<{
@@ -45,6 +48,9 @@ const emit = defineEmits<{
   reorderChecklistItem: [checklistItemId: ChecklistItemId, position: number]
   deleteChecklistItem: [checklistItemId: ChecklistItemId]
   deleteChecklist: []
+  createComment: [body: string]
+  updateComment: [commentId: CommentId, body: string]
+  deleteComment: [commentId: CommentId]
 }>()
 
 type RailPopover = 'labels' | 'members' | 'dates' | 'priority' | null
@@ -598,14 +604,14 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
               </h3>
             </section>
 
-            <section
-              class="detail-pane__section"
-              aria-label="Activity"
-            >
-              <h3 class="detail-pane__section-title">
-                Activity
-              </h3>
-            </section>
+            <ActivitySection
+              :comments="item.comments"
+              :current-human-name="currentHumanName"
+              :now="now"
+              @create="emit('createComment', $event)"
+              @update="(id, body) => emit('updateComment', id, body)"
+              @remove="emit('deleteComment', $event)"
+            />
 
             <dl class="detail-pane__facts">
               <div class="detail-pane__fact">

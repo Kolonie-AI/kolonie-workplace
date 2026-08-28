@@ -596,3 +596,125 @@
   outline: var(--focus-ring);
   outline-offset: var(--focus-offset);
 }
+
+.detail-activity__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.detail-activity__item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2);
+}
+
+.detail-activity__avatar {
+  display: grid;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  font-size: var(--text-small);
+  font-weight: 700;
+}
+
+.detail-activity__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.detail-activity__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.detail-activity__author {
+  font-size: var(--text-small);
+  font-weight: 700;
+}
+
+.detail-activity__time {
+  color: var(--color-text-muted);
+  font-size: var(--text-small);
+}
+
+.detail-activity__markup :where(p, ul, ol, pre) {
+  margin: 0 0 var(--space-2);
+}
+
+.detail-activity__markup :where(p:last-child, ul:last-child, ol:last-child, pre:last-child) {
+  margin: 0;
+}
+
+.detail-activity__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.detail-activity__compose {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.detail-activity__composer {
+  min-block-size: 4.5rem;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  resize: vertical;
+}
+
+.detail-activity__composer:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.detail-activity__submit:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.detail-activity__cancel:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.detail-activity__edit:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.detail-activity__delete:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.detail-activity__submit,
+.detail-activity__cancel,
+.detail-activity__edit,
+.detail-activity__delete {
+  min-block-size: 2rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-small);
+}

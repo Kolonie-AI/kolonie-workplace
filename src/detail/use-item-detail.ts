@@ -1,6 +1,7 @@
 import { ref, watch, type Ref } from 'vue'
 import type {
   ChecklistItemId,
+  CommentId,
   HumanId,
   UpdateChecklistItemInput,
   UpdateWorkItemInput,
@@ -42,6 +43,9 @@ export interface ItemDetail {
     position: number,
   ): Promise<WorkItemDetail | null>
   deleteChecklistItem(checklistItemId: ChecklistItemId): Promise<WorkItemDetail | null>
+  createComment(author: string, body: string): Promise<WorkItemDetail | null>
+  updateComment(commentId: CommentId, body: string): Promise<WorkItemDetail | null>
+  deleteComment(commentId: CommentId): Promise<WorkItemDetail | null>
 }
 
 export function useItemDetail(
@@ -206,6 +210,47 @@ export function useItemDetail(
     )
   }
 
+  async function createComment(author: string, body: string): Promise<WorkItemDetail | null> {
+    const currentHumanId = humanId.value
+    const current = item.value
+    const trimmed = body.trim()
+
+    if (currentHumanId === null || current === null || author.trim() === '' || trimmed === '') {
+      return null
+    }
+
+    return writeDetail(current, currentHumanId, () =>
+      gateway.createComment(currentHumanId, current.id, { author, body: trimmed }),
+    )
+  }
+
+  async function updateComment(commentId: CommentId, body: string): Promise<WorkItemDetail | null> {
+    const currentHumanId = humanId.value
+    const current = item.value
+    const trimmed = body.trim()
+
+    if (currentHumanId === null || current === null || trimmed === '') {
+      return null
+    }
+
+    return writeDetail(current, currentHumanId, () =>
+      gateway.updateComment(currentHumanId, current.id, commentId, trimmed),
+    )
+  }
+
+  async function deleteComment(commentId: CommentId): Promise<WorkItemDetail | null> {
+    const currentHumanId = humanId.value
+    const current = item.value
+
+    if (currentHumanId === null || current === null) {
+      return null
+    }
+
+    return writeDetail(current, currentHumanId, () =>
+      gateway.deleteComment(currentHumanId, current.id, commentId),
+    )
+  }
+
   return {
     status,
     item,
@@ -215,5 +260,8 @@ export function useItemDetail(
     updateChecklistItem,
     reorderChecklistItem,
     deleteChecklistItem,
+    createComment,
+    updateComment,
+    deleteComment,
   }
 }
