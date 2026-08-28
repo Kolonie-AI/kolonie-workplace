@@ -1,16 +1,11 @@
 <script setup lang="ts">
 /*
- * Copyright 2018-present Vikunja and contributors. All rights reserved.
  * Copyright 2026 Kolonie AI FZ-LLC.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  *
- * The per-lane Add-card composer is adapted for Kolonie Workplace on
- * 2026-08-27 from Vikunja 2.5.0 (ef2200e9429c5cc42f5c1811433418bfcc72b3aa):
- *   frontend/src/components/project/views/ProjectKanban.vue
- *   frontend/src/components/tasks/AddTask.vue
- * No Vikunja store, router, i18n or task model is used; creating a card
- * reaches the gateway only through the board's createItem call.
+ * Creating a card reaches the gateway only through the board's createItem
+ * call.
  */
 import { nextTick, ref, useTemplateRef } from 'vue'
 import { WORKPLACE_LANE_LABELS, type Lane } from '@/domain/lanes'

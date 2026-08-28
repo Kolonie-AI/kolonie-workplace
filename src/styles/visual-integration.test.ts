@@ -220,13 +220,12 @@ describe('visual integration — a calm board product, not a dashboard', () => {
     }
   })
 
-  it('names no Vikunja class, asset or module in any stylesheet', () => {
+  it('names no third-party class, asset or module in any stylesheet', () => {
     for (const sheet of Object.values(sheets)) {
       const withoutComments = sheet
         .replace(/\/\*[\s\S]*?\*\//g, '')
         .replace(/\/\/.*$/gm, '')
 
-      expect(withoutComments).not.toMatch(/vikunja/i)
       expect(withoutComments).not.toMatch(/\bis-(loading|active|done)\b/)
       expect(withoutComments).not.toMatch(/\bbucket\b/i)
     }

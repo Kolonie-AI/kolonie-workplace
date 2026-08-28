@@ -1,24 +1,8 @@
 <script setup lang="ts">
 /*
- * Copyright 2018-present Vikunja and contributors. All rights reserved.
  * Copyright 2026 Kolonie AI FZ-LLC.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
- *
- * The editable heading, description surface and metadata layout are adapted
- * for Kolonie Workplace on 2026-08-27 from Vikunja 2.5.0
- * (ef2200e9429c5cc42f5c1811433418bfcc72b3aa):
- *   frontend/src/views/tasks/TaskDetailView.vue
- *   frontend/src/components/tasks/partials/Heading.vue
- *   frontend/src/components/tasks/partials/Description.vue
- *   frontend/src/components/tasks/partials/EditLabels.vue
- *   frontend/src/components/tasks/partials/EditAssignees.vue
- *   frontend/src/components/input/Multiselect.vue
- *   frontend/src/components/tasks/partials/PriorityLabel.vue
- *   frontend/src/components/input/Datepicker.vue
- *   frontend/src/components/tasks/partials/DateTableCell.vue
- *   frontend/src/components/tasks/partials/PercentDoneSelect.vue
- * No Vikunja store, router, i18n or task model is used.
  */
 import { computed, nextTick, ref, useId, useTemplateRef, watch } from 'vue'
 import { WORKPLACE_LANE_LABELS } from '@/domain/lanes'

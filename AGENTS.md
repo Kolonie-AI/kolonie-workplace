@@ -17,8 +17,9 @@ actions belong in [`kolonie-platform`](https://github.com/Kolonie-AI/kolonie-pla
 Read `README.md` in this repository before writing code. It states the product
 boundary and the UI-first sequence.
 
-`README.md` and this file agree on the Vikunja question as of 2026-08-27; §5
-is the binding statement, and `README.md` states the same rule in prose.
+`README.md` and this file agree on the visual and lifecycle references as of
+2026-08-28; §5 is the binding statement, and `README.md` states the same
+rule in prose.
 
 ## 2. Where the work is
 
@@ -66,15 +67,8 @@ The writing standard is
   different domains. Platform schema work belongs in `kolonie-platform`.
 - **No secrets, credentials, host names or IP addresses** in any file,
   including tests and comments.
-- **Vikunja source may be imported or adapted, with attribution** — see §5.
-  This repository is AGPL-3.0-or-later and so is Vikunja, so reuse is a
-  licence-compatible engineering choice rather than a prohibited one. Three
-  duties come with it and none of them are optional: an imported or adapted
-  file keeps its upstream copyright and licence header intact; `NOTICE` names
-  the pinned upstream release and commit together with every imported or
-  derived path; and the issue that asks for the import names the source paths
-  it expects, so a reviewer can tell reuse from an unreviewed fork. Importing
-  a whole third-party frontend tree still needs the maintainer (§4).
+- **Vikunja reuse is forbidden.** Vikunja is a rejected former reference.
+  Do not import, copy or adapt its source, CSS, icons or assets. See §5.
 - **English** in repository prose, issues, comments and commit messages.
 
 ## 4. Integration
@@ -117,34 +111,16 @@ and state machines live in
 Trello research account is Vault key `trello/colette-reprise` and nothing
 more about that account belongs in git.
 
-**Selective Vikunja reuse is permitted, and a blind fork is not.** Gregor
-Sprint and Colette Reprise decided this on 2026-08-27, reversing the blanket
-import ban that stood before it. The reversal rests on a fact worth stating
-plainly rather than re-deriving: `LICENSE` and `NOTICE` already make this
-application **AGPL-3.0-or-later**, and Vikunja is AGPL-3.0-or-later too. The
-earlier rule read as if importing would impose a new obligation on otherwise
-unencumbered code. It would not. The obligation is attribution, and this
-repository already lives under the licence that obligation belongs to.
-
-So a worker may clone Vikunja, run the reference instance, read its source
-directly, and **copy or adapt a component, stylesheet, icon or asset** when
-that is cheaper and clearer than rebuilding it. Doing so carries the three
-duties in §3, and they are what makes the reuse honest: upstream headers stay
-intact, `NOTICE` records the pinned release, commit and every affected path,
-and the issue names the source paths it expects to be read.
-
-**The 2026-08-25 measurement still stands, and it is now a warning rather than
-a ban.** Vikunja's Kanban, list and detail components import Pinia stores, HTTP
-services, `vue-router`, `vue-i18n` and a 35-field `ITask`. That is why a
-wholesale copy of the tree is the wrong shape: it drags an architecture across
-the `TaskGateway` seam this repository exists to keep. Take the surface, leave
-the store. Where a file cannot be separated from Vikunja's data model, adapt it
-against Colony types instead of importing the model with it.
-
-Three things this decision does **not** change. The Colony domain does not come
-from Vikunja's `ITask`. Canonical work state stays in `kolonie-platform`. And
+**Vikunja reuse is forbidden.** Vikunja is a rejected former reference. A
+2026-08-27 permission to copy or adapt its source (#47) was withdrawn on
+2026-08-28 (#74). Do not import Vikunja source, CSS, icons or assets. Do
+not list Vikunja paths in `NOTICE`. The Colony domain does not come from
+an upstream task model. Canonical work state stays in `kolonie-platform`.
 `TaskGateway` remains the only seam through which board data reaches a
-component, whatever the origin of that component.
+component.
+
+This repository is AGPL-3.0-or-later because the workplace is a
+network-facing Colony application, not because of any third-party frontend.
 
 The decision record is
 [`human-workplace-form.md`](https://github.com/Kolonie-AI/kolonie-concept-lab/blob/main/concepts/human-workplace-form.md)

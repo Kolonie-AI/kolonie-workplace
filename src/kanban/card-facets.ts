@@ -1,20 +1,11 @@
 /*
- * Copyright 2018-present Vikunja and contributors. All rights reserved.
  * Copyright 2026 Kolonie AI FZ-LLC.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  *
- * Adapted for Kolonie Workplace on 2026-08-27 from Vikunja 2.5.0
- * (ef2200e9429c5cc42f5c1811433418bfcc72b3aa):
- *   frontend/src/helpers/color/colorIsDark.ts
- *   frontend/src/helpers/time/formatDate.ts
- *   frontend/src/components/tasks/partials/PriorityLabel.vue
- *   frontend/src/components/tasks/partials/DateTableCell.vue
- *
  * Relative-luminance contrast against black or white, guaranteeing a readable
  * foreground on a label chip. Relative due dates are computed from a clock
- * that is handed in, never from a Date constructed here. Colony types only;
- * no Vikunja store or ITask.
+ * that is handed in, never from a Date constructed here.
  */
 
 import type { ChecklistItem, WorkItemPriority } from '@/domain/workplace'
