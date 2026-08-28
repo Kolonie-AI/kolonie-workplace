@@ -9,6 +9,17 @@ function item(overrides: Partial<WorkItemSummary> & { id: string }): WorkItemSum
     title: `Title for ${overrides.id}`,
     lane: 'inbox',
     owner: 'Fictional Owner',
+    description: '',
+    labels: [],
+    assignees: [],
+    priority: 'unset',
+    dueDate: null,
+    percentDone: 0,
+    checklist: [],
+    comments: [],
+    attachments: [],
+    coverColour: null,
+    position: 0,
     ...overrides,
   }
 }

@@ -1,4 +1,10 @@
-import type { Agent, Board, Human, WorkItemDetail } from '@/domain/workplace'
+import type {
+  Agent,
+  Board,
+  Human,
+  WorkItemDetail,
+  WorkItemLabel,
+} from '@/domain/workplace'
 
 export const FIXTURE_HUMANS = {
   wren: 'fictional-human-wren',
@@ -109,6 +115,42 @@ export const FIXTURE_ITEMS = {
   done: 'fictional-item-done',
 } as const
 
+export const FIXTURE_LABELS = {
+  intake: {
+    id: 'fictional-label-intake',
+    title: 'Intake',
+    colour: '#1973ff',
+  },
+  delivery: {
+    id: 'fictional-label-delivery',
+    title: 'Delivery',
+    colour: '#00db60',
+  },
+  operator: {
+    id: 'fictional-label-operator',
+    title: 'Operator',
+    colour: '#ff4136',
+  },
+  research: {
+    id: 'fictional-label-research',
+    title: 'Research',
+    colour: '#8338ec',
+  },
+} as const satisfies Record<string, WorkItemLabel>
+
+const emptyBoardFields = {
+  description: '',
+  labels: [] as const,
+  assignees: [] as const,
+  priority: 'unset' as const,
+  dueDate: null,
+  percentDone: 0,
+  checklist: [] as const,
+  comments: [] as const,
+  attachments: [] as const,
+  coverColour: null,
+}
+
 export const fixtureWorkItems: readonly WorkItemDetail[] = [
   {
     id: FIXTURE_ITEMS.inbox,
@@ -116,6 +158,11 @@ export const fixtureWorkItems: readonly WorkItemDetail[] = [
     title: 'Triage the fictional intake note',
     lane: 'inbox',
     owner: 'Fictional Agent Quill',
+    ...emptyBoardFields,
+    labels: [FIXTURE_LABELS.intake],
+    assignees: [{ id: FIXTURE_HUMANS.wren, name: 'Fictional Human Wren' }],
+    priority: 'low',
+    position: 0,
     externalReferences: [],
   },
   {
@@ -124,6 +171,12 @@ export const fixtureWorkItems: readonly WorkItemDetail[] = [
     title: 'Draft the fictional delivery outline',
     lane: 'ready',
     owner: 'Fictional Agent Quill',
+    ...emptyBoardFields,
+    description: '<p>Outline the fictional delivery in three sections.</p>',
+    labels: [FIXTURE_LABELS.delivery],
+    priority: 'medium',
+    dueDate: '2026-09-04',
+    position: 0,
     externalReferences: [],
   },
   {
@@ -132,6 +185,49 @@ export const fixtureWorkItems: readonly WorkItemDetail[] = [
     title: 'Write the fictional delivery outline',
     lane: 'in_progress',
     owner: 'Fictional Agent Quill',
+    ...emptyBoardFields,
+    description: '<p>Write the fictional delivery from the outline.</p>',
+    labels: [FIXTURE_LABELS.delivery, FIXTURE_LABELS.research],
+    assignees: [
+      { id: FIXTURE_HUMANS.wren, name: 'Fictional Human Wren' },
+      { id: 'fictional-human-ember', name: 'Fictional Operator Ember' },
+    ],
+    priority: 'high',
+    dueDate: '2026-08-30',
+    percentDone: 40,
+    checklist: [
+      {
+        id: 'fictional-check-outline',
+        title: 'Draft fictional introduction',
+        done: true,
+        position: 0,
+      },
+      {
+        id: 'fictional-check-body',
+        title: 'Write fictional body',
+        done: false,
+        position: 1,
+      },
+    ],
+    comments: [
+      {
+        id: 'fictional-comment-start',
+        author: 'Fictional Human Wren',
+        body: '<p>Started the fictional body this morning.</p>',
+        createdAt: '2026-08-26T09:00:00.000Z',
+        updatedAt: '2026-08-26T09:00:00.000Z',
+      },
+    ],
+    attachments: [
+      {
+        id: 'fictional-attachment-notes',
+        name: 'fictional-outline.txt',
+        size: 128,
+        mimeType: 'text/plain',
+      },
+    ],
+    coverColour: '#1973ff',
+    position: 0,
     externalReferences: [],
   },
   {
@@ -140,6 +236,12 @@ export const fixtureWorkItems: readonly WorkItemDetail[] = [
     title: 'Confirm the fictional delivery window',
     lane: 'blocked',
     owner: 'Fictional Agent Quill',
+    ...emptyBoardFields,
+    labels: [FIXTURE_LABELS.operator],
+    assignees: [{ id: 'fictional-human-ember', name: 'Fictional Operator Ember' }],
+    priority: 'urgent',
+    dueDate: '2026-08-20',
+    position: 0,
     blocker: {
       actor: 'Fictional Operator Ember',
       smallestUnblock: 'Choose one of the fictional delivery windows',
@@ -152,6 +254,23 @@ export const fixtureWorkItems: readonly WorkItemDetail[] = [
     title: 'Review the fictional catalogue summary',
     lane: 'review',
     owner: 'Fictional Agent Quill',
+    ...emptyBoardFields,
+    description: '<p>Review the typed summaries against the fictional catalogue.</p>',
+    labels: [FIXTURE_LABELS.research],
+    assignees: [{ id: FIXTURE_HUMANS.wren, name: 'Fictional Human Wren' }],
+    priority: 'medium',
+    dueDate: '2026-09-10',
+    percentDone: 80,
+    comments: [
+      {
+        id: 'fictional-comment-review',
+        author: 'Fictional Operator Ember',
+        body: '<p>The fictional summaries look complete.</p>',
+        createdAt: '2026-08-25T16:00:00.000Z',
+        updatedAt: '2026-08-25T16:00:00.000Z',
+      },
+    ],
+    position: 0,
     handover: {
       done: 'Prepared the fictional catalogue for review',
       learned: 'The narrow fixture path is sufficient',
@@ -172,6 +291,11 @@ export const fixtureWorkItems: readonly WorkItemDetail[] = [
     title: 'Archive the fictional intake note',
     lane: 'done',
     owner: 'Fictional Agent Quill',
+    ...emptyBoardFields,
+    labels: [FIXTURE_LABELS.intake],
+    priority: 'low',
+    percentDone: 100,
+    position: 0,
     externalReferences: [],
   },
   {
@@ -180,6 +304,12 @@ export const fixtureWorkItems: readonly WorkItemDetail[] = [
     title: 'Prepare the fictional outreach list',
     lane: 'ready',
     owner: 'Fictional Agent Marlow',
+    ...emptyBoardFields,
+    labels: [FIXTURE_LABELS.operator],
+    assignees: [{ id: FIXTURE_HUMANS.ash, name: 'Fictional Human Ash' }],
+    priority: 'do_now',
+    dueDate: '2026-08-28',
+    position: 0,
     externalReferences: [],
   },
 ]

@@ -117,6 +117,19 @@ describe('board filtering — one filter, both views', () => {
       ] as WorkItemSummary[]),
       getItemDetail: vi.fn(),
       moveItemToLane: vi.fn(),
+      createWorkItem: vi.fn(),
+      updateWorkItem: vi.fn(),
+      deleteWorkItem: vi.fn(),
+      reorderWorkItem: vi.fn(),
+      createComment: vi.fn(),
+      updateComment: vi.fn(),
+      deleteComment: vi.fn(),
+      addAttachment: vi.fn(),
+      deleteAttachment: vi.fn(),
+      createChecklistItem: vi.fn(),
+      updateChecklistItem: vi.fn(),
+      reorderChecklistItem: vi.fn(),
+      deleteChecklistItem: vi.fn(),
     }
 
     await renderShell(FIXTURE_HUMANS.wren, 'board-shared', {}, gateway)
@@ -278,6 +291,19 @@ describe('board filtering — no match is its own state', () => {
         .mockRejectedValue(new Error('Kolonie Workplace: the board items could not be read.')),
       getItemDetail: vi.fn(),
       moveItemToLane: vi.fn(),
+      createWorkItem: vi.fn(),
+      updateWorkItem: vi.fn(),
+      deleteWorkItem: vi.fn(),
+      reorderWorkItem: vi.fn(),
+      createComment: vi.fn(),
+      updateComment: vi.fn(),
+      deleteComment: vi.fn(),
+      addAttachment: vi.fn(),
+      deleteAttachment: vi.fn(),
+      createChecklistItem: vi.fn(),
+      updateChecklistItem: vi.fn(),
+      reorderChecklistItem: vi.fn(),
+      deleteChecklistItem: vi.fn(),
     }
 
     await renderShell(FIXTURE_HUMANS.wren, 'board-mine', {}, gateway)

@@ -122,6 +122,19 @@ describe('SessionGate — rejection: no session at all', () => {
       getBoardItems: vi.fn(),
       getItemDetail: vi.fn(),
       moveItemToLane: vi.fn(),
+      createWorkItem: vi.fn(),
+      updateWorkItem: vi.fn(),
+      deleteWorkItem: vi.fn(),
+      reorderWorkItem: vi.fn(),
+      createComment: vi.fn(),
+      updateComment: vi.fn(),
+      deleteComment: vi.fn(),
+      addAttachment: vi.fn(),
+      deleteAttachment: vi.fn(),
+      createChecklistItem: vi.fn(),
+      updateChecklistItem: vi.fn(),
+      reorderChecklistItem: vi.fn(),
+      deleteChecklistItem: vi.fn(),
     }
 
     render(SessionGate, {

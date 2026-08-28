@@ -233,6 +233,19 @@ describe('view parity — rejection: an item the human may not see appears in ne
       ] as WorkItemSummary[]),
       getItemDetail: vi.fn(),
       moveItemToLane: vi.fn(),
+      createWorkItem: vi.fn(),
+      updateWorkItem: vi.fn(),
+      deleteWorkItem: vi.fn(),
+      reorderWorkItem: vi.fn(),
+      createComment: vi.fn(),
+      updateComment: vi.fn(),
+      deleteComment: vi.fn(),
+      addAttachment: vi.fn(),
+      deleteAttachment: vi.fn(),
+      createChecklistItem: vi.fn(),
+      updateChecklistItem: vi.fn(),
+      reorderChecklistItem: vi.fn(),
+      deleteChecklistItem: vi.fn(),
     }
 
     await renderShell(FIXTURE_HUMANS.wren, 'board-mine', gateway)
@@ -276,6 +289,19 @@ describe('view parity — rejection: an item the human may not see appears in ne
       ] as unknown as WorkItemSummary[]),
       getItemDetail: vi.fn(),
       moveItemToLane: vi.fn(),
+      createWorkItem: vi.fn(),
+      updateWorkItem: vi.fn(),
+      deleteWorkItem: vi.fn(),
+      reorderWorkItem: vi.fn(),
+      createComment: vi.fn(),
+      updateComment: vi.fn(),
+      deleteComment: vi.fn(),
+      addAttachment: vi.fn(),
+      deleteAttachment: vi.fn(),
+      createChecklistItem: vi.fn(),
+      updateChecklistItem: vi.fn(),
+      reorderChecklistItem: vi.fn(),
+      deleteChecklistItem: vi.fn(),
     }
 
     await renderShell(FIXTURE_HUMANS.wren, 'board-mine', gateway)
