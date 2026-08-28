@@ -33,6 +33,8 @@ describe('workplace design tokens', () => {
     for (const token of [
       '--color-accent',
       '--color-canvas',
+      '--color-list-well',
+      '--lane-width',
       '--space-1',
       '--space-8',
       '--radius-small',

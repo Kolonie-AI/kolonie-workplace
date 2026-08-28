@@ -22,6 +22,9 @@ const board = withoutComments(
 const card = withoutComments(
   readFileSync(resolve(root, 'src/kanban/KanbanCard.vue'), 'utf8'),
 )
+const composer = withoutComments(
+  readFileSync(resolve(root, 'src/kanban/LaneComposer.vue'), 'utf8'),
+)
 const styles = withoutComments(
   readFileSync(resolve(root, 'src/kanban/kanban-board.css'), 'utf8'),
 )
@@ -91,6 +94,22 @@ describe('kanban source — original Colony code', () => {
     expect(board).toMatch(/lane/i)
     expect(board).not.toMatch(/bucket/i)
   })
+
+  it('does not grow a seventh list or a list-create control', () => {
+    expect(board).not.toMatch(/add another list/i)
+    expect(board).not.toMatch(/kanban-add-list/)
+    expect(composer).not.toMatch(/add another list/i)
+  })
+})
+
+describe('kanban source — Trello inline add-card composer', () => {
+  it('opens a textarea with Add card and cancel, labelled Add a card when collapsed', () => {
+    expect(composer).toMatch(/<textarea\b/)
+    expect(composer).toMatch(/Add a card/)
+    expect(composer).toMatch(/>\s*Add card\s*</)
+    expect(composer).toMatch(/Cancel adding a card/)
+    expect(composer).not.toMatch(/<input\b/)
+  })
 })
 
 describe('kanban styles', () => {
@@ -103,5 +122,29 @@ describe('kanban styles', () => {
   it('lays the six lanes out as scrollable columns', () => {
     expect(styles).toMatch(/\.kanban__lanes\s*\{[^}]*grid-auto-flow:\s*column/s)
     expect(styles).toMatch(/\.kanban__lanes\s*\{[^}]*overflow-x:\s*auto/s)
+  })
+
+  it('gives each list a fixed well width rather than stretching six equal columns', () => {
+    expect(styles).toMatch(/\.kanban__lanes\s*\{[^}]*grid-auto-columns:\s*var\(--lane-width\)/s)
+    expect(styles).not.toMatch(/minmax\(\s*13rem\s*,\s*1fr\s*\)/)
+  })
+
+  it('paints the list well, the board canvas and the card as three distinct tones', () => {
+    expect(styles).toMatch(
+      /\.kanban__lane\s*\{[^}]*background:\s*var\(--color-list-well\)/s,
+    )
+    expect(styles).toMatch(
+      /\.kanban-card\s*\{[^}]*background:\s*var\(--color-surface\)/s,
+    )
+    expect(styles).not.toMatch(
+      /\.kanban__lane\s*\{[^}]*background:\s*var\(--color-canvas\)/s,
+    )
+    expect(styles).not.toMatch(
+      /\.kanban__lane\s*\{[^}]*background:\s*var\(--color-surface\)/s,
+    )
+  })
+
+  it('does not keep the standing drag-instruction chrome', () => {
+    expect(styles).not.toMatch(/kanban__move-hint/)
   })
 })

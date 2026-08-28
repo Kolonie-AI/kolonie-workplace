@@ -20,7 +20,9 @@ import '@/kanban/kanban-board.css'
  * A card moves between those fixed lanes by being dropped on a target lane, or
  * through the labelled keyboard control on the card. Within-lane order is not
  * modelled. Selecting a card still writes nothing. Creating a card is emitted
- * to the shell so TaskGateway remains the only write seam.
+ * to the shell so TaskGateway remains the only write seam. There is no list
+ * create control and no standing drag instruction: the six wells are the
+ * board.
  */
 defineProps<{
   status: BoardItemsStatus
@@ -141,15 +143,6 @@ function onCardMove(itemId: WorkItemId, lane: Lane): void {
         hiding it, so widening or clearing the filter brings it back.
       </p>
 
-      <p
-        v-if="!isBoardEmpty && !isFilterEmpty"
-        class="kanban__move-hint"
-        data-testid="kanban-move-hint"
-      >
-        Drag a card onto another lane, or choose a lane with Move to lane. Lanes
-        themselves cannot be added, renamed or removed.
-      </p>
-
       <div
         class="kanban__lanes"
         data-testid="kanban-lanes"
@@ -172,17 +165,16 @@ function onCardMove(itemId: WorkItemId, lane: Lane): void {
             >{{ column.items.length }}</span>
           </h3>
 
-          <p
+          <div
             v-if="column.items.length === 0"
             class="kanban__lane-empty"
             data-testid="kanban-lane-empty"
-          >
-            Nothing in this lane.
-          </p>
+          />
 
           <ul
             v-else
             class="kanban__cards"
+            data-testid="kanban-cards"
           >
             <li
               v-for="item in column.items"

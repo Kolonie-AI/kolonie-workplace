@@ -3,7 +3,7 @@
   min-block-size: 100vh;
   place-items: center;
   padding: var(--space-5);
-  background: var(--color-canvas);
+  background: var(--color-surface);
 }
 
 .session-signed-out__panel {

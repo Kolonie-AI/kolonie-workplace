@@ -49,6 +49,10 @@ describe('visual integration — a visible keyboard focus state on every control
     ['src/shell/app-shell.css', '.app-shell__sidebar-toggle'],
     ['src/shell/app-shell.css', '.app-shell__menu-button'],
     ['src/shell/app-shell.css', '.app-shell__search-button'],
+    ['src/kanban/kanban-board.css', '.lane-composer__add'],
+    ['src/kanban/kanban-board.css', '.lane-composer__submit'],
+    ['src/kanban/kanban-board.css', '.lane-composer__cancel'],
+    ['src/kanban/kanban-board.css', '.lane-composer__input'],
     ['src/session/session.css', '.session-signed-out__candidate'],
     ['src/session/session.css', '.session-human__sign-out'],
   ] as const
@@ -130,6 +134,19 @@ describe('visual integration — a failed board read does not look like a refusa
     expect(shell).not.toMatch(
       /\.app-shell__refusal\s*\{[^}]*var\(--color-blocked-soft\)/s,
     )
+  })
+})
+
+describe('visual integration — Trello board canvas, not a white card on a grey page', () => {
+  it('paints the board canvas from the canvas token rather than the card surface', () => {
+    expect(sheets['src/shell/app-shell.css']).toMatch(
+      /\.app-shell__canvas\s*\{[^}]*background:\s*var\(--color-canvas\)/s,
+    )
+  })
+
+  it('keeps list-view styles on the shared tokens and does not restyle them as Trello lists', () => {
+    expect(sheets['src/list/list-view.css']).not.toMatch(/--color-list-well/)
+    expect(sheets['src/list/list-view.css']).not.toMatch(/--lane-width/)
   })
 })
 

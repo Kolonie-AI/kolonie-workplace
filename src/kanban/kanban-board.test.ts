@@ -101,8 +101,18 @@ describe('kanban board — the six fixed Colony lanes', () => {
         .getAllByTestId('kanban-lane')
         .find((candidate) => candidate.getAttribute('data-lane') === lane)
 
-      expect(column?.textContent).toContain(WORKPLACE_LANE_LABELS[lane])
+      const heading = column?.querySelector('.kanban__lane-title')
+
+      expect(heading?.textContent).toContain(WORKPLACE_LANE_LABELS[lane])
     }
+
+    expect(
+      screen
+        .getAllByTestId('kanban-lane')
+        .map((column) =>
+          column.querySelector('.kanban__lane-title')?.firstElementChild?.textContent?.trim(),
+        ),
+    ).toEqual(['Inbox', 'Ready', 'In progress', 'Blocked', 'Review', 'Done'])
   })
 
   it('offers no way to add, rename, reorder or delete a lane', async () => {
@@ -123,6 +133,31 @@ describe('kanban board — the six fixed Colony lanes', () => {
     expect(screen.queryByRole('textbox')).toBeNull()
     expect(container.querySelectorAll('[draggable="true"]')).toHaveLength(6)
     expect(container.querySelector('[data-lane][draggable]')).toBeNull()
+  })
+
+  it('offers no Add another list control and no list menu that mutates a lane', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId('kanban-lane')).toHaveLength(6)
+    })
+
+    expect(screen.queryByRole('button', { name: /add (another )?list/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /rename|move list|copy list|archive list|delete list/i })).toBeNull()
+    expect(screen.queryByTestId('kanban-add-list')).toBeNull()
+  })
+
+  it('states no standing drag instruction on the board', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId('kanban-lane')).toHaveLength(6)
+    })
+
+    expect(screen.queryByTestId('kanban-move-hint')).toBeNull()
+    expect(screen.getByTestId('kanban-board').textContent).not.toMatch(
+      /drag a card onto another lane/i,
+    )
   })
 })
 
@@ -493,20 +528,157 @@ describe('kanban board — inline card composer', () => {
     return element
   }
 
-  it('offers one Add card button in every lane', async () => {
+  it('offers one collapsed Add a card control in every lane, naming its lane', async () => {
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
 
     await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: /add card to/i })).toHaveLength(6)
+      expect(screen.getAllByRole('button', { name: /^add a card in /i })).toHaveLength(6)
     })
+
+    for (const lane of WORKPLACE_LANES) {
+      const well = laneNamed(lane)
+      const collapsed = within(well).getByRole('button', {
+        name: `Add a card in ${WORKPLACE_LANE_LABELS[lane]}`,
+      })
+
+      expect(collapsed.textContent?.trim()).toBe('Add a card')
+    }
+  })
+
+  it('places the composer after the card stack', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    await screen.findAllByTestId('kanban-lane')
+
+    const ready = laneNamed('ready')
+    const cards = within(ready).getByTestId('kanban-cards')
+    const composer = within(ready).getByTestId('lane-composer')
+
+    expect(
+      cards.compareDocumentPosition(composer) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(composer.parentElement).toBe(ready)
+    expect(ready.lastElementChild).toBe(composer)
+  })
+
+  it('keeps the composer at the bottom of an empty well', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.birchResearch)
+    await screen.findAllByTestId('kanban-lane')
+
+    const inbox = laneNamed('inbox')
+    expect(within(inbox).getByTestId('lane-composer')).toBe(inbox.lastElementChild)
+
+    await fireEvent.click(
+      within(inbox).getByRole('button', { name: 'Add a card in Inbox' }),
+    )
+    expect(within(inbox).getByTestId('lane-composer')).toBe(inbox.lastElementChild)
+  })
+
+  it('opens a textarea with Add card and cancel controls', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    await screen.findAllByTestId('kanban-lane')
+    const ready = laneNamed('ready')
+
+    await fireEvent.click(
+      within(ready).getByRole('button', { name: 'Add a card in Ready' }),
+    )
+
+    const field = within(ready).getByRole('textbox', {
+      name: 'Enter a title or paste a link',
+    })
+    expect(field.tagName).toBe('TEXTAREA')
+    expect(document.activeElement).toBe(field)
+    expect(within(ready).getByRole('button', { name: 'Add card' })).toBeTruthy()
+    expect(within(ready).getByRole('button', { name: 'Cancel adding a card' })).toBeTruthy()
+    expect(
+      within(ready).queryByRole('button', { name: 'Add a card in Ready' }),
+    ).toBeNull()
+  })
+
+  it('creates through the gateway when the Add card button is pressed', async () => {
+    const gateway = createFixtureTaskGateway()
+    const create = vi.spyOn(gateway, 'createWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await screen.findAllByTestId('kanban-lane')
+    const done = laneNamed('done')
+    await fireEvent.click(
+      within(done).getByRole('button', { name: 'Add a card in Done' }),
+    )
+    const field = within(done).getByRole('textbox', {
+      name: 'Enter a title or paste a link',
+    })
+
+    await fireEvent.update(field, 'A card added with the button')
+    await fireEvent.click(within(done).getByRole('button', { name: 'Add card' }))
+
+    await waitFor(() => {
+      expect(within(done).getByText('A card added with the button')).toBeTruthy()
+    })
+    expect(create).toHaveBeenCalledTimes(1)
+    expect(create.mock.calls[0]?.[1]).toMatchObject({
+      lane: 'done',
+      title: 'A card added with the button',
+    })
+    expect((field as HTMLTextAreaElement).value).toBe('')
+  })
+
+  it('cancels without creating and returns focus to the collapsed control', async () => {
+    const gateway = createFixtureTaskGateway()
+    const create = vi.spyOn(gateway, 'createWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await screen.findAllByTestId('kanban-lane')
+    const inProgress = laneNamed('in_progress')
+    await fireEvent.click(
+      within(inProgress).getByRole('button', { name: 'Add a card in In progress' }),
+    )
+    await fireEvent.update(
+      within(inProgress).getByRole('textbox', { name: 'Enter a title or paste a link' }),
+      'A title that is discarded',
+    )
+
+    await fireEvent.click(
+      within(inProgress).getByRole('button', { name: 'Cancel adding a card' }),
+    )
+
+    expect(
+      within(inProgress).queryByRole('textbox', { name: 'Enter a title or paste a link' }),
+    ).toBeNull()
+    expect(create).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(document.activeElement).toBe(
+        within(inProgress).getByRole('button', { name: 'Add a card in In progress' }),
+      )
+    })
+  })
+
+  it('does not submit an empty or blank title', async () => {
+    const gateway = createFixtureTaskGateway()
+    const create = vi.spyOn(gateway, 'createWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await screen.findAllByTestId('kanban-lane')
+    const ready = laneNamed('ready')
+    await fireEvent.click(
+      within(ready).getByRole('button', { name: 'Add a card in Ready' }),
+    )
+    const field = within(ready).getByRole('textbox', {
+      name: 'Enter a title or paste a link',
+    })
+
+    await fireEvent.keyDown(field, { key: 'Enter' })
+    await fireEvent.update(field, '   ')
+    await fireEvent.click(within(ready).getByRole('button', { name: 'Add card' }))
+
+    expect(create).not.toHaveBeenCalled()
+    expect(
+      within(ready).getByRole('textbox', { name: 'Enter a title or paste a link' }),
+    ).toBe(field)
   })
 
   it('creates in the chosen lane, clears the input and keeps the composer open', async () => {
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
     await screen.findAllByTestId('kanban-lane')
     const ready = laneNamed('ready')
-    await fireEvent.click(within(ready).getByRole('button', { name: 'Add card to Ready' }))
-    const input = within(ready).getByRole('textbox', { name: 'Card title for Ready' })
+    await fireEvent.click(within(ready).getByRole('button', { name: 'Add a card in Ready' }))
+    const input = within(ready).getByRole('textbox', { name: 'Enter a title or paste a link' })
 
     await fireEvent.update(input, 'A card created from Ready')
     await fireEvent.keyDown(input, { key: 'Enter' })
@@ -514,25 +686,25 @@ describe('kanban board — inline card composer', () => {
     await waitFor(() => {
       expect(within(ready).getByText('A card created from Ready')).toBeTruthy()
     })
-    expect((input as HTMLInputElement).value).toBe('')
+    expect((input as HTMLTextAreaElement).value).toBe('')
     expect(document.activeElement).toBe(input)
-    expect(within(ready).getByRole('textbox', { name: 'Card title for Ready' })).toBe(input)
+    expect(within(ready).getByRole('textbox', { name: 'Enter a title or paste a link' })).toBe(input)
   })
 
-  it('closes on Escape and returns focus to the Add card button', async () => {
+  it('closes on Escape and returns focus to the Add a card button', async () => {
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
     await screen.findAllByTestId('kanban-lane')
     const blocked = laneNamed('blocked')
-    const add = within(blocked).getByRole('button', { name: 'Add card to Blocked' })
+    const add = within(blocked).getByRole('button', { name: 'Add a card in Blocked' })
     await fireEvent.click(add)
-    const input = within(blocked).getByRole('textbox', { name: 'Card title for Blocked' })
+    const input = within(blocked).getByRole('textbox', { name: 'Enter a title or paste a link' })
 
     await fireEvent.keyDown(input, { key: 'Escape' })
 
-    expect(within(blocked).queryByRole('textbox', { name: 'Card title for Blocked' })).toBeNull()
+    expect(within(blocked).queryByRole('textbox', { name: 'Enter a title or paste a link' })).toBeNull()
     await waitFor(() => {
       expect(document.activeElement).toBe(
-        within(blocked).getByRole('button', { name: 'Add card to Blocked' }),
+        within(blocked).getByRole('button', { name: 'Add a card in Blocked' }),
       )
     })
   })
@@ -543,11 +715,11 @@ describe('kanban board — inline card composer', () => {
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
     await screen.findAllByTestId('kanban-lane')
     const review = laneNamed('review')
-    await fireEvent.click(within(review).getByRole('button', { name: 'Add card to Review' }))
+    await fireEvent.click(within(review).getByRole('button', { name: 'Add a card in Review' }))
 
-    await fireEvent.blur(within(review).getByRole('textbox', { name: 'Card title for Review' }))
+    await fireEvent.blur(within(review).getByRole('textbox', { name: 'Enter a title or paste a link' }))
 
-    expect(within(review).queryByRole('textbox', { name: 'Card title for Review' })).toBeNull()
+    expect(within(review).queryByRole('textbox', { name: 'Enter a title or paste a link' })).toBeNull()
     expect(create).not.toHaveBeenCalled()
   })
 
@@ -560,8 +732,8 @@ describe('kanban board — inline card composer', () => {
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
     await screen.findAllByTestId('kanban-lane')
     const inbox = laneNamed('inbox')
-    await fireEvent.click(within(inbox).getByRole('button', { name: 'Add card to Inbox' }))
-    const input = within(inbox).getByRole('textbox', { name: 'Card title for Inbox' })
+    await fireEvent.click(within(inbox).getByRole('button', { name: 'Add a card in Inbox' }))
+    const input = within(inbox).getByRole('textbox', { name: 'Enter a title or paste a link' })
     await fireEvent.update(input, 'A card that will be rejected')
     await fireEvent.keyDown(input, { key: 'Enter' })
 

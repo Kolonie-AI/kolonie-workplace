@@ -191,7 +191,7 @@
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-medium);
-  background: var(--color-canvas);
+  background: var(--color-list-well);
   color: var(--color-text-muted);
   cursor: pointer;
   font: inherit;
@@ -341,7 +341,7 @@
   padding: var(--space-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-small);
-  background: var(--color-canvas);
+  background: var(--color-list-well);
   color: var(--color-text);
   font: inherit;
 }
@@ -372,10 +372,8 @@
 .app-shell__canvas {
   min-block-size: 24rem;
   min-inline-size: 0;
-  padding: var(--space-5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-large);
-  background: var(--color-surface);
+  padding: var(--space-4);
+  background: var(--color-canvas);
 }
 
 @media (max-width: 48rem) {
