@@ -219,3 +219,88 @@ describe('lane move — the move never leaves the session', () => {
     expect(moved?.lane).toBe('ready')
   })
 })
+
+function idsInLane(items: ReturnType<typeof useBoardItems>, lane: string): string[] {
+  return items.columns.value.find((column) => column.lane === lane)?.items.map((item) => item.id) ?? []
+}
+
+describe('lane reorder — within-list order persists', () => {
+  it('asks the gateway to reorder and keeps the new order after a re-read', async () => {
+    const gateway = createFixtureTaskGateway()
+    await gateway.createWorkItem(FIXTURE_HUMANS.wren, {
+      boardId: FIXTURE_BOARDS.quillDelivery,
+      title: 'Second fictional ready card',
+      lane: 'ready',
+    })
+    const spy = vi.spyOn(gateway, 'reorderWorkItem')
+    const activeBoardId = ref<BoardId | null>(FIXTURE_BOARDS.quillDelivery)
+    const items = useBoardItems(gateway, ref(FIXTURE_HUMANS.wren), activeBoardId)
+    await settled()
+
+    const before = idsInLane(items, 'ready')
+    expect(before).toHaveLength(2)
+    const first = before[0]
+    const second = before[1]
+    if (first === undefined || second === undefined) {
+      throw new Error('Kolonie Workplace: expected two ready cards.')
+    }
+
+    await items.reorderItem(first, 'ready', 1)
+    await settled()
+
+    expect(idsInLane(items, 'ready')).toEqual([second, first])
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy).toHaveBeenCalledWith(FIXTURE_HUMANS.wren, first, {
+      lane: 'ready',
+      position: 1,
+    })
+
+    activeBoardId.value = FIXTURE_BOARDS.birchResearch
+    await settled()
+    activeBoardId.value = FIXTURE_BOARDS.quillDelivery
+    await settled()
+
+    expect(idsInLane(items, 'ready')).toEqual([second, first])
+  })
+
+  it('does not call the gateway when the card is already at that position', async () => {
+    const gateway = createFixtureTaskGateway()
+    const spy = vi.spyOn(gateway, 'reorderWorkItem')
+    const items = boardItems(gateway)
+    await settled()
+
+    await items.reorderItem(FIXTURE_ITEMS.ready, 'ready', 0)
+    await settled()
+
+    expect(spy).not.toHaveBeenCalled()
+  })
+})
+
+describe('lane reorder — rejection: the gateway refuses', () => {
+  it('restores the previous order and reports the refusal', async () => {
+    const gateway = createFixtureTaskGateway()
+    await gateway.createWorkItem(FIXTURE_HUMANS.wren, {
+      boardId: FIXTURE_BOARDS.quillDelivery,
+      title: 'Second fictional ready card',
+      lane: 'ready',
+    })
+    vi.spyOn(gateway, 'reorderWorkItem').mockRejectedValue(
+      new WorkItemAccessRefused(FIXTURE_ITEMS.ready),
+    )
+    const items = boardItems(gateway)
+    await settled()
+
+    const before = idsInLane(items, 'ready')
+    const first = before[0]
+    if (first === undefined) {
+      throw new Error('Kolonie Workplace: expected a ready card.')
+    }
+
+    await items.reorderItem(first, 'ready', 1)
+    await settled()
+
+    expect(idsInLane(items, 'ready')).toEqual(before)
+    expect(items.moveError.value).toMatch(/not available to this human/i)
+    expect(items.movingItemId.value).toBeNull()
+  })
+})

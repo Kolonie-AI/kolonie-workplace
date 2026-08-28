@@ -49,15 +49,15 @@ describe('lane columns', () => {
     }
   })
 
-  it('keeps the order the gateway returned within a lane', () => {
+  it('orders items in a lane by position, not by the order they arrived', () => {
     const { columns } = partitionIntoLanes([
-      item({ id: 'second', lane: 'in_progress' }),
-      item({ id: 'first', lane: 'in_progress' }),
+      item({ id: 'second', lane: 'in_progress', position: 1 }),
+      item({ id: 'first', lane: 'in_progress', position: 0 }),
     ])
 
     const inProgress = columns.find((column) => column.lane === 'in_progress')
 
-    expect(inProgress?.items.map((entry) => entry.id)).toEqual(['second', 'first'])
+    expect(inProgress?.items.map((entry) => entry.id)).toEqual(['first', 'second'])
   })
 
   it('renders an empty lane as a column rather than dropping it', () => {

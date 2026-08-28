@@ -21,6 +21,7 @@ const props = defineProps<{
   item: WorkItemSummary
   selected: boolean
   moving: boolean
+  lifted?: boolean
   now: Date
 }>()
 
@@ -106,6 +107,7 @@ function onLaneChange(event: Event): void {
       :data-item-id="item.id"
       :data-blocked="isBlocked ? 'true' : 'false'"
       :data-selected="selected ? 'true' : 'false'"
+      :data-lifted="lifted ? 'true' : 'false'"
       :data-cover-colour="item.coverColour ?? undefined"
       :aria-pressed="selected"
       :aria-busy="moving"

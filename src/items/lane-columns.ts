@@ -48,7 +48,9 @@ export function partitionIntoLanes(items: readonly WorkItemSummary[]): LaneParti
   return {
     columns: WORKPLACE_LANES.map((lane) => ({
       lane,
-      items: collected.get(lane) ?? [],
+      items: (collected.get(lane) ?? [])
+        .slice()
+        .sort((left, right) => left.position - right.position),
     })),
     invalid,
   }

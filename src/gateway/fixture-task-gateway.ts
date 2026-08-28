@@ -100,6 +100,25 @@ function reindexChecklist(items: readonly ChecklistItem[]): ChecklistItem[] {
   return items.map((item, index) => ({ ...item, position: index }))
 }
 
+function reindexLane(
+  items: readonly WorkItemDetail[],
+  boardId: BoardId,
+  lane: Lane,
+): WorkItemDetail[] {
+  const positions = new Map(
+    items
+      .filter((item) => item.boardId === boardId && item.lane === lane)
+      .slice()
+      .sort((left, right) => left.position - right.position)
+      .map((item, index) => [item.id, index] as const),
+  )
+
+  return items.map((item) => {
+    const position = positions.get(item.id)
+    return position === undefined ? item : { ...item, position }
+  })
+}
+
 function isImageAttachment(attachment: WorkItemAttachment): boolean {
   return attachment.mimeType.startsWith('image/')
 }
@@ -196,7 +215,17 @@ export class FixtureTaskGateway implements TaskGateway {
 
   async moveItemToLane(humanId: HumanId, itemId: WorkItemId, lane: Lane): Promise<void> {
     const item = this.requireItem(humanId, itemId)
-    this.replace(item.id, { ...item, lane })
+
+    if (item.lane === lane) {
+      return
+    }
+
+    const originLane = item.lane
+    const destCount = this.items.filter(
+      (candidate) => candidate.boardId === item.boardId && candidate.lane === lane,
+    ).length
+    this.replace(item.id, { ...item, lane, position: destCount })
+    this.items = reindexLane(this.items, item.boardId, originLane)
   }
 
   async createWorkItem(
@@ -209,7 +238,9 @@ export class FixtureTaskGateway implements TaskGateway {
       throw new BoardAccessRefused(input.boardId)
     }
 
-    const boardItems = this.items.filter((item) => item.boardId === input.boardId)
+    const laneItems = this.items.filter(
+      (item) => item.boardId === input.boardId && item.lane === input.lane,
+    )
     const created: WorkItemDetail = {
       id: nextId('fictional-item-created', this.items.map((item) => item.id)),
       boardId: input.boardId,
@@ -228,7 +259,7 @@ export class FixtureTaskGateway implements TaskGateway {
       coverColour: null,
       coverImageUrl: null,
       coverAttachmentId: null,
-      position: input.position ?? boardItems.length,
+      position: input.position ?? laneItems.length,
       externalReferences: [],
     }
     this.items = [...this.items, created]
@@ -255,7 +286,34 @@ export class FixtureTaskGateway implements TaskGateway {
     input: ReorderWorkItemInput,
   ): Promise<WorkItemDetail> {
     const item = this.requireItem(humanId, itemId)
-    return this.replace(item.id, { ...item, lane: input.lane, position: input.position })
+    const originLane = item.lane
+    const siblings = this.items
+      .filter(
+        (candidate) =>
+          candidate.boardId === item.boardId &&
+          candidate.lane === input.lane &&
+          candidate.id !== item.id,
+      )
+      .slice()
+      .sort((left, right) => left.position - right.position)
+    const to = Math.max(0, Math.min(input.position, siblings.length))
+    const moved: WorkItemDetail = { ...item, lane: input.lane }
+    siblings.splice(to, 0, moved)
+    const positioned = new Map(
+      siblings.map((candidate, index) => [candidate.id, index] as const),
+    )
+    this.items = this.items.map((candidate) => {
+      const nextPosition = positioned.get(candidate.id)
+      if (nextPosition === undefined) {
+        return candidate
+      }
+
+      return { ...candidate, lane: input.lane, position: nextPosition }
+    })
+    if (originLane !== input.lane) {
+      this.items = reindexLane(this.items, item.boardId, originLane)
+    }
+    return cloneItem(this.requireItem(humanId, itemId))
   }
 
   async createComment(
