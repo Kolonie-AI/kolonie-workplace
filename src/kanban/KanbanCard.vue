@@ -16,6 +16,7 @@
  *   frontend/src/components/tasks/partials/PriorityLabel.vue
  *   frontend/src/components/tasks/partials/ChecklistSummary.vue
  *   frontend/src/components/tasks/partials/DateTableCell.vue
+ *   frontend/src/components/misc/ProgressBar.vue
  * No Vikunja store, router, i18n or task model is used; data reaches this
  * component only through TaskGateway.
  */
@@ -28,13 +29,14 @@ import {
   dueDateState,
   initialsOf,
   readableTextOn,
+  relativeDueDate,
 } from '@/kanban/card-facets'
 
 const props = defineProps<{
   item: WorkItemSummary
   selected: boolean
   moving: boolean
-  now?: Date
+  now: Date
 }>()
 
 const emit = defineEmits<{
@@ -44,17 +46,18 @@ const emit = defineEmits<{
 
 const isBlocked = computed(() => props.item.lane === 'blocked')
 const moveControlId = computed(() => `kanban-move-${props.item.id}`)
-const clock = computed(() => props.now ?? new Date())
 const labels = computed(() => props.item.labels ?? [])
 const assignees = computed(() => props.item.assignees ?? [])
 const checklist = computed(() => props.item.checklist ?? [])
 const comments = computed(() => props.item.comments ?? [])
 const attachments = computed(() => props.item.attachments ?? [])
-const dueState = computed(() => dueDateState(props.item.dueDate ?? null, clock.value))
+const dueState = computed(() => dueDateState(props.item.dueDate ?? null, props.now))
+const dueLabel = computed(() => relativeDueDate(props.item.dueDate ?? null, props.now))
 const progress = computed(() => checklistProgress(checklist.value))
 const showsPriority = computed(
   () => props.item.priority !== undefined && props.item.priority !== 'unset',
 )
+const showsPercentDone = computed(() => props.item.percentDone > 0)
 const showsCounts = computed(
   () => comments.value.length > 0 || attachments.value.length > 0,
 )
@@ -126,6 +129,15 @@ function onLaneChange(event: Event): void {
           data-testid="kanban-card-blocked"
         >Blocked</span>
       </span>
+      <progress
+        v-if="showsPercentDone"
+        class="kanban-card__progress"
+        data-testid="kanban-card-progress"
+        :value="item.percentDone"
+        max="100"
+      >
+        {{ item.percentDone }}%
+      </progress>
       <span
         v-if="assignees.length > 0 || showsPriority || dueState !== null || progress !== null || showsCounts"
         class="kanban-card__footer"
@@ -154,7 +166,7 @@ function onLaneChange(event: Event): void {
           data-testid="kanban-card-due"
           :data-due-state="dueState"
           :datetime="item.dueDate"
-        >{{ item.dueDate }}</time>
+        >{{ dueLabel }}</time>
         <span
           v-if="progress !== null"
           class="kanban-card__checklist"

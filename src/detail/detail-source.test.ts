@@ -34,6 +34,11 @@ describe('detail source — writes through the parent, never a gateway of its ow
   it('sanitises description markup before it is written', () => {
     expect(pane).toMatch(/sanitizeDescription/)
   })
+
+  it('judges due dates from the clock that is handed in, never from a Date it constructs', () => {
+    expect(pane).toMatch(/relativeDueDate/)
+    expect(pane).not.toMatch(/new Date\s*\(/)
+  })
 })
 
 describe('detail source — the detail is fetched, never taken from the board payload', () => {

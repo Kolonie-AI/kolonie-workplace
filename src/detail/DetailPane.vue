@@ -14,6 +14,10 @@
  *   frontend/src/components/tasks/partials/EditLabels.vue
  *   frontend/src/components/tasks/partials/EditAssignees.vue
  *   frontend/src/components/input/Multiselect.vue
+ *   frontend/src/components/tasks/partials/PriorityLabel.vue
+ *   frontend/src/components/input/Datepicker.vue
+ *   frontend/src/components/tasks/partials/DateTableCell.vue
+ *   frontend/src/components/tasks/partials/PercentDoneSelect.vue
  * No Vikunja store, router, i18n or task model is used.
  */
 import { computed, nextTick, ref, useId, useTemplateRef, watch } from 'vue'
@@ -27,7 +31,14 @@ import type {
 import type { ItemDetailStatus } from '@/detail/use-item-detail'
 import { renderHandover } from '@/detail/handover-parts'
 import { sanitizeDescription } from '@/detail/sanitize-description'
-import { readableTextOn, WORK_ITEM_PRIORITY_LABELS } from '@/kanban/card-facets'
+import {
+  dueDateState,
+  isWorkItemPriority,
+  readableTextOn,
+  relativeDueDate,
+  WORK_ITEM_PRIORITIES,
+  WORK_ITEM_PRIORITY_LABELS,
+} from '@/kanban/card-facets'
 import '@/detail/detail-pane.css'
 
 const props = defineProps<{
@@ -36,6 +47,7 @@ const props = defineProps<{
   updateError: string | null
   availableLabels: readonly WorkItemLabel[]
   availableAssignees: readonly WorkItemAssignee[]
+  now: Date
 }>()
 
 const emit = defineEmits<{
@@ -93,8 +105,11 @@ const activeAssigneeId = computed(() =>
 const laneLabel = computed(() =>
   props.item === null ? null : WORKPLACE_LANE_LABELS[props.item.lane],
 )
-const priorityLabel = computed(() =>
-  props.item === null ? null : WORK_ITEM_PRIORITY_LABELS[props.item.priority],
+const dueState = computed(() =>
+  props.item === null ? null : dueDateState(props.item.dueDate, props.now),
+)
+const dueRelative = computed(() =>
+  props.item === null ? null : relativeDueDate(props.item.dueDate, props.now),
 )
 const handoverParts = computed(() =>
   props.item?.handover === undefined ? null : renderHandover(props.item.handover),
@@ -266,6 +281,33 @@ function onLabelKeydown(event: KeyboardEvent): void {
     labelOpen.value = false
     labelActive.value = -1
   }
+}
+
+function onPriorityChange(event: Event): void {
+  const value = (event.target as HTMLSelectElement).value
+
+  if (isWorkItemPriority(value) && value !== props.item?.priority) {
+    emit('update', { priority: value })
+  }
+}
+
+function onDueDateChange(event: Event): void {
+  const value = (event.target as HTMLInputElement).value
+  const dueDate = value === '' ? null : value
+
+  if (dueDate !== props.item?.dueDate) {
+    emit('update', { dueDate })
+  }
+}
+
+function onPercentDoneChange(event: Event): void {
+  const percentDone = Number((event.target as HTMLInputElement).value)
+
+  if (!Number.isFinite(percentDone) || percentDone === props.item?.percentDone) {
+    return
+  }
+
+  emit('update', { percentDone: Math.min(100, Math.max(0, Math.round(percentDone))) })
 }
 
 function onAssigneeKeydown(event: KeyboardEvent): void {
@@ -453,13 +495,59 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
         <div class="detail-pane__fact">
           <dt>Priority</dt>
           <dd data-testid="detail-priority">
-            {{ priorityLabel }}
+            <select
+              class="detail-pane__control"
+              :class="`detail-pane__priority--${item.priority}`"
+              aria-label="Priority"
+              :value="item.priority"
+              @change="onPriorityChange"
+            >
+              <option
+                v-for="priority in WORK_ITEM_PRIORITIES"
+                :key="priority"
+                :value="priority"
+              >
+                {{ WORK_ITEM_PRIORITY_LABELS[priority] }}
+              </option>
+            </select>
           </dd>
         </div>
         <div class="detail-pane__fact">
           <dt>Due date</dt>
-          <dd data-testid="detail-due-date">
-            {{ item.dueDate ?? 'None' }}
+          <dd
+            data-testid="detail-due-date"
+            :data-due-state="dueState ?? undefined"
+          >
+            <input
+              class="detail-pane__control"
+              type="date"
+              aria-label="Due date"
+              :value="item.dueDate ?? ''"
+              @input="onDueDateChange"
+            >
+            <p
+              v-if="dueRelative !== null"
+              class="detail-pane__due-relative"
+              data-testid="detail-due-relative"
+            >
+              {{ dueRelative }}
+            </p>
+          </dd>
+        </div>
+        <div class="detail-pane__fact">
+          <dt>Progress</dt>
+          <dd data-testid="detail-percent-done">
+            <input
+              class="detail-pane__progress"
+              type="range"
+              min="0"
+              max="100"
+              step="10"
+              aria-label="Percent done"
+              :value="item.percentDone"
+              @input="onPercentDoneChange"
+            >
+            <span class="detail-pane__progress-value">{{ item.percentDone }}%</span>
           </dd>
         </div>
         <div class="detail-pane__fact">

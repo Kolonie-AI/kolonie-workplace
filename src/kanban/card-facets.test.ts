@@ -5,6 +5,7 @@ import {
   dueDateState,
   initialsOf,
   readableTextOn,
+  relativeDueDate,
 } from '@/kanban/card-facets'
 
 describe('card facets — label contrast is computed from the label colour', () => {
@@ -43,6 +44,15 @@ describe('card facets — a due date is judged against a clock that is handed in
   it('has no state at all for an item without a due date', () => {
     expect(dueDateState(null, now)).toBe(null)
     expect(dueDateState('not-a-date', now)).toBe(null)
+  })
+
+  it('renders exact relative strings from the clock that is handed in', () => {
+    expect(relativeDueDate('2026-08-30', now)).toBe('in 3 days')
+    expect(relativeDueDate('2026-08-25', now)).toBe('2 days ago')
+    expect(relativeDueDate('2026-08-27', now)).toBe('today')
+    expect(relativeDueDate('2026-08-28', now)).toBe('in 1 day')
+    expect(relativeDueDate('2026-08-26', now)).toBe('1 day ago')
+    expect(relativeDueDate(null, now)).toBe(null)
   })
 })
 

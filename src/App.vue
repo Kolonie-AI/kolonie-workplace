@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import SessionGate from '@/session/SessionGate.vue'
+import { provideWorkplaceClock } from '@/clock/workplace-clock'
 import { provideTaskGateway } from '@/gateway/provide-gateway'
 import { provideWorkplaceSession } from '@/session/provide-session'
 import type { WorkplaceSession } from '@/session/workplace-session'
@@ -14,6 +15,7 @@ import '@/styles/tokens.css'
 const props = defineProps<{ session?: WorkplaceSession }>()
 
 provideWorkplaceSession(props.session)
+provideWorkplaceClock()
 provideTaskGateway()
 </script>
 

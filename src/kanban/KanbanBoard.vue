@@ -37,6 +37,7 @@ defineProps<{
   movingItemId: WorkItemId | null
   moveError: string | null
   createError: string | null
+  now: Date
 }>()
 
 const emit = defineEmits<{
@@ -196,6 +197,7 @@ function onCardMove(itemId: WorkItemId, lane: Lane): void {
                 :item="item"
                 :selected="selectedItemId === item.id"
                 :moving="movingItemId === item.id"
+                :now="now"
                 @select="emit('select', $event)"
                 @move="onCardMove"
               />

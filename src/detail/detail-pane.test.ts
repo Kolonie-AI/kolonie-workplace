@@ -4,11 +4,14 @@ import { WORKPLACE_LANE_LABELS } from '@/domain/lanes'
 import type { BoardId } from '@/domain/workplace'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import { TASK_GATEWAY } from '@/gateway/provide-gateway'
+import { WORKPLACE_CLOCK } from '@/clock/workplace-clock'
 import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
 import { FIXTURE_BOARDS, FIXTURE_HUMANS, FIXTURE_ITEMS, FIXTURE_LABELS } from '@/fixtures/catalogue'
 import AppShell from '@/shell/AppShell.vue'
 import { createFixtureWorkplaceSession } from '@/session/fixture-workplace-session'
 import { WORKPLACE_SESSION, type WorkplaceSession } from '@/session/workplace-session'
+
+const FIXED_NOW = new Date('2026-08-27T12:00:00.000Z')
 
 async function signedInSession(humanId: string): Promise<WorkplaceSession> {
   const session = createFixtureWorkplaceSession()
@@ -24,7 +27,13 @@ async function renderBoard(
   const session = await signedInSession(humanId)
   const view = render(AppShell, {
     props: { initialBoardId: boardId },
-    global: { provide: { [WORKPLACE_SESSION]: session, [TASK_GATEWAY]: gateway } },
+    global: {
+      provide: {
+        [WORKPLACE_SESSION]: session,
+        [TASK_GATEWAY]: gateway,
+        [WORKPLACE_CLOCK]: () => FIXED_NOW,
+      },
+    },
   })
 
   await waitFor(() => {
@@ -110,6 +119,7 @@ describe('detail pane — opened from the board, beside it', () => {
         provide: {
           [WORKPLACE_SESSION]: session,
           [TASK_GATEWAY]: createFixtureTaskGateway(),
+          [WORKPLACE_CLOCK]: () => FIXED_NOW,
         },
       },
     })
@@ -510,10 +520,82 @@ describe('detail pane — metadata', () => {
 
     expect(within(pane()).getByTestId('detail-lane').textContent).toContain('Review')
     expect(within(pane()).getByTestId('detail-owner').textContent).toContain('Fictional Agent Quill')
-    expect(within(pane()).getByTestId('detail-priority').textContent).toContain('Medium')
-    expect(within(pane()).getByTestId('detail-due-date').textContent).toContain('2026-09-10')
+    expect(within(pane()).getByRole('combobox', { name: 'Priority' })).toHaveProperty('value', 'medium')
+    expect(within(pane()).getByLabelText('Due date')).toHaveProperty('value', '2026-09-10')
+    expect(within(pane()).getByTestId('detail-due-relative').textContent).toBe('in 14 days')
     expect(within(pane()).getByTestId('detail-labels').textContent).toContain('Research')
     expect(within(pane()).getByTestId('detail-assignees').textContent).toContain('Fictional Human Wren')
+  })
+})
+
+describe('detail pane — priority, due date and progress', () => {
+  it('writes each of the three fields through the gateway and updates the card without a refetch', async () => {
+    const gateway = createFixtureTaskGateway()
+    const boardReads = vi.spyOn(gateway, 'getBoardItems')
+    const updates = vi.spyOn(gateway, 'updateWorkItem')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.review)
+    const readsBeforeEdit = boardReads.mock.calls.length
+
+    await fireEvent.update(within(pane()).getByRole('combobox', { name: 'Priority' }), 'urgent')
+    await waitFor(() => {
+      expect(updates).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.review,
+        { priority: 'urgent' },
+      )
+    })
+
+    await fireEvent.update(within(pane()).getByLabelText('Due date'), '2026-08-24')
+    await waitFor(() => {
+      expect(updates).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.review,
+        { dueDate: '2026-08-24' },
+      )
+    })
+
+    await fireEvent.update(within(pane()).getByRole('slider', { name: 'Percent done' }), '50')
+    await waitFor(() => {
+      expect(updates).toHaveBeenCalledWith(
+        FIXTURE_HUMANS.wren,
+        FIXTURE_ITEMS.review,
+        { percentDone: 50 },
+      )
+    })
+
+    const card = screen
+      .getAllByTestId('kanban-card')
+      .find((candidate) => candidate.getAttribute('data-item-id') === FIXTURE_ITEMS.review)
+
+    expect(within(card!).getByTestId('kanban-card-priority').textContent).toMatch(/urgent/i)
+    expect(within(card!).getByTestId('kanban-card-due').textContent).toBe('3 days ago')
+    expect(within(card!).getByTestId('kanban-card-due').getAttribute('data-due-state')).toBe('overdue')
+    expect(within(card!).getByTestId('kanban-card-progress').getAttribute('value')).toBe('50')
+    expect(boardReads).toHaveBeenCalledTimes(readsBeforeEdit)
+  })
+
+  it('marks an overdue item on both the card and the detail view from the injected clock', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    await openItem(FIXTURE_ITEMS.blocked)
+
+    const card = screen
+      .getAllByTestId('kanban-card')
+      .find((candidate) => candidate.getAttribute('data-item-id') === FIXTURE_ITEMS.blocked)
+
+    expect(within(card!).getByTestId('kanban-card-due').getAttribute('data-due-state')).toBe('overdue')
+    expect(within(card!).getByTestId('kanban-card-due').textContent).toBe('7 days ago')
+    expect(within(pane()).getByTestId('detail-due-date').getAttribute('data-due-state')).toBe('overdue')
+    expect(within(pane()).getByTestId('detail-due-relative').textContent).toBe('7 days ago')
+  })
+
+  it('offers every Colony priority level without importing Vikunja numeric constants', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    await openItem(FIXTURE_ITEMS.review)
+    const select = within(pane()).getByRole('combobox', { name: 'Priority' })
+    const values = [...select.querySelectorAll('option')].map((option) => option.getAttribute('value'))
+
+    expect(values).toEqual(['unset', 'low', 'medium', 'high', 'urgent', 'do_now'])
   })
 })
 

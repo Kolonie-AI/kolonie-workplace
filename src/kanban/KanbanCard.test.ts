@@ -25,12 +25,15 @@ function item(overrides: Partial<WorkItemSummary> = {}): WorkItemSummary {
   }
 }
 
-function renderCard(overrides: Partial<WorkItemSummary> = {}) {
+const FIXED_NOW = new Date('2026-08-27T12:00:00.000Z')
+
+function renderCard(overrides: Partial<WorkItemSummary> = {}, now: Date = FIXED_NOW) {
   return render(KanbanCard, {
     props: {
       item: item(overrides),
       selected: false,
       moving: false,
+      now,
     },
   })
 }
@@ -78,9 +81,24 @@ describe('KanbanCard — seven facets render only when their data is present', (
     expect(screen.getByTestId('kanban-card-label').textContent).toContain('Delivery')
     expect(screen.getByTestId('kanban-card-assignee').textContent).toContain('FW')
     expect(screen.getByTestId('kanban-card-priority').textContent).toMatch(/high/i)
-    expect(screen.getByTestId('kanban-card-due').textContent).toContain('2026-09-04')
+    expect(screen.getByTestId('kanban-card-due').textContent).toBe('in 8 days')
+    expect(screen.getByTestId('kanban-card-due').getAttribute('datetime')).toBe('2026-09-04')
     expect(screen.getByTestId('kanban-card-checklist').textContent).toMatch(/1\/2/)
     expect(screen.getByTestId('kanban-card-counts').textContent).toMatch(/1/)
+  })
+
+  it('shows percent-done as a progress bar when it is above zero', () => {
+    renderCard({ percentDone: 40 })
+
+    const progress = screen.getByTestId('kanban-card-progress')
+    expect(progress.getAttribute('value')).toBe('40')
+    expect(progress.textContent).toContain('40%')
+  })
+
+  it('leaves the progress bar off a card that has not started', () => {
+    renderCard({ percentDone: 0 })
+
+    expect(screen.queryByTestId('kanban-card-progress')).toBeNull()
   })
 
   it('paints a dark label with light text and a light label with dark text', () => {
@@ -101,28 +119,14 @@ describe('KanbanCard — seven facets render only when their data is present', (
   })
 
   it('marks an overdue date from a fixed clock and leaves an upcoming one unmarked', () => {
-    const now = new Date('2026-08-27T12:00:00.000Z')
-
-    const overdue = render(KanbanCard, {
-      props: {
-        item: item({ dueDate: '2026-08-20' }),
-        selected: false,
-        moving: false,
-        now,
-      },
-    })
+    const overdue = renderCard({ dueDate: '2026-08-20' })
     expect(overdue.getByTestId('kanban-card-due').getAttribute('data-due-state')).toBe('overdue')
+    expect(overdue.getByTestId('kanban-card-due').textContent).toBe('7 days ago')
     overdue.unmount()
 
-    const upcoming = render(KanbanCard, {
-      props: {
-        item: item({ dueDate: '2026-09-04' }),
-        selected: false,
-        moving: false,
-        now,
-      },
-    })
+    const upcoming = renderCard({ dueDate: '2026-09-04' })
     expect(upcoming.getByTestId('kanban-card-due').getAttribute('data-due-state')).toBe('upcoming')
+    expect(upcoming.getByTestId('kanban-card-due').textContent).toBe('in 8 days')
   })
 
   it('generates assignee avatars from initials and never fetches an image', () => {
