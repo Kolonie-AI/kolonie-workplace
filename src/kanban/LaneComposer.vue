@@ -20,8 +20,9 @@ const emit = defineEmits<{
 
 const open = ref(false)
 const title = ref('')
-const input = useTemplateRef<HTMLInputElement>('composerInput')
+const input = useTemplateRef<HTMLTextAreaElement>('composerInput')
 const addButton = useTemplateRef<HTMLButtonElement>('addButton')
+const root = useTemplateRef<HTMLElement>('composerRoot')
 
 const laneLabel = WORKPLACE_LANE_LABELS[props.lane]
 
@@ -51,7 +52,7 @@ function submit(): void {
 }
 
 function onKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Enter') {
+  if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault()
     submit()
     return
@@ -63,7 +64,13 @@ function onKeydown(event: KeyboardEvent): void {
   }
 }
 
-function onBlur(): void {
+function onBlur(event: FocusEvent): void {
+  const next = event.relatedTarget
+
+  if (next instanceof Node && root.value?.contains(next)) {
+    return
+  }
+
   if (title.value.trim() === '') {
     closeComposer()
   }
@@ -71,27 +78,52 @@ function onBlur(): void {
 </script>
 
 <template>
-  <div class="lane-composer">
+  <div
+    ref="composerRoot"
+    class="lane-composer"
+    data-testid="lane-composer"
+  >
     <button
       v-if="!open"
       ref="addButton"
       class="lane-composer__add"
       type="button"
-      :aria-label="`Add card to ${laneLabel}`"
+      :aria-label="`Add a card in ${laneLabel}`"
       @click="openComposer"
     >
-      Add card
+      Add a card
     </button>
-    <input
+    <form
       v-else
-      ref="composerInput"
-      v-model="title"
-      class="lane-composer__input"
-      type="text"
-      :aria-label="`Card title for ${laneLabel}`"
-      placeholder="Card title"
-      @keydown="onKeydown"
-      @blur="onBlur"
+      class="lane-composer__form"
+      @submit.prevent="submit"
     >
+      <textarea
+        ref="composerInput"
+        v-model="title"
+        class="lane-composer__input"
+        rows="3"
+        aria-label="Enter a title or paste a link"
+        placeholder="Enter a title or paste a link"
+        @keydown="onKeydown"
+        @blur="onBlur"
+      />
+      <div class="lane-composer__actions">
+        <button
+          class="lane-composer__submit"
+          type="submit"
+        >
+          Add card
+        </button>
+        <button
+          class="lane-composer__cancel"
+          type="button"
+          aria-label="Cancel adding a card"
+          @click="closeComposer"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
   </div>
 </template>
