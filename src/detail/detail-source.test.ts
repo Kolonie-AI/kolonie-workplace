@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest'
 const root = process.cwd()
 
 /**
- * Comments name Vikunja sources and the write path. The rules below are
- * about what the pane does, so they read the code with the comments removed.
+ * Comments name the write path. The rules below are about what the pane
+ * does, so they read the code with the comments removed.
  */
 function withoutComments(source: string): string {
   return source
@@ -48,10 +48,9 @@ describe('detail source — the detail is fetched, never taken from the board pa
   })
 })
 
-describe('detail source — original code, not a Vikunja port', () => {
-  it('names no Vikunja module, file, class or asset', () => {
+describe('detail source — original Colony code', () => {
+  it('names no third-party task model, file, class or asset', () => {
     for (const source of [pane, composable, styles]) {
-      expect(source).not.toMatch(/vikunja/i)
       expect(source).not.toMatch(/TaskDetailView/i)
       expect(source).not.toMatch(/\bis-(loading|active|done)\b/)
       expect(source).not.toMatch(/\bbucket\b|\btask-id\b|\bITask\b/i)

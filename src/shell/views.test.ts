@@ -29,7 +29,7 @@ describe('workplace views', () => {
 })
 
 describe('workplace views — rejection: a view the workplace does not define', () => {
-  it('refuses views Vikunja has and this workplace does not', () => {
+  it('refuses views this workplace does not define', () => {
     expect(isWorkplaceView('table')).toBe(false)
     expect(isWorkplaceView('gantt')).toBe(false)
   })

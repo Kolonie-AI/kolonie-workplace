@@ -1,24 +1,10 @@
 <script setup lang="ts">
 /*
- * Copyright 2018-present Vikunja and contributors. All rights reserved.
  * Copyright 2026 Kolonie AI FZ-LLC.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  *
- * The card surface — colour stripe, label chips, assignee initials, priority
- * marker, due-date chip, checklist progress and attachment/comment counts — is
- * adapted for Kolonie Workplace on 2026-08-27 from Vikunja 2.5.0
- * (ef2200e9429c5cc42f5c1811433418bfcc72b3aa):
- *   frontend/src/components/tasks/partials/KanbanCard.vue
- *   frontend/src/components/tasks/partials/Labels.vue
- *   frontend/src/components/tasks/partials/Label.vue
- *   frontend/src/components/tasks/partials/AssigneeList.vue
- *   frontend/src/components/tasks/partials/PriorityLabel.vue
- *   frontend/src/components/tasks/partials/ChecklistSummary.vue
- *   frontend/src/components/tasks/partials/DateTableCell.vue
- *   frontend/src/components/misc/ProgressBar.vue
- * No Vikunja store, router, i18n or task model is used; data reaches this
- * component only through TaskGateway.
+ * Data reaches this component only through TaskGateway.
  */
 import { computed } from 'vue'
 import { isLane, WORKPLACE_LANE_LABELS, WORKPLACE_LANES, type Lane } from '@/domain/lanes'

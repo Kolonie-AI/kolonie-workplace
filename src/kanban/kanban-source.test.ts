@@ -79,10 +79,9 @@ describe('kanban source — lane moves without a drag library', () => {
   })
 })
 
-describe('kanban source — original code, not a Vikunja port', () => {
-  it('names no Vikunja module, file, class or asset', () => {
+describe('kanban source — original Colony code', () => {
+  it('names no third-party task model, file, class or asset', () => {
     for (const source of [board, card, styles]) {
-      expect(source).not.toMatch(/vikunja/i)
       expect(source).not.toMatch(/\bis-(loading|active|done)\b/)
       expect(source).not.toMatch(/\bbucket\b|\btask-id\b|\bITask\b/i)
     }

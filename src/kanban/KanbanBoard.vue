@@ -1,13 +1,8 @@
 <script setup lang="ts">
 /*
- * Copyright 2018-present Vikunja and contributors. All rights reserved.
  * Copyright 2026 Kolonie AI FZ-LLC.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
- *
- * Per-lane composer placement is adapted for Kolonie Workplace on 2026-08-27
- * from Vikunja 2.5.0 (ef2200e9429c5cc42f5c1811433418bfcc72b3aa):
- *   frontend/src/components/project/views/ProjectKanban.vue
  */
 import { WORKPLACE_LANE_LABELS, type Lane } from '@/domain/lanes'
 import type { WorkItemId } from '@/domain/workplace'

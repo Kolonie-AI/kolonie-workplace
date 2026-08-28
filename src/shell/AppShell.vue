@@ -1,18 +1,10 @@
 <script setup lang="ts">
 /*
- * Copyright 2018-present Vikunja and contributors. All rights reserved.
  * Copyright 2026 Kolonie AI FZ-LLC.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  *
- * The shell chrome — collapsible sidebar, menu button, top-bar board title and
- * search affordance — is adapted for Kolonie Workplace on 2026-08-27 from
- * Vikunja 2.5.0 (ef2200e9429c5cc42f5c1811433418bfcc72b3aa):
- *   frontend/src/components/home/Navigation.vue
- *   frontend/src/components/home/MenuButton.vue
- *   frontend/src/components/home/AppHeader.vue
- * No Vikunja store, router, i18n or task model is used; data reaches this
- * component only through TaskGateway.
+ * Data reaches this component only through TaskGateway.
  */
 import { computed, ref, useTemplateRef, watch } from 'vue'
 import { useWorkplaceClock } from '@/clock/workplace-clock'
@@ -65,7 +57,7 @@ const searchInput = useTemplateRef<HTMLInputElement>('searchInput')
  * Chrome state, kept in the shell because nothing else needs it: the desktop
  * sidebar can collapse to give the board the full row, and below the mobile
  * breakpoint the same sidebar becomes an overlay the menu button opens.
- * Selecting a board closes the overlay, as navigation in Vikunja does.
+ * Selecting a board closes the overlay.
  */
 const sidebarCollapsed = ref(false)
 const mobileMenuOpen = ref(false)

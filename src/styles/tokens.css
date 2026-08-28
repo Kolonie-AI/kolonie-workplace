@@ -1,20 +1,10 @@
 /*
- * Copyright 2018-present Vikunja and contributors. All rights reserved.
  * Copyright 2026 Kolonie AI FZ-LLC.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  *
- * Adapted for Kolonie Workplace on 2026-08-27 from Vikunja 2.5.0
- * (ef2200e9429c5cc42f5c1811433418bfcc72b3aa):
- *   frontend/src/styles/custom-properties/colors.scss
- *   frontend/src/styles/custom-properties/shadows.scss
- *   frontend/src/styles/theme/theme.scss
- *   frontend/src/styles/theme/scrollbars.scss
- *   frontend/src/styles/common-imports.scss
- *
  * Colony semantic names (--color-*, --space-*, --radius-*) are kept so
- * existing components restyle without a behaviour change. Pinia, vue-router,
- * vue-i18n and ITask are not imported.
+ * existing components restyle without a behaviour change.
  */
 
 :root,

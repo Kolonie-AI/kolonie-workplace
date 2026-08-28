@@ -589,7 +589,7 @@ describe('detail pane — priority, due date and progress', () => {
     expect(within(pane()).getByTestId('detail-due-relative').textContent).toBe('7 days ago')
   })
 
-  it('offers every Colony priority level without importing Vikunja numeric constants', async () => {
+  it('offers every Colony priority level without importing a numeric constant table', async () => {
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
     await openItem(FIXTURE_ITEMS.review)
     const select = within(pane()).getByRole('combobox', { name: 'Priority' })

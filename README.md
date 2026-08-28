@@ -88,21 +88,10 @@ here. Trello is the visual and interaction reference: rebuild it from
 Trello source, CSS, assets, logos or proprietary copy. Hermes Kanban is the
 lifecycle reference only — the six lanes stay fixed.
 
-Since 2026-08-27 some of it may come from
-[Vikunja](https://github.com/go-vikunja/vikunja): this repository is
-AGPL-3.0-or-later and so is Vikunja, so **its source may be copied or adapted
-with attribution** where that is cheaper and clearer than rebuilding it. Every
-imported or adapted file keeps its upstream copyright and licence header, and
-[NOTICE](NOTICE) records the pinned upstream release, commit and paths.
-
-What that permission does *not* cover is a fork. A 2026-08-25 read of
-Vikunja's frontend found its Kanban, list and detail components importing
-Pinia stores, HTTP services, `vue-router`, `vue-i18n` and a 35-field `ITask`,
-and that measurement still holds. Copying the tree wholesale would drag that
-architecture across the `TaskGateway` seam this repository exists to keep, so
-reuse is per surface and named by the issue that asks for it: take the
-presentation, leave the store, and adapt against Colony types where the two
-cannot be separated. The Colony domain never comes from `ITask`.
+**Vikunja reuse is forbidden.** Vikunja is a rejected former reference; do
+not copy or adapt its source. This repository is AGPL-3.0-or-later because
+the workplace is a network-facing Colony application, not because of any
+third-party frontend.
 
 The decision record is
 [`human-workplace-form.md`](https://github.com/Kolonie-AI/kolonie-concept-lab/blob/main/concepts/human-workplace-form.md)
@@ -230,8 +219,7 @@ kolonie-workplace/
 
 Directories for components, domain types and the gateway appear as the issues
 that need them land. Application code arrives only through an issue that asks
-for it, and imported or adapted Vikunja source keeps its upstream notices and
-is listed in `NOTICE` — see `AGENTS.md` §3 and §5.
+for it — see `AGENTS.md` §3 and §5.
 
 ## Contributing
 

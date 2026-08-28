@@ -151,7 +151,7 @@ Every path maps to one package issue or an explicit “unchanged/deferred”.
 | Checklists | Gateway verbs exist; card face shows `done/total`; detail has no checklist editor | One unnamed checklist section on the card back | #78 |
 | Activity | Gateway comment verbs exist; counts on the face | “Write a comment…” region on the card back | #79 |
 | Attachments / covers | Gateway attachment verbs exist; colour stripe on the face; `coverColour` on the summary | Fixture-memory attachments; cover from image or colour, exclusive | #80 |
-| Tokens / shell | `src/styles/tokens.css`, `src/shell/*` — dark sidebar, Vikunja colour story | Trello board canvas / list well / white cards. List view stays as a secondary view and is not Trello-restyled in #75 | #75 (board canvas); list view unchanged |
+| Tokens / shell | `src/styles/tokens.css`, `src/shell/*` — dark sidebar, current colour story | Trello board canvas / list well / white cards. List view stays as a secondary view and is not Trello-restyled in #75 | #75 (board canvas); list view unchanged |
 | Filter | `src/items/board-filter.ts` — URL `lane` / `owner` / `q` | Trello filter popover; keep URL encoding; add label + due | #82 |
 | Writes | `src/gateway/task-gateway.ts` already has create / update / move / **reorder** / comment / attachment / checklist verbs | UI must use them; do not invent a second store | unchanged |
 | Drag | Card `draggable`; drop on a lane emits `move`; within-lane order is not modelled | Within-list reorder + keep cross-list move; lists do not drag | #81 |

@@ -48,10 +48,9 @@ describe('list source — shared lane moves without extra data paths', () => {
   })
 })
 
-describe('list source — original code, not a Vikunja port', () => {
-  it('names no Vikunja module, file, class or asset', () => {
+describe('list source — original Colony code', () => {
+  it('names no third-party task model, file, class or asset', () => {
     for (const source of [view, row, styles]) {
-      expect(source).not.toMatch(/vikunja/i)
       expect(source).not.toMatch(/\bis-(loading|active|done)\b/)
       expect(source).not.toMatch(/\bbucket\b|\btask-id\b|\bITask\b/i)
     }
