@@ -156,7 +156,20 @@ function onDragStart(event: DragEvent): void {
           class="kanban-card__count"
           data-testid="kanban-card-description"
           aria-label="Has a description"
-        >Aa</span>
+        >
+          <svg
+            class="kanban-card__badge-icon"
+            viewBox="0 0 16 16"
+            aria-hidden="true"
+          >
+            <path
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              d="M4 3h8v10H4z M6 6h4 M6 8.5h4 M6 11h2"
+            />
+          </svg>
+        </span>
         <time
           v-if="dueState !== null && item.dueDate !== null && dueAccessible !== null"
           class="kanban-card__due"
@@ -170,19 +183,62 @@ function onDragStart(event: DragEvent): void {
           class="kanban-card__count"
           data-testid="kanban-card-attachments"
           :aria-label="attachmentLabel"
-        >{{ attachments.length }}</span>
+        >
+          <svg
+            class="kanban-card__badge-icon"
+            viewBox="0 0 16 16"
+            aria-hidden="true"
+          >
+            <path
+              fill="none"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-width="1.5"
+              d="M10 6.5 6.5 10a2 2 0 0 0 2.8 2.8l4-4a3.2 3.2 0 0 0-4.5-4.5L5 8"
+            />
+          </svg>
+          {{ attachments.length }}
+        </span>
         <span
           v-if="progress !== null"
           class="kanban-card__checklist"
           data-testid="kanban-card-checklist"
           :aria-label="`Checklist ${progress.done}/${progress.total}`"
-        >{{ progress.done }}/{{ progress.total }}</span>
+        >
+          <svg
+            class="kanban-card__badge-icon"
+            viewBox="0 0 16 16"
+            aria-hidden="true"
+          >
+            <path
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              d="M3 4h3v3H3z M8 5.5h5 M3 10h3v3H3z M8 11.5h5"
+            />
+          </svg>
+          {{ progress.done }}/{{ progress.total }}
+        </span>
         <span
           v-if="comments.length > 0"
           class="kanban-card__count"
           data-testid="kanban-card-comments"
           :aria-label="commentLabel"
-        >{{ comments.length }}</span>
+        >
+          <svg
+            class="kanban-card__badge-icon"
+            viewBox="0 0 16 16"
+            aria-hidden="true"
+          >
+            <path
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              d="M3 4h10v7H7l-3 3z"
+            />
+          </svg>
+          {{ comments.length }}
+        </span>
         <span
           v-if="assignees.length > 0"
           class="kanban-card__assignees"

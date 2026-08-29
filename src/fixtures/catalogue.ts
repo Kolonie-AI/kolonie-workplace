@@ -178,6 +178,7 @@ export const fixtureWorkItems: readonly WorkItemDetail[] = [
     labels: [FIXTURE_LABELS.delivery],
     priority: 'medium',
     dueDate: '2026-09-04',
+    coverImageUrl: '/fictional-covers/outline.svg',
     position: 0,
     externalReferences: [],
   },
