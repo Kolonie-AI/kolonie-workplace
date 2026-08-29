@@ -17,7 +17,7 @@ const validationStep = workflow.match(
   /- name: Validate build configuration[\s\S]*?(?=\n {6}- |\n {2}\S|$)/,
 )?.[0]
 
-const deployJob = workflow.match(/\n  deploy:\n[\s\S]*$/)?.[0]
+const deployJob = workflow.match(/\n {2}deploy:\n[\s\S]*$/)?.[0]
 
 const AUTH0_VARIABLES = [
   'VITE_AUTH0_DOMAIN',
