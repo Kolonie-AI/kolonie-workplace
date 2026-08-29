@@ -165,16 +165,20 @@ describe('KanbanCard — the resting face is title and badges, not a form', () =
     expect(screen.queryByRole('status', { name: 'Blocked' })).toBeNull()
   })
 
-  it('keeps Move to lane off the resting face, reachable through a disclosure', async () => {
-    const view = renderCard({ lane: 'ready' })
+  it('is one object: no Move group and no Move-to-lane combobox under the card', () => {
+    const { container } = renderCard({ lane: 'ready' })
     const card = screen.getByTestId('kanban-card')
+    const shell = container.querySelector('.kanban-card-shell') as HTMLElement
 
     expect(within(card).queryByLabelText('Move to lane')).toBeNull()
-    expect(screen.queryByRole('checkbox')).toBeNull()
-
-    await fireEvent.click(screen.getByTestId('kanban-card-move-disclosure').querySelector('summary') as HTMLElement)
-    await fireEvent.update(screen.getByLabelText('Move to lane'), 'done')
-    expect(view.emitted('move')[0]).toEqual(['fictional-card', 'done'])
+    expect(screen.queryByTestId('kanban-card-move')).toBeNull()
+    expect(screen.queryByTestId('kanban-card-move-disclosure')).toBeNull()
+    expect(screen.queryByRole('group', { name: /move/i })).toBeNull()
+    expect(screen.queryByRole('combobox', { name: 'Move to lane' })).toBeNull()
+    expect(shell.querySelector('select')).toBeNull()
+    expect(shell.querySelector('details')).toBeNull()
+    expect(shell.children).toHaveLength(1)
+    expect(shell.firstElementChild).toBe(card)
   })
 
   it('paints a dark label with light text and a light label with dark text', () => {

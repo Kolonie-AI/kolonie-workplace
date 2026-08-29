@@ -191,12 +191,6 @@ function adjacentLane(lane: Lane, delta: number): Lane | null {
 }
 
 function onCardKeydown(event: KeyboardEvent, item: WorkItemSummary, column: LaneColumn): void {
-  const target = event.target as HTMLElement
-
-  if (target.closest('.kanban-card__move') !== null) {
-    return
-  }
-
   const index = column.items.findIndex((entry) => entry.id === item.id)
 
   if (index === -1) {
@@ -237,9 +231,6 @@ function onCardKeydown(event: KeyboardEvent, item: WorkItemSummary, column: Lane
   }
 }
 
-function onCardMove(itemId: WorkItemId, lane: Lane): void {
-  emit('move', itemId, lane)
-}
 </script>
 
 <template>
@@ -377,7 +368,6 @@ function onCardMove(itemId: WorkItemId, lane: Lane): void {
                 :lifted="draggingId === slot.item.id"
                 :now="now"
                 @select="emit('select', $event)"
-                @move="onCardMove"
                 @dragstart="onDragStart($event, slot.item.id)"
                 @dragend="finishDrag"
                 @keydown="onCardKeydown($event, slot.item, column)"

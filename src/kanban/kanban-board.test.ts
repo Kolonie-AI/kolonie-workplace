@@ -278,11 +278,9 @@ describe('kanban board — cards', () => {
       expect(within(card).queryByLabelText('Move to lane')).toBeNull()
     }
 
-    const disclosures = screen.getAllByTestId('kanban-card-move-disclosure')
-    expect(disclosures).toHaveLength(6)
-    for (const disclosure of disclosures) {
-      expect(disclosure.hasAttribute('open')).toBe(false)
-    }
+    expect(screen.queryByTestId('kanban-card-move')).toBeNull()
+    expect(screen.queryByTestId('kanban-card-move-disclosure')).toBeNull()
+    expect(screen.queryByRole('combobox', { name: 'Move to lane' })).toBeNull()
 
     expect(screen.queryByRole('checkbox')).toBeNull()
     const board = screen.getByTestId('kanban-board')
