@@ -46,6 +46,8 @@ describe('visual integration — a visible keyboard focus state on every control
     ['src/detail/detail-pane.css', '.detail-pane__close'],
     ['src/detail/detail-pane.css', '.detail-pane__reference'],
     ['src/detail/detail-pane.css', '.detail-overlay'],
+    ['src/detail/detail-pane.css', '.detail-pane__lane-control'],
+    ['src/detail/detail-pane.css', '.detail-pane__edit'],
     ['src/detail/detail-pane.css', '.detail-pane__rail-button'],
     ['src/detail/detail-pane.css', '.detail-checklist__tick'],
     ['src/detail/detail-pane.css', '.detail-checklist__title'],

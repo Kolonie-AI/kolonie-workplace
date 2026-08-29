@@ -1,4 +1,5 @@
 import { ref, watch, type Ref } from 'vue'
+import type { Lane } from '@/domain/lanes'
 import type {
   AttachmentId,
   ChecklistItemId,
@@ -50,6 +51,7 @@ export interface ItemDetail {
   deleteComment(commentId: CommentId): Promise<WorkItemDetail | null>
   addAttachment(input: CreateAttachmentInput): Promise<WorkItemDetail | null>
   deleteAttachment(attachmentId: AttachmentId): Promise<WorkItemDetail | null>
+  applyLane(itemId: WorkItemId, lane: Lane): void
 }
 
 export function useItemDetail(
@@ -295,5 +297,12 @@ export function useItemDetail(
     deleteComment,
     addAttachment,
     deleteAttachment,
+    applyLane(itemId: WorkItemId, lane: Lane): void {
+      const current = item.value
+
+      if (current !== null && current.id === itemId) {
+        item.value = { ...current, lane }
+      }
+    },
   }
 }

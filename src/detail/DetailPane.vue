@@ -6,7 +6,7 @@
  */
 import { computed, nextTick, onMounted, ref, useId, useTemplateRef, watch } from 'vue'
 import { trapFocus } from '@/a11y/focus-trap'
-import { WORKPLACE_LANE_LABELS } from '@/domain/lanes'
+import { isLane, WORKPLACE_LANE_LABELS, WORKPLACE_LANES, type Lane } from '@/domain/lanes'
 import type {
   AttachmentId,
   ChecklistItemId,
@@ -25,7 +25,6 @@ import ChecklistSection from '@/detail/ChecklistSection.vue'
 import { renderHandover } from '@/detail/handover-parts'
 import { sanitizeDescription } from '@/detail/sanitize-description'
 import {
-  dueDateState,
   isWorkItemPriority,
   readableTextOn,
   relativeDueDate,
@@ -47,6 +46,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
+  move: [itemId: string, lane: Lane]
   update: [input: UpdateWorkItemInput]
   createChecklistItem: [title: string]
   updateChecklistItem: [checklistItemId: ChecklistItemId, input: UpdateChecklistItemInput]
@@ -64,7 +64,9 @@ type RailPopover = 'labels' | 'members' | 'dates' | 'priority' | 'cover' | null
 
 const titleDraft = ref('')
 const descriptionDraft = ref('')
+const editingDescription = ref(false)
 const descriptionEditor = useTemplateRef<HTMLElement>('descriptionEditor')
+const descriptionPreview = useTemplateRef<HTMLElement>('descriptionPreview')
 const dialogEl = useTemplateRef<HTMLElement>('dialogEl')
 const checklistSection = useTemplateRef<{ focusAdd: () => void }>('checklistSection')
 const attachmentSection = useTemplateRef<{ openPicker: () => void }>('attachmentSection')
@@ -114,12 +116,6 @@ const activeAssigneeId = computed(() =>
   assigneeActive.value < 0 ? undefined : `${assigneeListId}-${assigneeActive.value}`,
 )
 
-const laneLabel = computed(() =>
-  props.item === null ? null : WORKPLACE_LANE_LABELS[props.item.lane],
-)
-const dueState = computed(() =>
-  props.item === null ? null : dueDateState(props.item.dueDate, props.now),
-)
 const dueRelative = computed(() =>
   props.item === null ? null : relativeDueDate(props.item.dueDate, props.now),
 )
@@ -181,13 +177,45 @@ watch(
     titleDraft.value = item?.title ?? ''
     descriptionDraft.value = sanitizeDescription(item?.description ?? '')
     await nextTick()
-
-    if (descriptionEditor.value !== null) {
-      descriptionEditor.value.innerHTML = descriptionDraft.value
-    }
+    paintDescription()
   },
   { immediate: true },
 )
+
+function onLaneChange(event: Event): void {
+  const chosen = (event.target as HTMLSelectElement).value
+
+  if (props.item !== null && isLane(chosen) && chosen !== props.item.lane) {
+    emit('move', props.item.id, chosen)
+  }
+}
+
+function paintDescription(): void {
+  if (descriptionEditor.value !== null) {
+    descriptionEditor.value.innerHTML = descriptionDraft.value
+  }
+
+  if (descriptionPreview.value !== null) {
+    descriptionPreview.value.innerHTML = descriptionDraft.value
+  }
+}
+
+function startDescriptionEdit(): void {
+  editingDescription.value = true
+  void nextTick(() => {
+    paintDescription()
+    descriptionEditor.value?.focus()
+  })
+}
+
+watch(editingDescription, async (editing) => {
+  if (editing) {
+    return
+  }
+
+  await nextTick()
+  paintDescription()
+})
 
 watch(
   () => props.updateError,
@@ -199,10 +227,7 @@ watch(
     titleDraft.value = props.item.title
     descriptionDraft.value = sanitizeDescription(props.item.description)
     await nextTick()
-
-    if (descriptionEditor.value !== null) {
-      descriptionEditor.value.innerHTML = descriptionDraft.value
-    }
+    paintDescription()
   },
 )
 
@@ -270,6 +295,8 @@ function saveDescription(): void {
   if (sanitized !== previous) {
     emit('update', { description: sanitized })
   }
+
+  editingDescription.value = false
 }
 
 function formatDescription(command: string, value?: string): void {
@@ -484,11 +511,33 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
       @drop="onDrop"
     >
       <header class="detail-pane__header">
-        <p
+        <label
+          v-if="item !== null"
           class="detail-pane__lane"
-          data-testid="detail-lane"
         >
-          in list {{ laneLabel }}
+          in list
+          <select
+            class="detail-pane__lane-control"
+            data-testid="detail-lane"
+            aria-label="Change list for this card"
+            :value="item.lane"
+            @change="onLaneChange"
+          >
+            <option
+              v-for="lane in WORKPLACE_LANES"
+              :key="lane"
+              :value="lane"
+            >
+              {{ WORKPLACE_LANE_LABELS[lane] }}
+            </option>
+          </select>
+        </label>
+        <p
+          v-if="item !== null"
+          class="detail-pane__owner"
+          data-testid="detail-owner"
+        >
+          {{ item.owner }}
         </p>
         <button
           class="detail-pane__close"
@@ -582,10 +631,28 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
               class="detail-pane__section"
               aria-label="Description"
             >
-              <h3 class="detail-pane__section-title">
-                Description
-              </h3>
+              <div class="detail-pane__section-head">
+                <h3 class="detail-pane__section-title">
+                  Description
+                </h3>
+                <button
+                  v-if="!editingDescription"
+                  class="detail-pane__edit"
+                  type="button"
+                  aria-label="Edit description"
+                  @click="startDescriptionEdit"
+                >
+                  Edit
+                </button>
+              </div>
               <div
+                v-if="!editingDescription"
+                ref="descriptionPreview"
+                class="detail-pane__description detail-pane__description--preview"
+                data-testid="detail-description"
+              />
+              <div
+                v-else
                 class="detail-pane__toolbar"
                 role="toolbar"
                 aria-label="Description formatting"
@@ -640,6 +707,7 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
                 </button>
               </div>
               <div
+                v-if="editingDescription"
                 ref="descriptionEditor"
                 class="detail-pane__description"
                 data-testid="detail-description"
@@ -681,71 +749,6 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
               @update="(id, body) => emit('updateComment', id, body)"
               @remove="emit('deleteComment', $event)"
             />
-
-            <dl class="detail-pane__facts">
-              <div class="detail-pane__fact">
-                <dt>Owner</dt>
-                <dd data-testid="detail-owner">
-                  {{ item.owner }}
-                </dd>
-              </div>
-              <div class="detail-pane__fact">
-                <dt>Labels</dt>
-                <dd data-testid="detail-labels">
-                  <div class="detail-pane__chips">
-                    <span
-                      v-for="label in item.labels"
-                      :key="label.id"
-                      class="detail-pane__chip"
-                      :style="labelStyle(label.colour)"
-                    >
-                      {{ label.title }}
-                      <button
-                        class="detail-pane__chip-remove"
-                        type="button"
-                        :aria-label="`Remove label ${label.title}`"
-                        @click="removeLabel(label)"
-                      >×</button>
-                    </span>
-                  </div>
-                </dd>
-              </div>
-              <div class="detail-pane__fact">
-                <dt>Assignees</dt>
-                <dd data-testid="detail-assignees">
-                  <div class="detail-pane__chips">
-                    <span
-                      v-for="assignee in item.assignees"
-                      :key="assignee.id"
-                      class="detail-pane__chip detail-pane__chip--plain"
-                    >
-                      {{ assignee.name }}
-                      <button
-                        class="detail-pane__chip-remove"
-                        type="button"
-                        :aria-label="`Remove assignee ${assignee.name}`"
-                        @click="removeAssignee(assignee)"
-                      >×</button>
-                    </span>
-                  </div>
-                </dd>
-              </div>
-              <div class="detail-pane__fact">
-                <dt>Due date</dt>
-                <dd
-                  data-testid="detail-due-date"
-                  :data-due-state="dueState ?? undefined"
-                >
-                  <p
-                    v-if="dueRelative !== null"
-                    class="detail-pane__due-relative"
-                    data-testid="detail-due-relative"
-                  >
-                    {{ dueRelative }}
-                  </p>
-                </dd>
-              </div>
-            </dl>
 
             <section
               v-if="item.blocker !== undefined"
@@ -912,6 +915,22 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
               aria-label="Labels"
             >
               <div class="detail-pane__multiselect">
+                <div class="detail-pane__chips">
+                  <span
+                    v-for="label in item.labels"
+                    :key="label.id"
+                    class="detail-pane__chip"
+                    :style="labelStyle(label.colour)"
+                  >
+                    {{ label.title }}
+                    <button
+                      class="detail-pane__chip-remove"
+                      type="button"
+                      :aria-label="`Remove label ${label.title}`"
+                      @click="removeLabel(label)"
+                    >×</button>
+                  </span>
+                </div>
                 <input
                   v-model="labelQuery"
                   class="detail-pane__search"
@@ -991,6 +1010,21 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
               aria-label="Members"
             >
               <div class="detail-pane__multiselect">
+                <div class="detail-pane__chips">
+                  <span
+                    v-for="assignee in item.assignees"
+                    :key="assignee.id"
+                    class="detail-pane__chip detail-pane__chip--plain"
+                  >
+                    {{ assignee.name }}
+                    <button
+                      class="detail-pane__chip-remove"
+                      type="button"
+                      :aria-label="`Remove assignee ${assignee.name}`"
+                      @click="removeAssignee(assignee)"
+                    >×</button>
+                  </span>
+                </div>
                 <input
                   v-model="assigneeQuery"
                   class="detail-pane__search"
@@ -1053,6 +1087,12 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
                   @input="onDueDateChange"
                 >
               </label>
+              <p
+                v-if="dueRelative !== null"
+                class="detail-pane__due-relative"
+              >
+                {{ dueRelative }}
+              </p>
             </div>
 
             <button

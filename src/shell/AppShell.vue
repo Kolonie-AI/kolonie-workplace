@@ -24,6 +24,7 @@ import type {
   UpdateWorkItemInput,
   WorkItemAssignee,
   WorkItemDetail,
+  WorkItemId,
   WorkItemLabel,
 } from '@/domain/workplace'
 import { WORKPLACE_LANES, WORKPLACE_LANE_LABELS, type Lane } from '@/domain/lanes'
@@ -377,6 +378,11 @@ function applyDetail(updated: WorkItemDetail | null): WorkItemDetail | null {
   }
 
   return updated
+}
+
+async function moveDetail(itemId: WorkItemId, lane: Lane): Promise<void> {
+  await items.moveItem(itemId, lane)
+  detail.applyLane(itemId, lane)
 }
 
 async function updateDetail(input: UpdateWorkItemInput): Promise<WorkItemDetail | null> {
@@ -851,6 +857,7 @@ async function closeDetail(): Promise<void> {
             @delete-comment="deleteComment"
             @add-attachment="addAttachment"
             @delete-attachment="deleteAttachment"
+            @move="moveDetail"
             @close="closeDetail"
           />
         </div>

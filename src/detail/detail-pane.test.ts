@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/vue'
-import { WORKPLACE_LANE_LABELS } from '@/domain/lanes'
 import type { BoardId } from '@/domain/workplace'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import { TASK_GATEWAY } from '@/gateway/provide-gateway'
@@ -107,16 +106,14 @@ describe('detail pane — opened from the board, over it', () => {
     expect(within(pane()).getByTestId('detail-title').textContent).toContain(
       'Review the fictional catalogue summary',
     )
-    expect(within(pane()).getByTestId('detail-lane').textContent).toMatch(
-      new RegExp(`in list ${WORKPLACE_LANE_LABELS.review}`, 'i'),
-    )
+    const lane = within(pane()).getByRole('combobox', { name: 'Change list for this card' })
+    expect(lane).toHaveProperty('value', 'review')
+    expect(within(pane()).getByTestId('detail-lane')).toBe(lane)
 
     const owners = within(pane()).queryAllByTestId('detail-owner')
     expect(owners).toHaveLength(1)
     expect(owners[0]?.textContent).toContain('Fictional Agent Quill')
-    expect(within(pane()).getByTestId('detail-assignees').textContent).toContain(
-      'Fictional Human Wren',
-    )
+    expect(within(pane()).queryByTestId('detail-assignees')).toBeNull()
     expect(within(pane()).getByRole('heading', { name: 'Checklist' })).toBeTruthy()
     expect(within(pane()).getByRole('heading', { name: 'Attachments' })).toBeTruthy()
     expect(within(pane()).getByRole('heading', { name: 'Comments and activity' })).toBeTruthy()
@@ -232,6 +229,45 @@ describe('detail pane — opened from the board, over it', () => {
     await openRail('Labels')
     expect(within(pane()).getByRole('dialog', { name: 'Labels' })).toBeTruthy()
     expect(within(pane()).getByRole('combobox', { name: 'Search labels' })).toBeTruthy()
+  })
+
+  it('dims the board behind the dialog', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    await openItem(FIXTURE_ITEMS.review)
+
+    expect(screen.getByTestId('detail-overlay').classList.contains('detail-overlay')).toBe(true)
+    expect(screen.getByTestId('kanban-board')).toBeTruthy()
+  })
+
+  it('moves the open card to another lane through moveItemToLane', async () => {
+    const gateway = createFixtureTaskGateway()
+    const moves = vi.spyOn(gateway, 'moveItemToLane')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.review)
+
+    await fireEvent.update(
+      within(pane()).getByRole('combobox', { name: 'Change list for this card' }),
+      'done',
+    )
+
+    await waitFor(() => {
+      expect(moves).toHaveBeenCalledWith(FIXTURE_HUMANS.wren, FIXTURE_ITEMS.review, 'done')
+    })
+    expect(within(pane()).getByRole('combobox', { name: 'Change list for this card' })).toHaveProperty(
+      'value',
+      'done',
+    )
+  })
+
+  it('closes only the open popover on Escape and leaves the card dialog open', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    await openItem(FIXTURE_ITEMS.review)
+    await openRail('Labels')
+
+    expect(within(pane()).getByRole('dialog', { name: 'Labels' })).toBeTruthy()
+    await fireEvent.keyDown(pane(), { key: 'Escape' })
+    expect(within(pane()).queryByRole('dialog', { name: 'Labels' })).toBeNull()
+    expect(screen.getByTestId('detail-pane')).toBeTruthy()
   })
 })
 
@@ -385,15 +421,33 @@ describe('detail pane — editable title', () => {
   })
 })
 
+async function startDescriptionEdit(): Promise<HTMLElement> {
+  await fireEvent.click(within(pane()).getByRole('button', { name: 'Edit description' }))
+  const editor = await waitFor(() =>
+    within(pane()).getByRole('textbox', { name: 'Work item description' }),
+  )
+  await waitFor(() => {
+    expect(editor.innerHTML.length).toBeGreaterThan(0)
+  })
+  return editor
+}
+
 describe('detail pane — rich-text description', () => {
-  it('renders formatted markup and exposes the supported formatting controls', async () => {
+  it('renders formatted markup and keeps the formatting toolbar behind Edit', async () => {
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
     await openItem(FIXTURE_ITEMS.review)
-    const description = within(pane()).getByRole('textbox', { name: 'Work item description' })
+    const preview = within(pane()).getByTestId('detail-description')
 
-    expect(description.querySelector('p')?.textContent).toContain(
+    expect(preview.querySelector('p')?.textContent).toContain(
       'Review the typed summaries against the fictional catalogue.',
     )
+    expect(preview.getAttribute('contenteditable')).toBeNull()
+    expect(within(pane()).queryByRole('textbox', { name: 'Work item description' })).toBeNull()
+    for (const name of ['Bold', 'Italic', 'Bulleted list', 'Numbered list', 'Link', 'Code']) {
+      expect(within(pane()).queryByRole('button', { name })).toBeNull()
+    }
+
+    await startDescriptionEdit()
     for (const name of ['Bold', 'Italic', 'Bulleted list', 'Numbered list', 'Link', 'Code']) {
       expect(within(pane()).getByRole('button', { name })).toBeTruthy()
     }
@@ -404,7 +458,7 @@ describe('detail pane — rich-text description', () => {
     const updates = vi.spyOn(gateway, 'updateWorkItem')
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
     await openItem(FIXTURE_ITEMS.review)
-    const description = within(pane()).getByRole('textbox', { name: 'Work item description' })
+    const description = await startDescriptionEdit()
     description.innerHTML = '<p><strong>Bold</strong> and <em>italic</em></p><ul><li><code>code</code></li></ul>'
 
     await fireEvent.input(description)
@@ -419,9 +473,10 @@ describe('detail pane — rich-text description', () => {
         },
       )
     })
-    expect(description.querySelector('strong')?.textContent).toBe('Bold')
-    expect(description.querySelector('code')?.textContent).toBe('code')
-    expect(description.textContent).not.toContain('<strong>')
+    const preview = within(pane()).getByTestId('detail-description')
+    expect(preview.querySelector('strong')?.textContent).toBe('Bold')
+    expect(preview.querySelector('code')?.textContent).toBe('code')
+    expect(preview.textContent).not.toContain('<strong>')
   })
 
   it('removes scripts and event-handler attributes before markup reaches the gateway or DOM', async () => {
@@ -429,7 +484,7 @@ describe('detail pane — rich-text description', () => {
     const updates = vi.spyOn(gateway, 'updateWorkItem')
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
     await openItem(FIXTURE_ITEMS.review)
-    const description = within(pane()).getByRole('textbox', { name: 'Work item description' })
+    const description = await startDescriptionEdit()
     description.innerHTML = '<p>Safe<img src="x" onerror="alert(1)"></p><script>alert(2)</script>'
 
     await fireEvent.input(description)
@@ -442,9 +497,10 @@ describe('detail pane — rich-text description', () => {
         { description: '<p>Safe</p>' },
       )
     })
-    expect(description.querySelector('script')).toBeNull()
-    expect(description.querySelector('[onerror]')).toBeNull()
-    expect(description.innerHTML).toBe('<p>Safe</p>')
+    const preview = within(pane()).getByTestId('detail-description')
+    expect(preview.querySelector('script')).toBeNull()
+    expect(preview.querySelector('[onerror]')).toBeNull()
+    expect(preview.innerHTML).toBe('<p>Safe</p>')
   })
 
   it('restores the previous description when the gateway rejects the write', async () => {
@@ -452,7 +508,7 @@ describe('detail pane — rich-text description', () => {
     vi.spyOn(gateway, 'updateWorkItem').mockRejectedValueOnce(new Error('fixture rejection'))
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
     await openItem(FIXTURE_ITEMS.review)
-    const description = within(pane()).getByRole('textbox', { name: 'Work item description' })
+    const description = await startDescriptionEdit()
     const previous = description.innerHTML
 
     description.innerHTML = '<p>Rejected fictional body</p>'
@@ -462,7 +518,7 @@ describe('detail pane — rich-text description', () => {
     await waitFor(() => {
       expect(within(pane()).getByRole('alert').textContent).toMatch(/updating/i)
     })
-    expect(description.innerHTML).toBe(previous)
+    expect(within(pane()).getByTestId('detail-description').innerHTML).toBe(previous)
   })
 })
 
@@ -539,6 +595,7 @@ describe('detail pane — labels and assignees', () => {
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
     await openItem(FIXTURE_ITEMS.review)
 
+    await openRail('Labels')
     await fireEvent.click(within(pane()).getByRole('button', { name: 'Remove label Research' }))
     await waitFor(() => {
       expect(updates).toHaveBeenCalledWith(
@@ -607,20 +664,32 @@ describe('detail pane — labels and assignees', () => {
 })
 
 describe('detail pane — metadata', () => {
-  it('lays out lane, owner, priority, due date, labels and assignees', async () => {
+  it('keeps lane, owner, priority, due date, labels and assignees off a stacked definition list', async () => {
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
     await openItem(FIXTURE_ITEMS.review)
 
-    expect(within(pane()).getByTestId('detail-lane').textContent).toContain('Review')
+    expect(within(pane()).getByRole('combobox', { name: 'Change list for this card' })).toHaveProperty(
+      'value',
+      'review',
+    )
     expect(within(pane()).getByTestId('detail-owner').textContent).toContain('Fictional Agent Quill')
-    expect(within(pane()).getByTestId('detail-due-relative').textContent).toBe('in 14 days')
-    expect(within(pane()).getByTestId('detail-labels').textContent).toContain('Research')
-    expect(within(pane()).getByTestId('detail-assignees').textContent).toContain('Fictional Human Wren')
+    expect(within(pane()).queryByTestId('detail-labels')).toBeNull()
+    expect(within(pane()).queryByTestId('detail-assignees')).toBeNull()
+    expect(within(pane()).queryByTestId('detail-due-date')).toBeNull()
+    expect(within(pane()).queryByTestId('detail-due-relative')).toBeNull()
+    const factTerms = [...pane().querySelectorAll('dl.detail-pane__facts dt')].map(
+      (term) => term.textContent ?? '',
+    )
+    expect(factTerms.join(' ')).not.toMatch(/Owner|Labels|Assignees|Due date/)
 
     await openRail('Priority')
     expect(within(pane()).getByRole('combobox', { name: 'Priority' })).toHaveProperty('value', 'medium')
     await openRail('Dates')
     expect(within(pane()).getByLabelText('Due date')).toHaveProperty('value', '2026-09-10')
+    await openRail('Labels')
+    expect(within(pane()).getByRole('button', { name: 'Remove label Research' })).toBeTruthy()
+    await openRail('Members')
+    expect(within(pane()).getByRole('button', { name: 'Remove assignee Fictional Human Wren' })).toBeTruthy()
   })
 })
 
@@ -684,8 +753,8 @@ describe('detail pane — priority, due date and progress', () => {
 
     expect(within(card!).getByTestId('kanban-card-due').getAttribute('data-due-state')).toBe('overdue')
     expect(within(card!).getByTestId('kanban-card-due').textContent).toBe('7 days ago')
-    expect(within(pane()).getByTestId('detail-due-date').getAttribute('data-due-state')).toBe('overdue')
-    expect(within(pane()).getByTestId('detail-due-relative').textContent).toBe('7 days ago')
+    await openRail('Dates')
+    expect(within(pane()).getByLabelText('Due date')).toHaveProperty('value', '2026-08-20')
   })
 
   it('offers every Colony priority level without importing a numeric constant table', async () => {
@@ -902,7 +971,7 @@ describe('detail pane — one unnamed checklist', () => {
     const updates = vi.spyOn(gateway, 'updateWorkItem')
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
     await openItem(FIXTURE_ITEMS.ready)
-    const description = within(pane()).getByRole('textbox', { name: 'Work item description' })
+    const description = await startDescriptionEdit()
     description.innerHTML = '<p>- [ ] Parse this as a checklist item</p>'
     await fireEvent.input(description)
     await fireEvent.blur(description)
