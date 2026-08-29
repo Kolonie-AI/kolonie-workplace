@@ -85,11 +85,18 @@ describe('detail source — original Colony code', () => {
     expect(pane).toMatch(/role="dialog"/)
     expect(pane).toMatch(/aria-modal="true"/)
     expect(pane).toMatch(/detail-overlay/)
-    expect(pane).toMatch(/in list/)
+    expect(pane).toMatch(/Change list for this card/)
     expect(pane).toMatch(/Checklist/)
     expect(pane).toMatch(/Attachment/)
     expect(pane).toMatch(/Activity/)
     expect(pane).toMatch(/Add to card/)
+  })
+
+  it('does not stack Owner, Labels, Assignees and Due date as a main-column definition list', () => {
+    expect(pane).not.toMatch(/data-testid="detail-labels"/)
+    expect(pane).not.toMatch(/data-testid="detail-assignees"/)
+    expect(pane).not.toMatch(/data-testid="detail-due-date"/)
+    expect(pane).not.toMatch(/data-testid="detail-due-relative"/)
   })
 })
 
@@ -98,5 +105,12 @@ describe('detail styles', () => {
     expect(styles).not.toMatch(/#[0-9a-fA-F]{3,8}/)
     expect(styles).toContain('var(--color-border)')
     expect(styles).toContain('var(--color-surface)')
+  })
+
+  it('dims the board behind the dialog from the overlay token', () => {
+    expect(styles).toMatch(/\.detail-overlay\s*\{[^}]*background:\s*var\(--color-overlay\)/s)
+    expect(styles).not.toMatch(
+      /\.detail-overlay\s*\{[^}]*background:\s*(transparent|none|rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0)/s,
+    )
   })
 })

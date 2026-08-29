@@ -108,6 +108,21 @@ describe('item detail — loaded on open, never with the board', () => {
     expect(detail.item.value).toBeNull()
     expect(detail.status.value).toBe('idle')
   })
+
+  it('applies a lane change to the open item without a refetch', async () => {
+    const gateway = createFixtureTaskGateway()
+    const reads = vi.spyOn(gateway, 'getItemDetail')
+    const selectedItemId = ref<WorkItemId | null>(FIXTURE_ITEMS.review)
+    const detail = useItemDetail(gateway, ref(FIXTURE_HUMANS.wren), selectedItemId)
+    await settled()
+
+    expect(detail.item.value?.lane).toBe('review')
+    const readsAfterOpen = reads.mock.calls.length
+    detail.applyLane(FIXTURE_ITEMS.review, 'done')
+
+    expect(detail.item.value?.lane).toBe('done')
+    expect(reads).toHaveBeenCalledTimes(readsAfterOpen)
+  })
 })
 
 describe('item detail — writes update the open item', () => {
