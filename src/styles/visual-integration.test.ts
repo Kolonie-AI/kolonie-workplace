@@ -67,8 +67,6 @@ describe('visual integration — a visible keyboard focus state on every control
     ['src/kanban/kanban-board.css', '.lane-composer__submit'],
     ['src/kanban/kanban-board.css', '.lane-composer__cancel'],
     ['src/kanban/kanban-board.css', '.lane-composer__input'],
-    ['src/kanban/kanban-board.css', '.kanban-card__move-summary'],
-    ['src/kanban/kanban-board.css', '.kanban-card__move-control'],
     ['src/session/session.css', '.session-signed-out__candidate'],
     ['src/session/session.css', '.session-human__sign-out'],
   ] as const

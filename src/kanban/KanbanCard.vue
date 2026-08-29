@@ -7,7 +7,6 @@
  * Data reaches this component only through TaskGateway.
  */
 import { computed } from 'vue'
-import { isLane, WORKPLACE_LANE_LABELS, WORKPLACE_LANES, type Lane } from '@/domain/lanes'
 import type { WorkItemSummary } from '@/domain/workplace'
 import {
   checklistProgress,
@@ -27,12 +26,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   select: [itemId: string]
-  move: [itemId: string, lane: Lane]
 }>()
 
 const isBlocked = computed(() => props.item.lane === 'blocked')
 const isReview = computed(() => props.item.lane === 'review')
-const moveControlId = computed(() => `kanban-move-${props.item.id}`)
 const labels = computed(() => props.item.labels ?? [])
 const assignees = computed(() => props.item.assignees ?? [])
 const checklist = computed(() => props.item.checklist ?? [])
@@ -85,14 +82,6 @@ function onDragStart(event: DragEvent): void {
 
   if (event.dataTransfer !== null) {
     event.dataTransfer.effectAllowed = 'move'
-  }
-}
-
-function onLaneChange(event: Event): void {
-  const chosen = (event.target as HTMLSelectElement).value
-
-  if (isLane(chosen)) {
-    emit('move', props.item.id, chosen)
   }
 }
 </script>
@@ -209,35 +198,5 @@ function onLaneChange(event: Event): void {
         </span>
       </span>
     </button>
-
-    <details
-      class="kanban-card__move"
-      data-testid="kanban-card-move-disclosure"
-    >
-      <summary class="kanban-card__move-summary">
-        Move
-      </summary>
-      <label
-        class="kanban-card__move-label"
-        :for="moveControlId"
-      >Move to lane</label>
-      <select
-        :id="moveControlId"
-        class="kanban-card__move-control"
-        data-testid="kanban-card-move"
-        :data-item-id="item.id"
-        :value="item.lane"
-        :disabled="moving"
-        @change="onLaneChange"
-      >
-        <option
-          v-for="lane in WORKPLACE_LANES"
-          :key="lane"
-          :value="lane"
-        >
-          {{ WORKPLACE_LANE_LABELS[lane] }}
-        </option>
-      </select>
-    </details>
   </div>
 </template>
