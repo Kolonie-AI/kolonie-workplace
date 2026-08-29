@@ -115,6 +115,23 @@ describe('kanban source — Trello inline add-card composer', () => {
   })
 })
 
+describe('kanban source — Trello card face covers and badges', () => {
+  it('gives colour covers a strip taller than 8px and image covers a Trello-band height', () => {
+    expect(styles).toMatch(/\.kanban-card__cover\s*\{[^}]*block-size:\s*var\(--space-4\)/s)
+    expect(styles).not.toMatch(/\.kanban-card__cover\s*\{[^}]*block-size:\s*var\(--space-2\)/s)
+    expect(styles).toMatch(
+      /\.kanban-card__cover\[data-cover-kind="image"\]\s*\{[^}]*block-size:\s*calc\(\s*var\(--space-8\)\s*\*\s*2\s*\+\s*var\(--space-6\)\s*\)/s,
+    )
+    expect(styles).toMatch(/\.kanban-card__cover-image\s*\{[^}]*object-fit:\s*cover/s)
+    expect(styles).toMatch(/\.kanban-card\s*\{[^}]*overflow:\s*hidden/s)
+    expect(styles).toMatch(/\.kanban-card\s*\{[^}]*border-radius:\s*var\(--radius-medium\)/s)
+  })
+
+  it('does not put the letters Aa on the description badge', () => {
+    expect(card).not.toMatch(/>Aa</)
+  })
+})
+
 describe('kanban styles', () => {
   it('uses design tokens instead of literal colour values', () => {
     expect(styles).not.toMatch(/#[0-9a-fA-F]{3,8}/)

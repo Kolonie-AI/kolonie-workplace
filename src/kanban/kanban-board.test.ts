@@ -229,10 +229,42 @@ describe('kanban board — cards', () => {
 
     expect(within(card as HTMLElement).getByRole('img', { name: 'Delivery' })).toBeTruthy()
     expect(within(card as HTMLElement).getByRole('img', { name: 'Research' })).toBeTruthy()
-    expect(within(card as HTMLElement).getByLabelText('Has a description')).toBeTruthy()
+    const description = within(card as HTMLElement).getByLabelText('Has a description')
+    expect(description.textContent).not.toMatch(/Aa/)
+    expect(description.querySelector('svg')).not.toBeNull()
     expect(within(card as HTMLElement).getByLabelText('Checklist 1/2')).toBeTruthy()
-    expect(within(card as HTMLElement).getByLabelText('3 comments')).toBeTruthy()
-    expect(within(card as HTMLElement).getByLabelText('1 attachment')).toBeTruthy()
+    const comments = within(card as HTMLElement).getByLabelText('3 comments')
+    expect(comments.textContent).toMatch(/3/)
+    expect(comments.querySelector('svg')).not.toBeNull()
+    const attachments = within(card as HTMLElement).getByLabelText('1 attachment')
+    expect(attachments.textContent).toMatch(/1/)
+    expect(attachments.querySelector('svg')).not.toBeNull()
+  })
+
+  it('shows an image-cover fixture card and a colour-cover strip on the default board', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+
+    await waitFor(() => {
+      expect(allCardIds()).toContain(FIXTURE_ITEMS.ready)
+      expect(allCardIds()).toContain(FIXTURE_ITEMS.inProgress)
+    })
+
+    const ready = screen
+      .getAllByTestId('kanban-card')
+      .find((candidate) => candidate.getAttribute('data-item-id') === FIXTURE_ITEMS.ready)
+    const inProgress = screen
+      .getAllByTestId('kanban-card')
+      .find((candidate) => candidate.getAttribute('data-item-id') === FIXTURE_ITEMS.inProgress)
+
+    const imageCover = within(ready as HTMLElement).getByTestId('kanban-card-cover')
+    expect(imageCover.getAttribute('data-cover-kind')).toBe('image')
+    expect(imageCover.querySelector('img')?.getAttribute('src')).toBe(
+      '/fictional-covers/outline.svg',
+    )
+
+    const colourCover = within(inProgress as HTMLElement).getByTestId('kanban-card-cover')
+    expect(colourCover.getAttribute('data-cover-kind')).toBe('colour')
+    expect(colourCover.querySelector('img')).toBeNull()
   })
 
   it('stays compact: no description body, handover or reference content', async () => {

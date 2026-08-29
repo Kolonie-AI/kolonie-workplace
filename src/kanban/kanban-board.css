@@ -167,12 +167,12 @@
 .kanban-card__cover {
   display: block;
   overflow: hidden;
-  block-size: var(--space-2);
+  block-size: var(--space-4);
   margin: calc(var(--space-3) * -1) calc(var(--space-3) * -1) 0;
 }
 
 .kanban-card__cover[data-cover-kind="image"] {
-  block-size: calc(var(--space-8) * 2);
+  block-size: calc(var(--space-8) * 2 + var(--space-6));
 }
 
 .kanban-card__cover-image {
@@ -243,12 +243,22 @@
 .kanban-card__due,
 .kanban-card__checklist,
 .kanban-card__count {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   padding: 0 var(--space-2);
   border-radius: var(--radius-small);
   background: var(--color-list-well);
   color: var(--color-text-muted);
   font-size: var(--text-caption);
   font-weight: 600;
+}
+
+.kanban-card__badge-icon {
+  display: block;
+  block-size: 0.875rem;
+  inline-size: 0.875rem;
+  flex: none;
 }
 
 .kanban-card__due[data-due-state="overdue"] {
