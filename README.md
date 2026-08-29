@@ -175,8 +175,9 @@ docker pull ghcr.io/kolonie-ai/kolonie-workplace:<commit-sha>
 ```
 
 Consumers should pin the digest resolved from the commit tag rather than
-`latest`, so the selected build cannot move underneath them. Publishing the
-image does not deploy it; deployment remains a separate infrastructure change.
+`latest`, so the selected build cannot move underneath them. A successful
+publish then deploys that same SHA to `workplace.kolonie.ai` through
+`kolonie-infra`'s reusable workflow. A red publish deploys nothing.
 
 ## Status
 

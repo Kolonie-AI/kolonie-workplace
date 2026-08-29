@@ -17,6 +17,8 @@ const validationStep = workflow.match(
   /- name: Validate build configuration[\s\S]*?(?=\n {6}- |\n {2}\S|$)/,
 )?.[0]
 
+const deployJob = workflow.match(/\n  deploy:\n[\s\S]*$/)?.[0]
+
 const AUTH0_VARIABLES = [
   'VITE_AUTH0_DOMAIN',
   'VITE_AUTH0_CLIENT_ID',
@@ -61,10 +63,12 @@ describe('publish workflow — how it authenticates', () => {
   })
 
   /**
-   * #28's guarantee, kept but stated precisely. The registry credential is the
-   * built-in token and nothing else — no personal access token, no stored
-   * registry login. The three Auth0 entries are configuration carried through
-   * `secrets` for its masking, and they authenticate nothing.
+   * #28's registry guarantee, kept but stated precisely. The registry
+   * credential is the built-in token and nothing else — no personal access
+   * token, no stored registry login. The Auth0 and preview-identity entries
+   * are configuration carried through `secrets` for its masking, and they
+   * authenticate nothing. VPS_HOST / VPS_SSH_KEY are the named deploy
+   * secrets #94 requires; they are not a registry login.
    */
   it('uses the built-in token and no long-lived registry credential', () => {
     expect(workflow).toContain('password: ${{ secrets.GITHUB_TOKEN }}')
@@ -74,7 +78,7 @@ describe('publish workflow — how it authenticates', () => {
       (name) => !REQUIRED_BUILD_VALUES.includes(name as (typeof REQUIRED_BUILD_VALUES)[number]),
     )
 
-    expect(credentials).toEqual(['GITHUB_TOKEN'])
+    expect(credentials.sort()).toEqual(['GITHUB_TOKEN', 'VPS_HOST', 'VPS_SSH_KEY'])
   })
 })
 
@@ -181,9 +185,26 @@ describe('publish workflow — rejection: a failed build must publish nothing', 
   })
 })
 
-describe('publish workflow — it publishes and does not deploy', () => {
-  it('calls no deploy workflow and holds no host credential', () => {
-    expect(workflow).not.toContain('kolonie-infra/.github/workflows/deploy.yml')
-    expect(workflow).not.toMatch(/VPS_HOST|VPS_SSH_KEY/)
+describe('publish workflow — it publishes and then deploys that SHA', () => {
+  it('calls infra deploy after a successful publish, never on a red build', () => {
+    expect(deployJob).toBeDefined()
+    expect(deployJob).toMatch(/needs:\s*publish\b/)
+    expect(deployJob).toContain('uses: Kolonie-AI/kolonie-infra/.github/workflows/deploy.yml@main')
+    expect(workflow).not.toMatch(/continue-on-error/)
+  })
+
+  it('deploys only workplace at the commit SHA, never latest and never another service', () => {
+    expect(deployJob).toBeDefined()
+    expect(deployJob).toMatch(/service:\s*workplace\s*$/m)
+    expect(deployJob).toContain('version: ${{ github.sha }}')
+    expect(deployJob).not.toMatch(/version:\s*['"]?latest['"]?/)
+    expect(deployJob).not.toMatch(/service:\s*(api|website|all|verifier-runner)/)
+  })
+
+  it('names the two host secrets and does not inherit the rest', () => {
+    expect(deployJob).toBeDefined()
+    expect(deployJob).toContain('VPS_HOST: ${{ secrets.VPS_HOST }}')
+    expect(deployJob).toContain('VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}')
+    expect(workflow).not.toMatch(/secrets:\s*inherit/)
   })
 })

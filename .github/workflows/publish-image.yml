@@ -1,19 +1,20 @@
 name: Publish image
 
-# Every merge to `main` publishes the workplace image to GHCR, so that
-# `kolonie-infra` can pin an exact build. Without this the image from #27 exists
-# only on whoever's laptop built it.
+# Every merge to `main` publishes the workplace image to GHCR and then deploys
+# that exact SHA to the host, so `workplace.kolonie.ai` is a function of a merge.
+# Without the publish the image from #27 exists only on whoever's laptop built
+# it. Without the deploy job the host kept serving a sixteen-build-old image
+# while every Publish run reported green — measured 2026-08-28, issue #94.
 #
 # **A separate workflow from `ci.yml`, and deliberately not a fifth check.** The
 # four pull-request checks decide whether a change may land; this decides what
-# is published once it has. Merging the two would mean either publishing from an
-# unmerged branch or gating a merge on a registry push.
+# is published and served once it has. Merging the two would mean either
+# publishing from an unmerged branch or gating a merge on a registry push.
 #
-# **This publishes and does not deploy.** `kolonie-website` and
-# `kolonie-platform` both end their build workflow by calling
-# `kolonie-infra`'s reusable deploy; this one stops at the push on purpose.
-# Issue #28 states it: the deploy decision stays in `kolonie-infra`, and
-# `kolonie-infra#243` is the issue that consumes what this produces.
+# **This publishes and then deploys that SHA.** Same shape as `kolonie-website`
+# and `kolonie-platform`. #28's non-goal ("publishing an image must not deploy
+# it") is superseded by #94: the deploy decision is still `kolonie-infra`'s
+# reusable workflow, called from here so nobody has to press it by hand.
 
 on:
   push:
@@ -167,3 +168,25 @@ jobs:
           echo "published ${IMAGE}:${GITHUB_SHA}"
           docker buildx imagetools inspect "${IMAGE}:${GITHUB_SHA}" \
             --format '{{ .Manifest.Digest }}'
+
+  # The step that was missing here, and that kolonie-website's workflow has had
+  # since it reproduced the same failure: pushing the image was the end of this
+  # file, so every merge rebuilt GHCR and production kept serving whatever had
+  # last been deployed by hand. #94 reverses that. `version: github.sha` rather
+  # than `latest` because deploy.sh refuses the mutable tag, and a mutable tag
+  # would ship whatever finished building most recently, which need not be this
+  # commit.
+  deploy:
+    name: deploy ghcr.io/kolonie-ai/kolonie-workplace:${{ github.sha }} to the VPS
+    needs: publish
+    uses: Kolonie-AI/kolonie-infra/.github/workflows/deploy.yml@main
+    with:
+      service: workplace
+      version: ${{ github.sha }}
+    # Named, not inherited: the called workflow declares exactly these two.
+    secrets:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+    permissions:
+      contents: read
+      packages: read
