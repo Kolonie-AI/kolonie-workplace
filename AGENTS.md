@@ -94,7 +94,8 @@ Confirm with the maintainer before:
 - changing repository visibility
 - pointing this repository at the Colony-wide project board
 - importing a third-party frontend tree
-- spending money, or any DNS / live VPS write
+- spending money, or any DNS / live VPS write outside the merge-to-main
+  auto-deploy in `.github/workflows/publish-image.yml` (#94)
 
 ## 5. Settled decisions, and what still needs the maintainer
 
