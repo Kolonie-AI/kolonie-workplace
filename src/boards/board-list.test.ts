@@ -113,10 +113,8 @@ describe('sidebar board list — journey 1: two agents, one board each', () => {
     expect(sidebar.textContent).toContain(quill.name)
     expect(sidebar.textContent).toContain(birch.name)
     expect(quill.profession).not.toBe(birch.profession)
-    expect(groups[0]?.textContent).toContain(displayedProfession(quill))
-    expect(groups[0]?.textContent).not.toContain(displayedProfession(birch))
-    expect(groups[1]?.textContent).toContain(displayedProfession(birch))
-    expect(groups[1]?.textContent).not.toContain(displayedProfession(quill))
+    expect(groups[0]?.textContent).not.toContain(displayedProfession(quill))
+    expect(groups[1]?.textContent).not.toContain(displayedProfession(birch))
   })
 })
 
@@ -131,7 +129,7 @@ describe('sidebar board list — journey 2: one agent, two boards', () => {
     const groups = screen.getAllByTestId('board-group')
     expect(groups).toHaveLength(1)
     expect(groups[0]?.textContent).toContain(marlow.name)
-    expect(groups[0]?.textContent).toContain(displayedProfession(marlow))
+    expect(groups[0]?.textContent).not.toContain(displayedProfession(marlow))
     expect(within(groups[0] as HTMLElement).getAllByTestId('board-link')).toHaveLength(2)
   })
 })
@@ -311,22 +309,27 @@ describe('sidebar board list — selecting a board', () => {
       )
     })
     expect(screen.getByTestId('active-board').textContent).toContain(birchResearch.title)
-    expect(screen.getByTestId('active-board').textContent).toContain(birch.name)
-    expect(screen.getByTestId('active-board').textContent).toContain(displayedProfession(birch))
+    expect(screen.getByTestId('active-board').textContent).not.toContain(birch.name)
+    expect(screen.getByTestId('active-board').textContent).not.toContain(
+      displayedProfession(birch),
+    )
     expect(screen.getByTestId('active-board').textContent).not.toContain(
       displayedProfession(quill),
     )
   })
 
-  it('keeps one agent profession unchanged while switching between its boards', async () => {
+  it('keeps profession out of the board bar while switching between one agent\'s boards', async () => {
     await renderForHuman(FIXTURE_HUMANS.ash)
 
     await fireEvent.click(screen.getByText(marlowOutreach.title))
     await waitFor(() => {
-      expect(screen.getByTestId('active-board').textContent).toContain(
-        displayedProfession(marlow),
+      expect(screen.getByTestId('active-board').getAttribute('data-board-id')).toBe(
+        FIXTURE_BOARDS.marlowOutreach,
       )
     })
+    expect(screen.getByTestId('active-board').textContent).not.toContain(
+      displayedProfession(marlow),
+    )
 
     await fireEvent.click(screen.getByText(marlowBacklog.title))
     await waitFor(() => {
@@ -334,7 +337,7 @@ describe('sidebar board list — selecting a board', () => {
         FIXTURE_BOARDS.marlowBacklog,
       )
     })
-    expect(screen.getByTestId('active-board').textContent).toContain(
+    expect(screen.getByTestId('active-board').textContent).not.toContain(
       displayedProfession(marlow),
     )
   })

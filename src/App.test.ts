@@ -33,7 +33,7 @@ describe('App', () => {
     await fireEvent.click(screen.getByRole('button', { name: /Fictional Human Wren/ }))
 
     expect(screen.getByTestId('sidebar')).toBeTruthy()
-    expect(screen.getByTestId('topbar')).toBeTruthy()
+    expect(screen.queryByTestId('topbar')).toBeNull()
     expect(screen.getByTestId('board-header')).toBeTruthy()
     expect(screen.getByRole('tabpanel')).toBeTruthy()
     expect(screen.getByTestId('signed-in-human').textContent).toContain('Fictional Human Wren')
@@ -44,7 +44,8 @@ describe('App', () => {
 
     await fireEvent.click(screen.getByRole('button', { name: /Fictional Human Wren/ }))
 
-    expect(screen.getByRole('heading', { level: 1 }).textContent?.trim()).toBe('Work board')
+    expect(screen.queryByRole('heading', { name: 'Work board' })).toBeNull()
+    expect(screen.getByTestId('board-header')).toBeTruthy()
     expect(container.querySelector('form')).toBeNull()
     expect(screen.queryByTestId('work-item')).toBeNull()
   })

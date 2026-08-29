@@ -500,11 +500,10 @@ async function closeDetail(): Promise<void> {
         <button
           class="app-shell__sidebar-toggle"
           type="button"
+          :aria-label="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
           :aria-expanded="sidebarCollapsed ? 'false' : 'true'"
           @click="toggleSidebar"
-        >
-          {{ sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar' }}
-        </button>
+        />
       </div>
       <BoardList
         :status="boardList.status.value"
@@ -517,8 +516,8 @@ async function closeDetail(): Promise<void> {
 
     <div class="app-shell__workspace">
       <header
-        class="app-shell__topbar"
-        data-testid="topbar"
+        class="app-shell__board-header"
+        data-testid="board-header"
       >
         <button
           class="app-shell__menu-button"
@@ -533,7 +532,7 @@ async function closeDetail(): Promise<void> {
           />
         </button>
         <svg
-          class="app-shell__mark app-shell__mark--topbar"
+          class="app-shell__mark app-shell__mark--header"
           viewBox="0 0 64 64"
           role="img"
           aria-label="Kolonie AI"
@@ -559,33 +558,13 @@ async function closeDetail(): Promise<void> {
             />
           </g>
         </svg>
-        <span class="app-shell__workplace-name">Kolonie Workplace</span>
-        <span
+        <h1
           v-if="boardList.activeBoard.value !== null"
-          class="app-shell__topbar-board-title"
-        >{{ boardList.activeBoard.value.title }}</span>
-        <button
-          class="app-shell__search-button"
-          type="button"
-          :disabled="boardList.activeBoard.value === null"
-          @click="focusBoardSearch"
+          class="app-shell__title"
+          data-testid="active-board"
+          :data-board-id="boardList.activeBoard.value.id"
         >
-          Search this board
-        </button>
-        <span
-          v-if="showsPreviewData"
-          class="app-shell__preview-data"
-          data-testid="preview-data-indication"
-        >Example data. Moves are session-local and not recorded.</span>
-        <SignedInHuman />
-      </header>
-
-      <header
-        class="app-shell__board-header"
-        data-testid="board-header"
-      >
-        <h1 class="app-shell__title">
-          Work board
+          {{ boardList.activeBoard.value.title }}
         </h1>
         <div class="app-shell__board-toolbar">
           <div
@@ -626,6 +605,13 @@ async function closeDetail(): Promise<void> {
               @click="filterOpen ? closeFilter() : openFilter()"
             >
               Filter cards
+            </button>
+            <button
+              class="app-shell__search-button"
+              type="button"
+              @click="focusBoardSearch"
+            >
+              Search this board
             </button>
             <button
               v-if="isFiltered"
@@ -772,6 +758,12 @@ async function closeDetail(): Promise<void> {
             </div>
           </div>
         </div>
+        <span
+          v-if="showsPreviewData"
+          class="app-shell__preview-data"
+          data-testid="preview-data-indication"
+        >Example data</span>
+        <SignedInHuman />
       </header>
 
       <main class="app-shell__main">
@@ -793,23 +785,6 @@ async function closeDetail(): Promise<void> {
           That board could not be read. This is a read failure, not a statement
           about whether this human may open it.
         </p>
-
-        <section
-          v-if="boardList.activeBoard.value !== null"
-          class="app-shell__active-board"
-          data-testid="active-board"
-          :data-board-id="boardList.activeBoard.value.id"
-        >
-          <h2 class="app-shell__active-board-title">
-            {{ boardList.activeBoard.value.title }}
-          </h2>
-          <p class="app-shell__active-board-agent">
-            {{ boardList.activeBoard.value.agentName }}
-          </p>
-          <p class="app-shell__active-board-profession">
-            {{ boardList.activeBoard.value.profession ?? 'Profession not declared' }}
-          </p>
-        </section>
 
         <div
           class="app-shell__board-area"

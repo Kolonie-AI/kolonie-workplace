@@ -29,7 +29,7 @@
 }
 
 .board-list__groups {
-  gap: var(--space-5);
+  gap: var(--space-3);
 }
 
 .board-list__group {
@@ -37,18 +37,10 @@
 }
 
 .board-list__agent {
-  margin: 0;
+  margin: 0 0 var(--space-1);
   color: var(--color-sidebar-text);
-  font-size: var(--text-small);
+  font-size: var(--text-caption);
   font-weight: 600;
-}
-
-.board-list__profession {
-  margin: var(--space-1) 0 var(--space-2);
-  color: var(--color-sidebar-text);
-  font-size: var(--text-small);
-  line-height: 1.35;
-  overflow-wrap: anywhere;
 }
 
 .board-list__board {

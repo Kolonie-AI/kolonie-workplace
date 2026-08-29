@@ -52,6 +52,7 @@ describe('SessionGate — signed in', () => {
 
     expect(screen.queryByTestId('signed-out')).toBeNull()
     expect(screen.getByTestId('sidebar')).toBeTruthy()
+    expect(screen.queryByTestId('topbar')).toBeNull()
     expect(screen.getByTestId('board-header')).toBeTruthy()
     expect(screen.getByTestId('signed-in-human').textContent).toContain('Fictional Human Ash')
     expect(screen.getByTestId('signed-in-human').textContent).not.toContain('Fictional Human Wren')

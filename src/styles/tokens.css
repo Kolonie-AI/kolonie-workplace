@@ -78,7 +78,7 @@
   --motion-slow: 300ms ease;
 
   --sidebar-width: 15rem;
-  --lane-width: 17rem;
+  --lane-width: 17.5rem;
   --font-stack: system-ui, -apple-system, "Segoe UI", sans-serif;
 
   --focus-ring: 2px solid var(--color-accent);
@@ -161,7 +161,7 @@
   --motion-slow: 300ms ease;
 
   --sidebar-width: 15rem;
-  --lane-width: 17rem;
+  --lane-width: 17.5rem;
   --font-stack: system-ui, -apple-system, "Segoe UI", sans-serif;
 
   --focus-ring: 2px solid var(--color-accent);
@@ -245,7 +245,7 @@
     --motion-slow: 300ms ease;
 
     --sidebar-width: 15rem;
-    --lane-width: 17rem;
+    --lane-width: 17.5rem;
     --font-stack: system-ui, -apple-system, "Segoe UI", sans-serif;
 
     --focus-ring: 2px solid var(--color-accent);
@@ -267,7 +267,9 @@
 
 html,
 body {
+  block-size: 100%;
   margin: 0;
+  overflow: hidden;
   background: var(--color-canvas);
   color: var(--color-text);
   font-family: var(--font-stack);
@@ -284,6 +286,7 @@ h6 {
 }
 
 #app {
+  block-size: 100%;
   min-block-size: 100vh;
 }
 
