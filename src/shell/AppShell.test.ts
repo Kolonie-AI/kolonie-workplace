@@ -39,11 +39,11 @@ const nonFixtureGateway: TaskGateway = {
 }
 
 describe('AppShell', () => {
-  it('renders a persistent sidebar, top bar, board header and canvas', () => {
+  it('renders a persistent sidebar, one board bar and canvas', () => {
     renderShell()
 
     expect(screen.getByTestId('sidebar').tagName).toBe('ASIDE')
-    expect(screen.getByTestId('topbar').tagName).toBe('HEADER')
+    expect(screen.queryByTestId('topbar')).toBeNull()
     expect(screen.getByTestId('board-header').tagName).toBe('HEADER')
     expect(screen.getByRole('tabpanel').getAttribute('data-view')).toBe('kanban')
   })
@@ -181,10 +181,8 @@ describe('AppShell — preview data derives from the active gateway', () => {
 
     const indication = screen.getByTestId('preview-data-indication')
 
-    expect(indication.textContent?.trim()).toBe(
-      'Example data. Moves are session-local and not recorded.',
-    )
-    expect(screen.getByTestId('topbar').contains(indication)).toBe(true)
+    expect(indication.textContent?.trim()).toBe('Example data')
+    expect(screen.getByTestId('board-header').contains(indication)).toBe(true)
     expect(indication.getAttribute('role')).toBeNull()
     expect(indication.getAttribute('aria-live')).toBeNull()
     expect(indication.querySelector('button')).toBeNull()
@@ -275,13 +273,13 @@ describe('AppShell — preview data derives from the active gateway', () => {
 })
 
 describe('AppShell — responsive application chrome', () => {
-  it('renders the Colony mark in the top bar', () => {
+  it('renders the Colony mark in the board bar', () => {
     renderShell()
 
     const mark = screen.getByRole('img', { name: 'Kolonie AI' })
 
     expect(mark.tagName).toBe('svg')
-    expect(screen.getByTestId('topbar').contains(mark)).toBe(true)
+    expect(screen.getByTestId('board-header').contains(mark)).toBe(true)
   })
 
   it('collapses and expands the sidebar without losing the state on rerender', async () => {
@@ -356,7 +354,7 @@ describe('AppShell — responsive application chrome', () => {
     expect(screen.getByTestId('app-shell').getAttribute('data-mobile-menu-open')).toBe('true')
   })
 
-  it('opens the existing board search from the top bar', async () => {
+  it('opens the existing board search from the board bar', async () => {
     const session = createFixtureWorkplaceSession()
     await session.signIn({ humanId: FIXTURE_HUMANS.wren })
     render(AppShell, {

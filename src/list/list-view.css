@@ -1,7 +1,10 @@
 .list-view {
   display: grid;
+  align-content: start;
   gap: var(--space-4);
+  min-block-size: 0;
   min-inline-size: 0;
+  overflow-y: auto;
 }
 
 .list-view__state {

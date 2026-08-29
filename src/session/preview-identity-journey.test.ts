@@ -74,7 +74,8 @@ describe('the configured preview identity reaches the fixture boards', () => {
 
     expect(screen.queryByTestId('signed-out')).toBeNull()
     expect(screen.getByTestId('sidebar')).toBeTruthy()
-    expect(screen.getByTestId('topbar')).toBeTruthy()
+    expect(screen.queryByTestId('topbar')).toBeNull()
+    expect(screen.getByTestId('board-header')).toBeTruthy()
 
     const previewHuman = fixtureHumans.find((human) => human.id === PREVIEW_HUMAN_ID)
     expect(screen.getByTestId('signed-in-human').textContent).toContain(previewHuman?.name ?? '')
@@ -94,9 +95,7 @@ describe('the configured preview identity reaches the fixture boards', () => {
     })
 
     expect(screen.getAllByTestId('kanban-lane').length).toBeGreaterThan(0)
-    expect(screen.getByTestId('preview-data-indication').textContent).toBe(
-      'Example data. Moves are session-local and not recorded.',
-    )
+    expect(screen.getByTestId('preview-data-indication').textContent).toBe('Example data')
   })
 
   it('leaves no usable session after signing out', async () => {

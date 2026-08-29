@@ -234,7 +234,7 @@ describe('visual integration — the preview-data indication is chrome, not a ba
     )
   })
 
-  it('stays inside the top bar row rather than adding a strip of its own', () => {
+  it('stays inside the board bar rather than adding a strip of its own', () => {
     expect(shell).not.toMatch(
       /\.app-shell__preview-data\s*\{[^}]*(position:\s*(fixed|sticky|absolute)|inline-size:\s*100%|display:\s*block)/s,
     )
