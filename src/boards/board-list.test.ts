@@ -248,6 +248,9 @@ describe('sidebar board list — loading and failure', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     const session = await signedInSession(FIXTURE_HUMANS.wren)
@@ -282,6 +285,9 @@ describe('sidebar board list — loading and failure', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     const session = await signedInSession(FIXTURE_HUMANS.wren)
@@ -460,6 +466,9 @@ describe('sidebar board list — board management and no cardinality assumption'
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     await renderForHuman(FIXTURE_HUMANS.wren, gateway)
@@ -501,6 +510,9 @@ describe('sidebar board list — any implementation of the session port', () => 
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     renderShell(stub, gateway)
@@ -543,6 +555,9 @@ describe('sidebar board list — a read failure is not a permission refusal', ()
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     await renderForHuman(FIXTURE_HUMANS.wren, gateway, {
@@ -610,6 +625,9 @@ describe('sidebar board list — a read failure is not a permission refusal', ()
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     await renderForHuman(FIXTURE_HUMANS.wren, gateway, {

@@ -7,17 +7,22 @@
 import { computed, nextTick, onMounted, ref, useId, useTemplateRef, watch } from 'vue'
 import { trapFocus } from '@/a11y/focus-trap'
 import { isLane, WORKPLACE_LANE_LABELS, WORKPLACE_LANES, type Lane } from '@/domain/lanes'
-import type {
-  AttachmentId,
-  ChecklistItemId,
-  CommentId,
-  CreateAttachmentInput,
-  UpdateChecklistItemInput,
-  UpdateWorkItemInput,
-  WorkItemAssignee,
-  WorkItemDetail,
-  WorkItemLabel,
-  WorkItemMoveInput,
+import {
+  WORKPLACE_LINK_KIND_LABELS,
+  WORKPLACE_LINK_KINDS,
+  type AttachmentId,
+  type CardLinkId,
+  type CardLinkKind,
+  type ChecklistItemId,
+  type CommentId,
+  type CreateAttachmentInput,
+  type CreateCardLinkInput,
+  type UpdateChecklistItemInput,
+  type UpdateWorkItemInput,
+  type WorkItemAssignee,
+  type WorkItemDetail,
+  type WorkItemLabel,
+  type WorkItemMoveInput,
 } from '@/domain/workplace'
 import type { ItemDetailStatus } from '@/detail/use-item-detail'
 import ActivitySection from '@/detail/ActivitySection.vue'
@@ -60,9 +65,11 @@ const emit = defineEmits<{
   deleteComment: [commentId: CommentId]
   addAttachment: [input: CreateAttachmentInput]
   deleteAttachment: [attachmentId: AttachmentId]
+  addCardLink: [input: CreateCardLinkInput]
+  removeCardLink: [linkId: CardLinkId]
 }>()
 
-type RailPopover = 'labels' | 'members' | 'dates' | 'priority' | 'cover' | null
+type RailPopover = 'labels' | 'members' | 'dates' | 'priority' | 'cover' | 'connection' | null
 
 const titleDraft = ref('')
 const descriptionDraft = ref('')
@@ -87,6 +94,10 @@ const selectedLabelColour = ref<(typeof labelColours)[number]>(labelColours[0])
 const blockedByDraft = ref('')
 const unblockWhenDraft = ref('')
 const outcomeDraft = ref('')
+const linkKind = ref<CardLinkKind>('account')
+const linkRef = ref('')
+const linkNote = ref('')
+const linkInputError = ref<string | null>(null)
 
 const filteredLabels = computed(() => {
   const selected = new Set(props.item?.labels.map((label) => label.id) ?? [])
@@ -189,6 +200,29 @@ watch(
   },
   { immediate: true },
 )
+
+function submitConnection(): void {
+  const refValue = linkRef.value.trim()
+  const note = linkNote.value.trim()
+
+  if (refValue === '') {
+    linkInputError.value = 'Enter the identifier for this connection.'
+    return
+  }
+  if (linkKind.value === 'url' && !refValue.startsWith('https://')) {
+    linkInputError.value = 'External URLs must start with https://.'
+    return
+  }
+
+  linkInputError.value = null
+  emit('addCardLink', {
+    kind: linkKind.value,
+    ref: refValue,
+    ...(note === '' ? {} : { note }),
+  })
+  linkRef.value = ''
+  linkNote.value = ''
+}
 
 function onLaneChange(event: Event): void {
   const chosen = (event.target as HTMLSelectElement).value
@@ -901,24 +935,57 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
             </section>
 
             <section
-              v-if="item.externalReferences.length > 0"
               class="detail-pane__section"
-              aria-label="References"
+              aria-label="Connections"
+              data-testid="detail-connections"
             >
               <h3 class="detail-pane__section-title">
-                References
+                Connections
               </h3>
-              <ul class="detail-pane__references">
+              <p
+                v-if="item.links.length === 0"
+                class="detail-pane__empty"
+                data-testid="detail-connections-empty"
+              >
+                No connections yet.
+              </p>
+              <ul
+                v-else
+                class="detail-connections__list"
+              >
                 <li
-                  v-for="reference in item.externalReferences"
-                  :key="reference.href"
+                  v-for="link in item.links"
+                  :key="link.id"
+                  class="detail-connections__item"
+                  data-testid="detail-connection"
+                  :data-link-kind="link.kind"
+                  :data-link-state="link.state"
                 >
+                  <span class="detail-connections__kind">
+                    {{ WORKPLACE_LINK_KIND_LABELS[link.kind] }}
+                  </span>
                   <a
-                    class="detail-pane__reference"
-                    data-testid="detail-reference"
-                    :href="reference.href"
+                    v-if="link.kind === 'url' && link.state === 'resolved'"
+                    class="detail-pane__reference detail-connections__summary"
+                    :href="link.ref"
                     rel="noreferrer"
-                  >{{ reference.label }}</a>
+                  >{{ link.summary }}</a>
+                  <span
+                    v-else
+                    class="detail-connections__summary"
+                  >{{ link.summary }}</span>
+                  <span
+                    v-if="link.note !== undefined"
+                    class="detail-connections__note"
+                  >{{ link.note }}</span>
+                  <button
+                    class="detail-connections__remove"
+                    type="button"
+                    :aria-label="`Remove ${WORKPLACE_LINK_KIND_LABELS[link.kind]} connection ${link.summary}`"
+                    @click="emit('removeCardLink', link.id)"
+                  >
+                    Remove
+                  </button>
                 </li>
               </ul>
             </section>
@@ -942,6 +1009,70 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
             >
               Attachment
             </button>
+            <button
+              class="detail-pane__rail-button"
+              type="button"
+              :aria-expanded="railPopover === 'connection' ? 'true' : 'false'"
+              @click="toggleRail('connection')"
+            >
+              Connection
+            </button>
+            <form
+              v-if="railPopover === 'connection'"
+              class="detail-pane__popover"
+              aria-label="Add connection"
+              novalidate
+              @submit.prevent="submitConnection"
+            >
+              <label class="detail-pane__move-label">
+                Kind
+                <select
+                  v-model="linkKind"
+                  class="detail-pane__control"
+                  aria-label="Connection kind"
+                >
+                  <option
+                    v-for="kind in WORKPLACE_LINK_KINDS"
+                    :key="kind"
+                    :value="kind"
+                  >
+                    {{ WORKPLACE_LINK_KIND_LABELS[kind] }}
+                  </option>
+                </select>
+              </label>
+              <label class="detail-pane__move-label">
+                {{ WORKPLACE_LINK_KIND_LABELS[linkKind] }} identifier
+                <input
+                  v-model="linkRef"
+                  class="detail-pane__control"
+                  :type="linkKind === 'url' ? 'url' : 'text'"
+                  :aria-label="`${WORKPLACE_LINK_KIND_LABELS[linkKind]} identifier`"
+                  maxlength="2048"
+                >
+              </label>
+              <label class="detail-pane__move-label">
+                Note (optional)
+                <input
+                  v-model="linkNote"
+                  class="detail-pane__control"
+                  aria-label="Connection note"
+                  maxlength="500"
+                >
+              </label>
+              <p
+                v-if="linkInputError !== null"
+                class="detail-pane__state detail-pane__state--error"
+                role="alert"
+              >
+                {{ linkInputError }}
+              </p>
+              <button
+                class="detail-pane__rail-button"
+                type="submit"
+              >
+                Add connection
+              </button>
+            </form>
             <button
               class="detail-pane__rail-button"
               type="button"

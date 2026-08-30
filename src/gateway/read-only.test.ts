@@ -14,6 +14,7 @@ describe('the gateway write surface', () => {
 
     expect(methods.sort()).toEqual([
       'addAttachment',
+      'addCardLink',
       'archiveBoard',
       'createBoard',
       'createChecklistItem',
@@ -25,8 +26,10 @@ describe('the gateway write surface', () => {
       'deleteWorkItem',
       'getBoardItems',
       'getItemDetail',
+      'listCardLinks',
       'listVisibleBoards',
       'moveItemToLane',
+      'removeCardLink',
       'renameBoard',
       'reorderChecklistItem',
       'reorderWorkItem',
@@ -36,6 +39,7 @@ describe('the gateway write surface', () => {
     ])
     expect(methods.filter((name) => WRITE_LIKE.test(name)).sort()).toEqual([
       'addAttachment',
+      'addCardLink',
       'archiveBoard',
       'createBoard',
       'createChecklistItem',
@@ -46,6 +50,7 @@ describe('the gateway write surface', () => {
       'deleteComment',
       'deleteWorkItem',
       'moveItemToLane',
+      'removeCardLink',
       'renameBoard',
       'reorderChecklistItem',
       'reorderWorkItem',

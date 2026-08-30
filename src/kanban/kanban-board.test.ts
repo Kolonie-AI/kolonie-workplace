@@ -371,6 +371,9 @@ describe('kanban board — an empty lane is not an empty board', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
@@ -488,6 +491,9 @@ describe('kanban board — items of one board never appear on another', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     await renderBoard(FIXTURE_HUMANS.wren, 'board-mine', gateway)
@@ -543,6 +549,9 @@ describe('kanban board — rejection: an item in a lane the Colony does not defi
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
   }
 
@@ -838,6 +847,9 @@ describe('kanban board — loading and failure', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     await renderBoard(FIXTURE_HUMANS.wren, 'board-mine', gateway)
@@ -883,6 +895,9 @@ describe('kanban board — loading and failure', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     await renderBoard(FIXTURE_HUMANS.wren, 'board-mine', gateway)
@@ -1016,6 +1031,9 @@ describe('kanban board — any implementation of the session port', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     render(AppShell, {

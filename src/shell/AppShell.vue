@@ -17,9 +17,11 @@ import {
 import type {
   AttachmentId,
   BoardId,
+  CardLinkId,
   ChecklistItemId,
   CommentId,
   CreateAttachmentInput,
+  CreateCardLinkInput,
   UpdateChecklistItemInput,
   UpdateWorkItemInput,
   WorkItemMoveInput,
@@ -469,6 +471,14 @@ async function deleteAttachment(attachmentId: AttachmentId): Promise<WorkItemDet
   return updated
 }
 
+async function addCardLink(input: CreateCardLinkInput): Promise<WorkItemDetail | null> {
+  return detail.addCardLink(input)
+}
+
+async function removeCardLink(linkId: CardLinkId): Promise<WorkItemDetail | null> {
+  return detail.removeCardLink(linkId)
+}
+
 function openItem(itemId: string): void {
   items.selectItem(itemId)
 }
@@ -868,6 +878,8 @@ async function closeDetail(): Promise<void> {
             @delete-comment="deleteComment"
             @add-attachment="addAttachment"
             @delete-attachment="deleteAttachment"
+            @add-card-link="addCardLink"
+            @remove-card-link="removeCardLink"
             @move="moveDetail"
             @close="closeDetail"
           />

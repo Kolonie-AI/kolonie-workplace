@@ -40,6 +40,9 @@ function gatewayServing(details: Readonly<Record<string, WorkItemDetail>>): Task
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
   }
 }
 
@@ -217,6 +220,26 @@ describe('item detail — writes update the open item', () => {
     expect(removed?.attachments).toEqual([])
     expect(detail.item.value?.attachments).toEqual([])
   })
+
+  it('adds and removes a typed card link through the gateway', async () => {
+    const gateway = createFixtureTaskGateway()
+    const selectedItemId = ref<WorkItemId | null>(FIXTURE_ITEMS.ready)
+    const detail = useItemDetail(gateway, ref(FIXTURE_HUMANS.wren), selectedItemId)
+    await settled()
+
+    const added = await detail.addCardLink({ kind: 'vault', ref: 'fictional/mailbox' })
+    expect(added?.links).toHaveLength(1)
+    expect(detail.item.value?.links[0]).toMatchObject({
+      kind: 'vault',
+      ref: 'fictional/mailbox',
+      summary: 'fictional/mailbox',
+    })
+    expect(detail.item.value?.links[0]).not.toHaveProperty('value')
+
+    const removed = await detail.removeCardLink(added!.links[0]!.id)
+    expect(removed?.links).toEqual([])
+    expect(detail.item.value?.links).toEqual([])
+  })
 })
 
 describe('item detail — rejection: an item on a board this human may not open', () => {
@@ -258,6 +281,9 @@ describe('item detail — rejection: an item on a board this human may not open'
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
       },
       ref(FIXTURE_HUMANS.wren),
       selectedItemId,
@@ -325,6 +351,9 @@ describe('item detail — a slow read that is overtaken', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
     const selectedItemId = ref<WorkItemId | null>(null)
     const detail = useItemDetail(gateway, ref(FIXTURE_HUMANS.wren), selectedItemId)

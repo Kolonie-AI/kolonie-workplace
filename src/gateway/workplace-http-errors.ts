@@ -61,6 +61,13 @@ export class WorkplaceCitizenRequired extends Error {
   }
 }
 
+export class WorkplaceLinkUnresolvable extends Error {
+  constructor() {
+    super('Kolonie Workplace: nothing matches that kind and ref.')
+    this.name = 'WorkplaceLinkUnresolvable'
+  }
+}
+
 export class AttachmentPreviewOnly extends Error {
   constructor() {
     super(

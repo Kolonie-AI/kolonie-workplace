@@ -36,6 +36,9 @@ const nonFixtureGateway: TaskGateway = {
   updateChecklistItem: async () => Promise.reject(new Error('No write requested in this test.')),
   reorderChecklistItem: async () => Promise.reject(new Error('No write requested in this test.')),
   deleteChecklistItem: async () => Promise.reject(new Error('No write requested in this test.')),
+  listCardLinks: async () => [],
+  addCardLink: async () => Promise.reject(new Error('No write requested in this test.')),
+  removeCardLink: async () => undefined,
 }
 
 describe('AppShell', () => {

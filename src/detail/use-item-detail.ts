@@ -2,9 +2,11 @@ import { ref, watch, type Ref } from 'vue'
 import type { Lane } from '@/domain/lanes'
 import type {
   AttachmentId,
+  CardLinkId,
   ChecklistItemId,
   CommentId,
   CreateAttachmentInput,
+  CreateCardLinkInput,
   HumanId,
   UpdateChecklistItemInput,
   UpdateWorkItemInput,
@@ -51,6 +53,8 @@ export interface ItemDetail {
   deleteComment(commentId: CommentId): Promise<WorkItemDetail | null>
   addAttachment(input: CreateAttachmentInput): Promise<WorkItemDetail | null>
   deleteAttachment(attachmentId: AttachmentId): Promise<WorkItemDetail | null>
+  addCardLink(input: CreateCardLinkInput): Promise<WorkItemDetail | null>
+  removeCardLink(linkId: CardLinkId): Promise<WorkItemDetail | null>
   applyLane(itemId: WorkItemId, lane: Lane): void
 }
 
@@ -283,6 +287,43 @@ export function useItemDetail(
     )
   }
 
+  async function addCardLink(input: CreateCardLinkInput): Promise<WorkItemDetail | null> {
+    const currentHumanId = humanId.value
+    const current = item.value
+    const ref = input.ref.trim()
+    const note = input.note?.trim()
+
+    if (currentHumanId === null || current === null || ref === '') {
+      return null
+    }
+
+    return writeDetail(current, currentHumanId, async () => {
+      const created = await gateway.addCardLink(currentHumanId, current.id, {
+        kind: input.kind,
+        ref,
+        ...(note === undefined || note === '' ? {} : { note }),
+      })
+      if (current.links.some((link) => link.id === created.id)) {
+        return current
+      }
+      return { ...current, links: [...current.links, created] }
+    })
+  }
+
+  async function removeCardLink(linkId: CardLinkId): Promise<WorkItemDetail | null> {
+    const currentHumanId = humanId.value
+    const current = item.value
+
+    if (currentHumanId === null || current === null) {
+      return null
+    }
+
+    return writeDetail(current, currentHumanId, async () => {
+      await gateway.removeCardLink(currentHumanId, linkId)
+      return { ...current, links: current.links.filter((link) => link.id !== linkId) }
+    })
+  }
+
   return {
     status,
     item,
@@ -297,6 +338,8 @@ export function useItemDetail(
     deleteComment,
     addAttachment,
     deleteAttachment,
+    addCardLink,
+    removeCardLink,
     applyLane(itemId: WorkItemId, lane: Lane): void {
       const current = item.value
 

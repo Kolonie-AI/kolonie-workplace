@@ -108,6 +108,9 @@ describe('useBoardList — reading the visible boards', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     await settled(null, gateway)
@@ -138,6 +141,9 @@ describe('useBoardList — failure is not emptiness', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     const list = await settled(FIXTURE_HUMANS.wren, gateway)
@@ -254,6 +260,9 @@ describe('useBoardList — selecting a board', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     const list = await settled(FIXTURE_HUMANS.wren, gateway)
@@ -315,6 +324,9 @@ describe('useBoardList — a read failure is not a permission refusal', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
   }
 
@@ -401,6 +413,9 @@ describe('useBoardList — a read failure is not a permission refusal', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     const list = await settled(FIXTURE_HUMANS.wren, gateway)
@@ -444,6 +459,9 @@ describe('useBoardList — a read failure is not a permission refusal', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     const list = await settled(FIXTURE_HUMANS.wren, gateway)
@@ -503,6 +521,9 @@ describe('useBoardList — a failed selection leaves no board active', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
   }
 
@@ -576,6 +597,9 @@ describe('useBoardList — a failed selection leaves no board active', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     const list = await settled(FIXTURE_HUMANS.wren, gateway)
@@ -629,6 +653,9 @@ describe('useBoardList — a failed selection leaves no board active', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     const list = await settled(FIXTURE_HUMANS.wren, gateway)

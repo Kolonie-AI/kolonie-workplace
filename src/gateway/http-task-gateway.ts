@@ -2,10 +2,15 @@ import { isLane, type Lane } from '@/domain/lanes'
 import type {
   AttachmentId,
   BoardId,
+  CardLink,
+  CardLinkId,
+  CardLinkKind,
+  CardLinkState,
   ChecklistItem,
   ChecklistItemId,
   CommentId,
   CreateAttachmentInput,
+  CreateCardLinkInput,
   CreateCommentInput,
   CreateWorkItemInput,
   HumanId,
@@ -21,6 +26,7 @@ import type {
   WorkItemPriority,
   WorkItemSummary,
 } from '@/domain/workplace'
+import { isCardLinkKind } from '@/domain/workplace'
 import { BoardAccessRefused, WorkItemAccessRefused } from '@/gateway/refusals'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import {
@@ -31,6 +37,7 @@ import {
   WorkplaceHandoverRequired,
   WorkplaceInvalidTransition,
   WorkplaceLifecycleInputRequired,
+  WorkplaceLinkUnresolvable,
   WorkplaceMultipleOwnersUnsupported,
   WorkplaceUnauthorized,
 } from '@/gateway/workplace-http-errors'
@@ -427,6 +434,36 @@ export class HttpTaskGateway implements TaskGateway {
     throw new AttachmentPreviewOnly()
   }
 
+  async listCardLinks(_humanId: HumanId, itemId: WorkItemId): Promise<readonly CardLink[]> {
+    const body = await this.#request('GET', `${WORKPLACE_API_PREFIX}/cards/${itemId}/links`)
+    return this.#links((body as Json).items)
+  }
+
+  async addCardLink(
+    _humanId: HumanId,
+    itemId: WorkItemId,
+    input: CreateCardLinkInput,
+  ): Promise<CardLink> {
+    const json: Json = { kind: input.kind, ref: input.ref }
+    if (input.note !== undefined && input.note.trim() !== '') {
+      json.note = input.note.trim()
+    }
+
+    const body = await this.#request('POST', `${WORKPLACE_API_PREFIX}/cards/${itemId}/links`, {
+      json,
+    })
+    const [created] = this.#links([body])
+    if (created === undefined) {
+      throw new WorkItemAccessRefused(itemId)
+    }
+
+    return created
+  }
+
+  async removeCardLink(_humanId: HumanId, linkId: CardLinkId): Promise<void> {
+    await this.#request('DELETE', `${WORKPLACE_API_PREFIX}/links/${linkId}`)
+  }
+
   async createChecklistItem(
     humanId: HumanId,
     itemId: WorkItemId,
@@ -629,6 +666,9 @@ export class HttpTaskGateway implements TaskGateway {
     if (errorCode(body) === 'workplace_handover_required') {
       return new WorkplaceHandoverRequired()
     }
+    if (errorCode(body) === 'workplace_link_unresolvable') {
+      return new WorkplaceLinkUnresolvable()
+    }
     if (status === 404 || errorCode(body) === 'not_found') {
       if (path.includes('/boards/') && path.includes('/cards') === false && path.includes('/cards/') === false) {
         const boardId = path.split('/boards/')[1]?.split(/[/?]/)[0]
@@ -785,7 +825,7 @@ export class HttpTaskGateway implements TaskGateway {
       coverImageUrl: null,
       coverAttachmentId: null,
       position: number(card.position),
-      externalReferences: this.#links(envelope.links),
+      links: this.#links(envelope.links),
       ...(handover === undefined ? {} : { handover }),
       ...(blockedBy === null && unblockWhen === null
         ? {}
@@ -807,7 +847,7 @@ export class HttpTaskGateway implements TaskGateway {
     const summary = this.#toSummary(body)
     return {
       ...summary,
-      externalReferences: [],
+      links: [],
     }
   }
 
@@ -913,7 +953,7 @@ export class HttpTaskGateway implements TaskGateway {
     }
   }
 
-  #links(value: unknown): WorkItemDetail['externalReferences'] {
+  #links(value: unknown): CardLink[] {
     if (!Array.isArray(value)) {
       return []
     }
@@ -924,13 +964,52 @@ export class HttpTaskGateway implements TaskGateway {
       }
 
       const row = entry as Json
+      const kind = text(row.kind)
       const ref = text(row.ref)
-      if (row.kind !== 'url' || ref.length === 0) {
+      if (!isCardLinkKind(kind) || ref.length === 0) {
         return []
       }
 
-      return [{ label: text(row.note) || ref, href: ref }]
+      const target =
+        typeof row.target === 'object' && row.target !== null ? (row.target as Json) : {}
+      const resolved = linkProjection(kind, ref, target)
+      const note = text(row.note)
+
+      return [
+        {
+          id: text(row.id),
+          kind,
+          ref,
+          ...(note.length > 0 ? { note } : {}),
+          state: resolved.state,
+          summary: resolved.summary,
+        },
+      ]
     })
+  }
+}
+
+function linkProjection(
+  kind: CardLinkKind,
+  ref: string,
+  target: Json,
+): { state: CardLinkState; summary: string } {
+  if (text(target.state) === 'unresolvable') {
+    return { state: 'unresolvable', summary: 'Not resolvable' }
+  }
+
+  switch (kind) {
+    case 'account':
+      return { state: 'resolved', summary: text(target.identifier) || ref }
+    case 'provider':
+      return { state: 'resolved', summary: text(target.title) || ref }
+    case 'vault':
+      return { state: 'resolved', summary: text(target.name) || ref }
+    case 'task':
+    case 'playbook':
+      return { state: 'resolved', summary: text(target.title) || ref }
+    case 'url':
+      return { state: 'resolved', summary: ref }
   }
 }
 

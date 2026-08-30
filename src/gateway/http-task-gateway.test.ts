@@ -5,6 +5,7 @@ import {
   WorkplaceConflict,
   WorkplaceForbidden,
   WorkplaceInvalidTransition,
+  WorkplaceLinkUnresolvable,
   WorkplaceMultipleOwnersUnsupported,
   WorkplaceUnauthorized,
 } from '@/gateway/workplace-http-errors'
@@ -16,6 +17,8 @@ const CITIZEN_ID = '00000000-0000-4000-8000-0000000000c1'
 const OTHER_CITIZEN_ID = '00000000-0000-4000-8000-0000000000c2'
 const BOARD_ID = '00000000-0000-4000-8000-0000000000b1'
 const CARD_ID = '00000000-0000-4000-8000-0000000000a1'
+const ACCOUNT_ID = '00000000-0000-4000-8000-0000000000d1'
+const LINK_ID = '00000000-0000-4000-8000-0000000000e1'
 const ORIGIN = 'https://platform.example.invalid'
 const TOKEN = 'test-access-token'
 
@@ -528,6 +531,191 @@ describe('live HTTP gateway — cards', () => {
         ],
       }),
     ).rejects.toBeInstanceOf(WorkplaceMultipleOwnersUnsupported)
+  })
+})
+
+describe('live HTTP gateway — typed card links', () => {
+  it('lists all six resolved kinds plus an unresolvable row without exposing a vault value', async () => {
+    const plantedVaultValue = 'planted-vault-value-never-exposed'
+    const { fetchImpl, calls } = recordedFetch((url) => {
+      if (url === `${ORIGIN}/v1/workplace/cards/${CARD_ID}/links`) {
+        return jsonResponse(200, {
+          items: [
+            {
+              id: LINK_ID,
+              cardId: CARD_ID,
+              kind: 'account',
+              ref: ACCOUNT_ID,
+              note: 'Primary mailbox',
+              target: {
+                state: 'resolved',
+                kind: 'account',
+                provider: null,
+                identifier: 'fictional-account-summary',
+                proved: true,
+              },
+            },
+            {
+              id: '00000000-0000-4000-8000-0000000000e2',
+              cardId: CARD_ID,
+              kind: 'provider',
+              ref: 'fictional-provider',
+              target: {
+                state: 'resolved',
+                kind: 'provider',
+                title: 'Fictional Provider',
+                category: 'mailbox',
+              },
+            },
+            {
+              id: '00000000-0000-4000-8000-0000000000e3',
+              cardId: CARD_ID,
+              kind: 'vault',
+              ref: 'fictional/mailbox',
+              target: {
+                state: 'resolved',
+                kind: 'vault',
+                name: 'fictional/mailbox',
+                held: true,
+                value: plantedVaultValue,
+              },
+            },
+            {
+              id: '00000000-0000-4000-8000-0000000000e4',
+              cardId: CARD_ID,
+              kind: 'task',
+              ref: '00000000-0000-4000-8000-0000000000f1',
+              target: {
+                state: 'resolved',
+                kind: 'task',
+                title: 'Fictional task',
+                status: 'open',
+              },
+            },
+            {
+              id: '00000000-0000-4000-8000-0000000000e5',
+              cardId: CARD_ID,
+              kind: 'playbook',
+              ref: '00000000-0000-4000-8000-0000000000f2',
+              target: {
+                state: 'resolved',
+                kind: 'playbook',
+                title: 'Fictional playbook',
+                status: 'open',
+              },
+            },
+            {
+              id: '00000000-0000-4000-8000-0000000000e6',
+              cardId: CARD_ID,
+              kind: 'url',
+              ref: `${ORIGIN}/reference/item`,
+              target: { state: 'resolved', kind: 'url' },
+            },
+            {
+              id: '00000000-0000-4000-8000-0000000000e7',
+              cardId: CARD_ID,
+              kind: 'account',
+              ref: '00000000-0000-4000-8000-0000000000f3',
+              target: { state: 'unresolvable', kind: 'account' },
+            },
+          ],
+        })
+      }
+      return jsonResponse(404, { code: 'not_found' })
+    })
+
+    const links = await gateway(fetchImpl).listCardLinks(HUMAN_ID, CARD_ID)
+
+    expect(links.map((link) => link.kind)).toEqual([
+      'account',
+      'provider',
+      'vault',
+      'task',
+      'playbook',
+      'url',
+      'account',
+    ])
+    expect(links[0]).toMatchObject({ summary: 'fictional-account-summary', note: 'Primary mailbox' })
+    expect(links[2]).toMatchObject({ summary: 'fictional/mailbox' })
+    expect(links[6]).toMatchObject({ state: 'unresolvable', summary: 'Not resolvable' })
+    expect(JSON.stringify(links)).not.toContain(plantedVaultValue)
+    expect(calls.every((call) => !call.url.includes('/vault'))).toBe(true)
+    expect(header(calls[0]?.init, 'X-Kolonie-Citizen')).toBe(CITIZEN_ID)
+  })
+
+  it('adds an account and a vault-name link with matching POST payloads', async () => {
+    const created = [
+      {
+        id: LINK_ID,
+        cardId: CARD_ID,
+        kind: 'account',
+        ref: ACCOUNT_ID,
+        note: 'Primary mailbox',
+        target: {
+          state: 'resolved',
+          kind: 'account',
+          provider: null,
+          identifier: 'fictional-account-summary',
+          proved: true,
+        },
+      },
+      {
+        id: '00000000-0000-4000-8000-0000000000e2',
+        cardId: CARD_ID,
+        kind: 'vault',
+        ref: 'fictional/mailbox',
+        target: {
+          state: 'resolved',
+          kind: 'vault',
+          name: 'fictional/mailbox',
+          held: true,
+        },
+      },
+    ]
+    let index = 0
+    const { fetchImpl, calls } = recordedFetch(() => jsonResponse(201, created[index++]))
+    const live = gateway(fetchImpl)
+
+    const account = await live.addCardLink(HUMAN_ID, CARD_ID, {
+      kind: 'account',
+      ref: ACCOUNT_ID,
+      note: 'Primary mailbox',
+    })
+    const vault = await live.addCardLink(HUMAN_ID, CARD_ID, {
+      kind: 'vault',
+      ref: 'fictional/mailbox',
+    })
+
+    expect(account.summary).toBe('fictional-account-summary')
+    expect(vault.summary).toBe('fictional/mailbox')
+    expect(calls.map((call) => JSON.parse(String(call.init.body)))).toEqual([
+      { kind: 'account', ref: ACCOUNT_ID, note: 'Primary mailbox' },
+      { kind: 'vault', ref: 'fictional/mailbox' },
+    ])
+    expect(calls.every((call) => call.url === `${ORIGIN}/v1/workplace/cards/${CARD_ID}/links`)).toBe(true)
+  })
+
+  it('removes one link through DELETE /v1/workplace/links/:linkId', async () => {
+    const { fetchImpl, calls } = recordedFetch(() => new Response(null, { status: 204 }))
+
+    await gateway(fetchImpl).removeCardLink(HUMAN_ID, LINK_ID)
+
+    expect(calls[0]?.url).toBe(`${ORIGIN}/v1/workplace/links/${LINK_ID}`)
+    expect(calls[0]?.init.method).toBe('DELETE')
+    expect(header(calls[0]?.init, 'X-Kolonie-Citizen')).toBe(CITIZEN_ID)
+  })
+
+  it('types a link target that cannot be resolved', async () => {
+    const { fetchImpl } = recordedFetch(() =>
+      jsonResponse(422, {
+        code: 'workplace_link_unresolvable',
+        message: 'Nothing matches that kind and ref.',
+      }),
+    )
+
+    await expect(
+      gateway(fetchImpl).addCardLink(HUMAN_ID, CARD_ID, { kind: 'account', ref: ACCOUNT_ID }),
+    ).rejects.toBeInstanceOf(WorkplaceLinkUnresolvable)
   })
 })
 

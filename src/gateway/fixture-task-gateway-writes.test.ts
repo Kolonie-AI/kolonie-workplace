@@ -228,6 +228,30 @@ describe('fixture gateway writes', () => {
     ).rejects.toBeInstanceOf(WorkItemAccessRefused)
   })
 
+  it('adds and removes a vault-name link without a value field', async () => {
+    const gateway = createFixtureTaskGateway()
+
+    const created = await gateway.addCardLink(FIXTURE_HUMANS.wren, FIXTURE_ITEMS.ready, {
+      kind: 'vault',
+      ref: 'fictional/mailbox',
+    })
+    expect(created).toMatchObject({
+      kind: 'vault',
+      ref: 'fictional/mailbox',
+      summary: 'fictional/mailbox',
+      state: 'resolved',
+    })
+    expect(created).not.toHaveProperty('value')
+    expect(
+      (await gateway.getItemDetail(FIXTURE_HUMANS.wren, FIXTURE_ITEMS.ready)).links,
+    ).toEqual([created])
+
+    await gateway.removeCardLink(FIXTURE_HUMANS.wren, created.id)
+    expect(
+      (await gateway.getItemDetail(FIXTURE_HUMANS.wren, FIXTURE_ITEMS.ready)).links,
+    ).toEqual([])
+  })
+
   it('returns summary fields needed by a board card', async () => {
     const gateway = createFixtureTaskGateway()
     const items = await gateway.getBoardItems(

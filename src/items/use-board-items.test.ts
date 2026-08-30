@@ -46,6 +46,9 @@ function gatewayReturning(
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
   }
 }
 
@@ -123,6 +126,9 @@ describe('board kanban — loading the active board', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
       },
       ref(FIXTURE_HUMANS.wren),
       ref(FIXTURE_BOARDS.quillDelivery),
@@ -331,7 +337,7 @@ function createdItem(id: string, title: string, lane: 'ready' | 'blocked' = 'rea
     coverImageUrl: null,
     coverAttachmentId: null,
     position: 0,
-    externalReferences: [],
+    links: [],
   }
 }
 

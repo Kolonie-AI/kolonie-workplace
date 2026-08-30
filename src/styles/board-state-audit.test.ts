@@ -58,6 +58,9 @@ function stubbedGateway(overrides: Partial<TaskGateway> = {}): TaskGateway {
     updateChecklistItem: vi.fn(),
     reorderChecklistItem: vi.fn(),
     deleteChecklistItem: vi.fn(),
+    listCardLinks: vi.fn(),
+    addCardLink: vi.fn(),
+    removeCardLink: vi.fn(),
     ...overrides,
   }
 }
