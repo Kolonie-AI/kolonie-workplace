@@ -1017,13 +1017,13 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
             >
               Connection
             </button>
-              <form
-                v-if="railPopover === 'connection'"
-                class="detail-pane__popover"
-                aria-label="Add connection"
-                novalidate
-                @submit.prevent="submitConnection"
-              >
+            <form
+              v-if="railPopover === 'connection'"
+              class="detail-pane__popover"
+              aria-label="Add connection"
+              novalidate
+              @submit.prevent="submitConnection"
+            >
               <label class="detail-pane__move-label">
                 Kind
                 <select
