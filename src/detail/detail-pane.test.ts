@@ -4,6 +4,7 @@ import type { BoardId } from '@/domain/workplace'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import { TASK_GATEWAY } from '@/gateway/provide-gateway'
 import { WORKPLACE_CLOCK } from '@/clock/workplace-clock'
+import { createHttpTaskGateway } from '@/gateway/http-task-gateway'
 import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
 import { FIXTURE_BOARDS, FIXTURE_HUMANS, FIXTURE_ITEMS, FIXTURE_LABELS } from '@/fixtures/catalogue'
 import AppShell from '@/shell/AppShell.vue'
@@ -519,6 +520,98 @@ describe('detail pane — rich-text description', () => {
       expect(within(pane()).getByRole('alert').textContent).toMatch(/updating/i)
     })
     expect(within(pane()).getByTestId('detail-description').innerHTML).toBe(previous)
+  })
+})
+
+describe('detail pane — live lifecycle inputs', () => {
+  it('hides the multiple-assignee control and records the fields required to block', async () => {
+    let status = 'in_progress'
+    let version = 3
+    const calls: { url: string; init: RequestInit }[] = []
+    const fetchImpl: typeof fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      const request = init ?? {}
+      calls.push({ url, init: request })
+      const card = {
+        id: FIXTURE_ITEMS.review,
+        boardId: FIXTURE_BOARDS.quillDelivery,
+        status,
+        title: 'Review the delivery handoff',
+        description: '',
+        ownerId: FIXTURE_HUMANS.wren,
+        position: 0,
+        priority: 'unset',
+        dueAt: null,
+        blockedBy: status === 'blocked' ? 'Waiting on the operator.' : null,
+        unblockWhen: status === 'blocked' ? 'The operator answers.' : null,
+        outcome: null,
+        version,
+        coverColour: null,
+        seedKey: null,
+        archivedAt: null,
+        createdAt: '2026-08-27T12:00:00.000Z',
+        updatedAt: '2026-08-27T12:00:00.000Z',
+      }
+      if (url.endsWith('/boards')) {
+        return new Response(JSON.stringify({ items: [{
+          id: FIXTURE_BOARDS.quillDelivery,
+          ownerId: FIXTURE_HUMANS.wren,
+          title: 'Live delivery board',
+          kind: 'default',
+          archivedAt: null,
+          version: 1,
+          createdAt: '2026-08-27T12:00:00.000Z',
+          updatedAt: '2026-08-27T12:00:00.000Z',
+        }], nextCursor: null }), { status: 200 })
+      }
+      if (url.endsWith('/cards') && request.method !== 'POST') {
+        return new Response(JSON.stringify({ items: [{
+          id: card.id,
+          boardId: card.boardId,
+          status: card.status,
+          title: card.title,
+          ownerId: card.ownerId,
+          position: card.position,
+          priority: card.priority,
+          dueAt: card.dueAt,
+          version: card.version,
+          coverColour: null,
+          labelCount: 0,
+          checklistCount: 0,
+          commentCount: 0,
+          linkCount: 0,
+          linkCounts: { account: 0, provider: 0, vault: 0, task: 0, playbook: 0, url: 0 },
+        }], nextCursor: null }), { status: 200 })
+      }
+      if (url.endsWith('/block')) {
+        status = 'blocked'
+        version += 1
+        return new Response(JSON.stringify({ ...card, status, version, blockedBy: 'Waiting on the operator.', unblockWhen: 'The operator answers.' }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ card, labels: [], checklists: [], comments: [], links: [], handover: null }), { status: 200 })
+    })
+    const gateway = createHttpTaskGateway({
+      origin: 'https://platform.example.invalid',
+      getToken: async () => 'test-token',
+      getCitizen: () => ({ id: FIXTURE_HUMANS.wren, handle: 'wren' }),
+      fetch: fetchImpl,
+    })
+
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.review)
+    await waitFor(() => expect(within(pane()).getByLabelText('Blocked by')).toBeTruthy())
+
+    expect(within(pane()).queryByRole('button', { name: 'Members' })).toBeNull()
+    await fireEvent.update(within(pane()).getByLabelText('Blocked by'), 'Waiting on the operator.')
+    await fireEvent.update(within(pane()).getByLabelText('Unblock when'), 'The operator answers.')
+    await fireEvent.update(within(pane()).getByLabelText('Move to'), 'blocked')
+
+    await waitFor(() => expect(calls.some((call) => call.url.endsWith('/block'))).toBe(true))
+    const block = calls.find((call) => call.url.endsWith('/block'))
+    expect(JSON.parse(String(block?.init.body))).toEqual({
+      blockedBy: 'Waiting on the operator.',
+      unblockWhen: 'The operator answers.',
+    })
   })
 })
 

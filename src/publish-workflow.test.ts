@@ -19,22 +19,13 @@ const validationStep = workflow.match(
 
 const deployJob = workflow.match(/\n {2}deploy:\n[\s\S]*$/)?.[0]
 
-const AUTH0_VARIABLES = [
+const REQUIRED_BUILD_VALUES = [
   'VITE_AUTH0_DOMAIN',
   'VITE_AUTH0_CLIENT_ID',
   'VITE_AUTH0_CALLBACK',
+  'VITE_AUTH0_AUDIENCE',
+  'VITE_PLATFORM_API_ORIGIN',
 ] as const
-
-const PREVIEW_IDENTITY_VARIABLES = [
-  'VITE_PREVIEW_IDENTITY_PROVIDER',
-  'VITE_PREVIEW_IDENTITY_SUBJECT',
-] as const
-
-/**
- * Everything Vite must have at build time. The preview mapping (#39) travels the
- * delivery path #38 settled rather than a second one of its own.
- */
-const REQUIRED_BUILD_VALUES = [...AUTH0_VARIABLES, ...PREVIEW_IDENTITY_VARIABLES] as const
 
 /** The BuildKit secret id a value is mounted under: `VITE_AUTH0_DOMAIN` → `auth0_domain`. */
 const secretId = (name: string) => name.replace(/^VITE_/, '').toLowerCase()
@@ -65,7 +56,7 @@ describe('publish workflow — how it authenticates', () => {
   /**
    * #28's registry guarantee, kept but stated precisely. The registry
    * credential is the built-in token and nothing else — no personal access
-   * token, no stored registry login. The Auth0 and preview-identity entries
+   * token, no stored registry login. The public SPA configuration entries
    * are configuration carried through `secrets` for its masking, and they
    * authenticate nothing. VPS_HOST / VPS_SSH_KEY are the named deploy
    * secrets #94 requires; they are not a registry login.
@@ -103,7 +94,7 @@ describe('publish workflow — what it publishes', () => {
 describe('publish workflow — build configuration', () => {
   /**
    * The correction from the 2026-08-27 exposure. The first implementation read
-   * the three Auth0 values from `vars` and handed them to `build-push-action` as
+   * the public SPA values from `vars` and handed them to `build-push-action` as
    * `build-args`. Actions prints a step's `env:` block and every action input
    * verbatim, and repository *variables* are not masked — only secrets are — so
    * the values appeared in the public job log and, because buildx records build

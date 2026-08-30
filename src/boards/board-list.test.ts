@@ -142,7 +142,7 @@ describe('sidebar board list — journey 3: no boards at all', () => {
     expect(screen.getByTestId('boards-empty').textContent).toMatch(/no boards/i)
     expect(screen.queryByTestId('boards-error')).toBeNull()
     expect(screen.queryByTestId('active-board')).toBeNull()
-    expect(screen.queryByRole('button', { name: /create/i })).toBeNull()
+    expect(screen.getByRole('button', { name: /create board/i })).toBeTruthy()
     expect(screen.queryByText(quillDelivery.title)).toBeNull()
     expect(screen.queryByText(marlowOutreach.title)).toBeNull()
   })
@@ -376,17 +376,47 @@ describe('sidebar board list — selecting a board', () => {
   })
 })
 
-describe('sidebar board list — read-only, and no cardinality assumption', () => {
-  it('offers no create, rename, delete, favourite, archive or reorder affordance', async () => {
-    const { container } = await renderForHuman(FIXTURE_HUMANS.wren)
+describe('sidebar board list — board management and no cardinality assumption', () => {
+  it('creates, renames and archives through the gateway controls', async () => {
+    const gateway = createFixtureTaskGateway()
+    const createBoard = vi.fn(async () => ({
+      id: 'board-created',
+      agentId: quill.id,
+      agentName: quill.name,
+      profession: quill.profession,
+      title: 'Created board',
+    }))
+    const renameBoard = vi.fn(async () => ({
+      ...quillDelivery,
+      agentName: quill.name,
+      profession: quill.profession,
+      title: 'Renamed board',
+    }))
+    const archiveBoard = vi.fn(async () => undefined)
+    gateway.createBoard = createBoard
+    gateway.renameBoard = renameBoard
+    gateway.archiveBoard = archiveBoard
+    await renderForHuman(FIXTURE_HUMANS.wren, gateway)
 
-    expect(screen.queryByRole('button', { name: /create/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /rename/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /delete/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /favourite/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /favorite/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /archive/i })).toBeNull()
-    expect(container.querySelector('[draggable="true"]')).toBeNull()
+    await fireEvent.click(screen.getByRole('button', { name: /create board/i }))
+    await fireEvent.update(screen.getByRole('textbox', { name: /board title/i }), 'Created board')
+    await fireEvent.click(screen.getByRole('button', { name: /^create$/i }))
+    await waitFor(() => expect(createBoard).toHaveBeenCalledWith(FIXTURE_HUMANS.wren, 'Created board'))
+
+    await fireEvent.click(screen.getByRole('button', { name: `Rename ${quillDelivery.title}` }))
+    await fireEvent.update(screen.getByRole('textbox', { name: /board title/i }), 'Renamed board')
+    await fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    await waitFor(() => expect(renameBoard).toHaveBeenCalledWith(
+      FIXTURE_HUMANS.wren,
+      quillDelivery.id,
+      'Renamed board',
+    ))
+
+    await fireEvent.click(screen.getByRole('button', { name: `Archive ${birchResearch.title}` }))
+    await waitFor(() => expect(archiveBoard).toHaveBeenCalledWith(
+      FIXTURE_HUMANS.wren,
+      birchResearch.id,
+    ))
   })
 
   it('renders exactly the boards the gateway returned, whatever their shape', async () => {

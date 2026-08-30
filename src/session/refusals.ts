@@ -31,12 +31,3 @@ export class IdentityNotRecognised extends Error {
     this.name = 'IdentityNotRecognised'
   }
 }
-
-export class IdentityUnverified extends Error {
-  constructor() {
-    super(
-      'Kolonie Workplace: that identity is not verified, so no session was started.',
-    )
-    this.name = 'IdentityUnverified'
-  }
-}

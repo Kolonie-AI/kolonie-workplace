@@ -4,24 +4,13 @@ import { describe, expect, it } from 'vitest'
 
 const readRootFile = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
-const AUTH0_VARIABLES = [
+const REQUIRED_BUILD_VALUES = [
   'VITE_AUTH0_DOMAIN',
   'VITE_AUTH0_CLIENT_ID',
   'VITE_AUTH0_CALLBACK',
+  'VITE_AUTH0_AUDIENCE',
+  'VITE_PLATFORM_API_ORIGIN',
 ] as const
-
-const PREVIEW_IDENTITY_VARIABLES = [
-  'VITE_PREVIEW_IDENTITY_PROVIDER',
-  'VITE_PREVIEW_IDENTITY_SUBJECT',
-] as const
-
-/**
- * Everything Vite must have at build time. The preview mapping (#39) joins the
- * tenant configuration (#38) here rather than getting a delivery path of its
- * own: both are read by the same `npm run build`, and a value that reached the
- * bundle by a second route would be a second thing to audit.
- */
-const REQUIRED_BUILD_VALUES = [...AUTH0_VARIABLES, ...PREVIEW_IDENTITY_VARIABLES] as const
 
 /** The BuildKit secret id a value is mounted under: `VITE_AUTH0_DOMAIN` → `auth0_domain`. */
 const secretId = (name: string) => name.replace(/^VITE_/, '').toLowerCase()
@@ -78,7 +67,7 @@ describe('container configuration — the runtime image carries no toolchain', (
    */
   it('takes no build argument for any required value, because provenance would record one', () => {
     expect(dockerfile).not.toMatch(/ARG\s+VITE_AUTH0_/)
-    expect(dockerfile).not.toMatch(/ARG\s+VITE_PREVIEW_IDENTITY_/)
+    expect(dockerfile).not.toMatch(/ARG\s+VITE_PLATFORM_API_ORIGIN/)
   })
 
   it('reads every required value from a secret mount on the build step', () => {
@@ -93,15 +82,9 @@ describe('container configuration — the runtime image carries no toolchain', (
   })
 
   /**
-   * The guard has to refuse without ever expanding a value, because BuildKit
-   * prints the resolved `RUN` line. So it tests the *file* — `-s` is true only
-   * for a file that exists and is non-empty — and the message names the
-   * variable, which is public, rather than what is in it.
-   *
-   * The preview mapping is held to the same rule for the same reason #38
-   * exists: without a guard, a build with no mapping would succeed, publish
-   * green, and then throw `MissingPreviewIdentityConfiguration` in the browser
-   * at mount. A green build and a dead page.
+   * The guard refuses without expanding a value, because BuildKit prints the
+   * resolved `RUN` line. It tests each mounted file and names only the public
+   * environment variable when configuration is absent.
    */
   it('refuses each missing or empty value before the bundle is built, without expanding it', () => {
     const buildCommand = dockerfile.slice(dockerfile.indexOf('\nRUN --mount=type=secret'))
@@ -116,7 +99,7 @@ describe('container configuration — the runtime image carries no toolchain', (
     }
 
     expect(buildCommand).not.toMatch(/\$\{VITE_AUTH0_[A-Z_]*:\?/)
-    expect(buildCommand).not.toMatch(/\$\{VITE_PREVIEW_IDENTITY_[A-Z_]*:\?/)
+    expect(buildCommand).not.toMatch(/\$\{VITE_PLATFORM_API_ORIGIN:\?/)
     expect(buildCommand).not.toMatch(/echo[^\n]*\$\(cat \/run\/secrets/)
   })
 
@@ -124,7 +107,7 @@ describe('container configuration — the runtime image carries no toolchain', (
     const runtimeStage = dockerfile.slice(dockerfile.indexOf('FROM nginx:1.29-alpine AS runtime'))
 
     expect(runtimeStage).not.toMatch(
-      /VITE_AUTH0_|VITE_PREVIEW_IDENTITY_|\bARG\b|\bENV\b|\/run\/secrets/,
+      /VITE_AUTH0_|VITE_PLATFORM_API_ORIGIN|\bARG\b|\bENV\b|\/run\/secrets/,
     )
   })
 

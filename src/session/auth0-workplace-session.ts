@@ -1,25 +1,23 @@
 import { ref, type Ref } from 'vue'
 import type { Human } from '@/domain/workplace'
-import type { HumanDirectory } from '@/session/human-directory'
-import { IdentityNotRecognised, IdentityUnverified } from '@/session/refusals'
-import type { WorkplaceSession } from '@/session/workplace-session'
-
-/**
- * The slice of an Auth0 client this session actually uses, named as a port of
- * its own so the session is testable without a tenant, a browser redirect or a
- * network. The SDK is wired to it in `provide-session.ts`.
- */
-export interface Auth0Subject {
-  readonly provider: string
-  readonly subject: string
-  readonly emailVerified: boolean
-}
+import { IdentityNotRecognised } from '@/session/refusals'
+import {
+  createSessionCitizenStorage,
+  type CitizenStorage,
+} from '@/session/citizen-storage'
+import type {
+  LinkedCitizen,
+  WorkplaceSession,
+  WorkplaceSessionFailure,
+} from '@/session/workplace-session'
+import type { WorkplaceMeClient } from '@/session/workplace-me'
+import { WorkplaceForbidden, WorkplaceUnauthorized } from '@/gateway/workplace-http-errors'
 
 export interface Auth0Client {
   loginWithRedirect(): Promise<void>
   handleRedirectCallback(): Promise<void>
   isAuthenticated(): Promise<boolean>
-  getSubject(): Promise<Auth0Subject | null>
+  getAccessToken(): Promise<string>
   logout(): Promise<void>
 }
 
@@ -28,24 +26,34 @@ export interface Auth0WorkplaceSession extends WorkplaceSession {
   restore(): Promise<void>
 }
 
+function asHuman(agent: LinkedCitizen): Human {
+  return {
+    id: agent.id,
+    name: agent.handle,
+    agentIds: [agent.id],
+  }
+}
+
 export class Auth0Session implements Auth0WorkplaceSession {
   readonly #human: Ref<Human | null> = ref(null)
+  readonly #agents: Ref<readonly LinkedCitizen[] | null> = ref(null)
+  readonly #failure: Ref<WorkplaceSessionFailure | null> = ref(null)
   readonly #client: Auth0Client
-  readonly #humans: HumanDirectory
+  readonly #me: WorkplaceMeClient
+  readonly #storage: CitizenStorage
 
   readonly currentHuman: Readonly<Ref<Human | null>> = this.#human
+  readonly linkedAgents: Readonly<Ref<readonly LinkedCitizen[] | null>> = this.#agents
+  readonly failure: Readonly<Ref<WorkplaceSessionFailure | null>> = this.#failure
 
-  constructor(client: Auth0Client, humans: HumanDirectory) {
+  constructor(client: Auth0Client, me: WorkplaceMeClient, storage: CitizenStorage) {
     this.#client = client
-    this.#humans = humans
+    this.#me = me
+    this.#storage = storage
   }
 
-  /**
-   * Sign-in is a redirect to the hosted login and nothing else. The workplace
-   * never sees a credential, which is the point of federating: there is no
-   * password field here to get wrong.
-   */
   async signIn(): Promise<void> {
+    this.#failure.value = null
     await this.#client.loginWithRedirect()
   }
 
@@ -60,23 +68,40 @@ export class Auth0Session implements Auth0WorkplaceSession {
 
   async signOut(): Promise<void> {
     this.#human.value = null
+    this.#agents.value = null
+    this.#failure.value = null
+    this.#storage.clear()
     await this.#client.logout()
   }
 
-  /**
-   * The one place a human is adopted, so every route in holds to the same two
-   * refusals. `restore` is quiet because an absent session on load is the
-   * ordinary state of a page nobody has signed into; `completeSignIn` refuses
-   * loudly because somebody has just come back from the login expecting to be
-   * signed in, and silence there would look like success.
-   */
+  switchCitizen(): void {
+    this.#human.value = null
+    this.#storage.clear()
+  }
+
+  pickCitizen(citizenId: string): void {
+    const agents = this.#agents.value
+    const agent = agents?.find((candidate) => candidate.id === citizenId)
+    if (agent === undefined) {
+      return
+    }
+
+    this.#human.value = asHuman(agent)
+    this.#storage.write(agent.id)
+  }
+
+  async getAccessToken(): Promise<string> {
+    return this.#client.getAccessToken()
+  }
+
   async #adopt({ refuse }: { refuse: boolean }): Promise<void> {
     this.#human.value = null
+    this.#agents.value = null
+    this.#failure.value = null
 
     const authenticated = await this.#client.isAuthenticated()
-    const subject = authenticated ? await this.#client.getSubject() : null
 
-    if (subject === null) {
+    if (!authenticated) {
       if (refuse) {
         throw new IdentityNotRecognised()
       }
@@ -84,31 +109,46 @@ export class Auth0Session implements Auth0WorkplaceSession {
       return
     }
 
-    if (!subject.emailVerified) {
-      if (refuse) {
-        throw new IdentityUnverified()
+    try {
+      const token = await this.#client.getAccessToken()
+      const directory = await this.#me.me(token)
+      const agents: LinkedCitizen[] = directory.agents.map((agent) => ({
+        id: agent.id,
+        handle: agent.handle,
+        status: agent.status,
+      }))
+      this.#agents.value = agents
+
+      const stored = this.#storage.read()
+      const remembered = stored === null ? undefined : agents.find((agent) => agent.id === stored)
+      if (remembered !== undefined) {
+        this.#human.value = asHuman(remembered)
+      } else if (stored !== null) {
+        this.#storage.clear()
       }
-
-      return
-    }
-
-    const human = await this.#humans.resolve(subject.provider, subject.subject)
-
-    if (human === null) {
-      if (refuse) {
-        throw new IdentityNotRecognised()
+    } catch (error) {
+      this.#agents.value = null
+      this.#storage.clear()
+      if (error instanceof WorkplaceUnauthorized) {
+        this.#failure.value = 'unauthorized'
+      } else if (error instanceof WorkplaceForbidden) {
+        this.#failure.value = 'forbidden'
       }
+      if (refuse) {
+        if (error instanceof WorkplaceUnauthorized) {
+          throw new IdentityNotRecognised()
+        }
 
-      return
+        throw error
+      }
     }
-
-    this.#human.value = human
   }
 }
 
 export function createAuth0WorkplaceSession(
   client: Auth0Client,
-  humans: HumanDirectory,
+  me: WorkplaceMeClient,
+  storage: CitizenStorage = createSessionCitizenStorage(),
 ): Auth0WorkplaceSession {
-  return new Auth0Session(client, humans)
+  return new Auth0Session(client, me, storage)
 }

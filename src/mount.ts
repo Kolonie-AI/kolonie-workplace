@@ -3,10 +3,12 @@ import App from '@/App.vue'
 import { createWorkplaceSession, provideWorkplaceSession } from '@/session/provide-session'
 import { startSession } from '@/session/sign-in-callback'
 import type { WorkplaceSession } from '@/session/workplace-session'
+import type { TaskGateway } from '@/gateway/task-gateway'
 
 export function mountWorkplace(
   selector: string,
   session?: WorkplaceSession,
+  gateway?: TaskGateway,
 ): VueApp<Element> {
   const target = document.querySelector(selector)
 
@@ -14,7 +16,10 @@ export function mountWorkplace(
     throw new Error(`Kolonie Workplace: mount target "${selector}" was not found.`)
   }
 
-  const app = createApp(App, session === undefined ? {} : { session })
+  const app = createApp(App, {
+    ...(session === undefined ? {} : { session }),
+    ...(gateway === undefined ? {} : { gateway }),
+  })
   app.mount(target)
 
   return app

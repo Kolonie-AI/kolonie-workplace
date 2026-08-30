@@ -5,6 +5,7 @@ const COMPLETE = {
   VITE_AUTH0_DOMAIN: 'configured-domain',
   VITE_AUTH0_CLIENT_ID: 'configured-client-id',
   VITE_AUTH0_CALLBACK: 'configured-callback',
+  VITE_AUTH0_AUDIENCE: 'configured-audience',
 } as const
 
 describe('Auth0 configuration comes from the environment', () => {
@@ -15,6 +16,7 @@ describe('Auth0 configuration comes from the environment', () => {
       domain: 'configured-domain',
       clientId: 'configured-client-id',
       callback: 'configured-callback',
+      audience: 'configured-audience',
     })
   })
 
@@ -23,11 +25,13 @@ describe('Auth0 configuration comes from the environment', () => {
       VITE_AUTH0_DOMAIN: '  configured-domain  ',
       VITE_AUTH0_CLIENT_ID: 'configured-client-id\n',
       VITE_AUTH0_CALLBACK: ' configured-callback ',
+      VITE_AUTH0_AUDIENCE: ' configured-audience ',
     })
 
     expect(config.domain).toBe('configured-domain')
     expect(config.clientId).toBe('configured-client-id')
     expect(config.callback).toBe('configured-callback')
+    expect(config.audience).toBe('configured-audience')
   })
 })
 
@@ -36,6 +40,7 @@ describe('Auth0 configuration fails loudly rather than falling back', () => {
     'VITE_AUTH0_DOMAIN',
     'VITE_AUTH0_CLIENT_ID',
     'VITE_AUTH0_CALLBACK',
+    'VITE_AUTH0_AUDIENCE',
   ])('refuses when %s is absent, and names it', (missing) => {
     const partial: Record<string, string> = { ...COMPLETE }
     delete partial[missing]
@@ -67,6 +72,7 @@ describe('Auth0 configuration fails loudly rather than falling back', () => {
       expect(message).toContain('VITE_AUTH0_DOMAIN')
       expect(message).toContain('VITE_AUTH0_CLIENT_ID')
       expect(message).toContain('VITE_AUTH0_CALLBACK')
+      expect(message).toContain('VITE_AUTH0_AUDIENCE')
     }
   })
 

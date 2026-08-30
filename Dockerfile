@@ -14,9 +14,8 @@ RUN npm ci --no-audit --no-fund
 
 COPY . .
 
-# The Auth0 SPA configuration from #2 and the preview identity mapping from #39
-# are read by Vite while this stage runs, so they have to arrive here and
-# nowhere else.
+# The complete live workplace configuration is read by Vite while this stage
+# runs, so it has to arrive here and nowhere else.
 #
 # **Not as build arguments.** The first attempt at #38 used `ARG`, and it leaked
 # the values twice: BuildKit records every build argument in the SLSA provenance
@@ -29,12 +28,9 @@ COPY . .
 # this one `RUN`, never becomes a layer, never reaches provenance, and the
 # echoed command names a path rather than a value.
 #
-# There is deliberately no default, for any of the five. Without the tenant
-# configuration `npm run build` still succeeds and produces a bundle carrying
-# the `MissingAuth0Configuration` refusal; without the preview mapping it
-# produces one carrying `MissingPreviewIdentityConfiguration`. Either way the
-# application throws before it mounts — a green build and a dead page, which is
-# the failure #38 exists to remove and which #39 must not reintroduce.
+# There is deliberately no default for the five live values. Without one,
+# `npm run build` would still produce a bundle that fails only in the browser —
+# a green build and a dead page.
 #
 # `-s` is what refuses that here: true only for a file that exists and is not
 # empty, so a missing mount and an empty value fail alike, and the message names
@@ -47,23 +43,23 @@ COPY . .
 RUN --mount=type=secret,id=auth0_domain \
     --mount=type=secret,id=auth0_client_id \
     --mount=type=secret,id=auth0_callback \
-    --mount=type=secret,id=preview_identity_provider \
-    --mount=type=secret,id=preview_identity_subject \
+    --mount=type=secret,id=auth0_audience \
+    --mount=type=secret,id=platform_api_origin \
     test -s /run/secrets/auth0_domain \
       || { echo "VITE_AUTH0_DOMAIN is required to build the workplace" >&2; exit 1; }; \
     test -s /run/secrets/auth0_client_id \
       || { echo "VITE_AUTH0_CLIENT_ID is required to build the workplace" >&2; exit 1; }; \
     test -s /run/secrets/auth0_callback \
       || { echo "VITE_AUTH0_CALLBACK is required to build the workplace" >&2; exit 1; }; \
-    test -s /run/secrets/preview_identity_provider \
-      || { echo "VITE_PREVIEW_IDENTITY_PROVIDER is required to build the workplace" >&2; exit 1; }; \
-    test -s /run/secrets/preview_identity_subject \
-      || { echo "VITE_PREVIEW_IDENTITY_SUBJECT is required to build the workplace" >&2; exit 1; }; \
+    test -s /run/secrets/auth0_audience \
+      || { echo "VITE_AUTH0_AUDIENCE is required to build the workplace" >&2; exit 1; }; \
+    test -s /run/secrets/platform_api_origin \
+      || { echo "VITE_PLATFORM_API_ORIGIN is required to build the workplace" >&2; exit 1; }; \
     export VITE_AUTH0_DOMAIN="$(cat /run/secrets/auth0_domain)"; \
     export VITE_AUTH0_CLIENT_ID="$(cat /run/secrets/auth0_client_id)"; \
     export VITE_AUTH0_CALLBACK="$(cat /run/secrets/auth0_callback)"; \
-    export VITE_PREVIEW_IDENTITY_PROVIDER="$(cat /run/secrets/preview_identity_provider)"; \
-    export VITE_PREVIEW_IDENTITY_SUBJECT="$(cat /run/secrets/preview_identity_subject)"; \
+    export VITE_AUTH0_AUDIENCE="$(cat /run/secrets/auth0_audience)"; \
+    export VITE_PLATFORM_API_ORIGIN="$(cat /run/secrets/platform_api_origin)"; \
     npm run build
 
 FROM nginx:1.29-alpine AS runtime

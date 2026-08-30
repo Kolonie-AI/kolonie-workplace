@@ -17,6 +17,7 @@ import type {
   WorkItemComment,
   WorkItemDetail,
   WorkItemId,
+  WorkItemMoveInput,
   WorkItemSummary,
 } from '@/domain/workplace'
 import {
@@ -175,21 +176,75 @@ function withCoverInvariant(
 export class FixtureTaskGateway implements TaskGateway {
   readonly [PREVIEW_DATA_GATEWAY] = true as const
   private items: WorkItemDetail[] = fixtureWorkItems.map(cloneItem)
+  private boards: VisibleBoard[] = fixtureBoards.map((board) => {
+    const agent = fixtureAgents.find((candidate) => candidate.id === board.agentId)
+    return {
+      ...board,
+      agentName: agent?.name ?? 'Unknown agent',
+      profession: agent?.profession ?? null,
+    }
+  })
+  private archivedBoardIds = new Set<BoardId>()
+  private createdBoardHumanIds = new Map<BoardId, HumanId>()
 
   async listVisibleBoards(humanId: HumanId): Promise<readonly VisibleBoard[]> {
     const visible = visibleBoardIdsFor(humanId)
 
-    return fixtureBoards
-      .filter((board) => visible.has(board.id))
-      .map((board) => {
-        const agent = fixtureAgents.find((candidate) => candidate.id === board.agentId)
+    return this.boards
+      .filter(
+        (board) =>
+          (visible.has(board.id) || this.createdBoardHumanIds.get(board.id) === humanId) &&
+          !this.archivedBoardIds.has(board.id),
+      )
+      .map((board) => ({ ...board }))
+  }
 
-        return {
-          ...board,
-          agentName: agent?.name ?? 'Unknown agent',
-          profession: agent?.profession ?? null,
-        }
-      })
+  async createBoard(humanId: HumanId, title: string): Promise<VisibleBoard> {
+    const human = fixtureHumans.find((candidate) => candidate.id === humanId)
+    const agentId = human?.agentIds[0]
+    const agent = fixtureAgents.find((candidate) => candidate.id === agentId)
+    if (agentId === undefined || agent === undefined) {
+      throw new BoardAccessRefused('new-board')
+    }
+
+    const board: VisibleBoard = {
+      id: nextId('fictional-board-created', this.boards.map((candidate) => candidate.id)),
+      agentId,
+      agentName: agent.name,
+      profession: agent.profession ?? null,
+      title,
+    }
+    this.boards = [...this.boards, board]
+    this.createdBoardHumanIds.set(board.id, humanId)
+    return { ...board }
+  }
+
+  async renameBoard(
+    humanId: HumanId,
+    boardId: BoardId,
+    title: string,
+  ): Promise<VisibleBoard> {
+    const visible = visibleBoardIdsFor(humanId)
+    const board = this.boards.find((candidate) => candidate.id === boardId)
+    if (
+      board === undefined ||
+      (!visible.has(boardId) && this.createdBoardHumanIds.get(boardId) !== humanId) ||
+      this.archivedBoardIds.has(boardId)
+    ) {
+      throw new BoardAccessRefused(boardId)
+    }
+
+    const renamed = { ...board, title }
+    this.boards = this.boards.map((candidate) => candidate.id === boardId ? renamed : candidate)
+    return { ...renamed }
+  }
+
+  async archiveBoard(humanId: HumanId, boardId: BoardId): Promise<void> {
+    const visible = visibleBoardIdsFor(humanId)
+    if (!visible.has(boardId) && this.createdBoardHumanIds.get(boardId) !== humanId) {
+      throw new BoardAccessRefused(boardId)
+    }
+    this.archivedBoardIds.add(boardId)
   }
 
   async getBoardItems(
@@ -213,19 +268,64 @@ export class FixtureTaskGateway implements TaskGateway {
     return cloneItem(this.requireItem(humanId, itemId))
   }
 
-  async moveItemToLane(humanId: HumanId, itemId: WorkItemId, lane: Lane): Promise<void> {
+  async moveItemToLane(
+    humanId: HumanId,
+    itemId: WorkItemId,
+    laneOrInput: Lane | WorkItemMoveInput,
+    position?: number,
+    lifecycle: Omit<WorkItemMoveInput, 'lane' | 'position'> = {},
+  ): Promise<WorkItemDetail> {
     const item = this.requireItem(humanId, itemId)
+    const lane = typeof laneOrInput === 'string' ? laneOrInput : laneOrInput.lane
+    const requestedPosition =
+      typeof laneOrInput === 'string' ? position : laneOrInput.position
+    const requestedLifecycle =
+      typeof laneOrInput === 'string' ? lifecycle : laneOrInput
 
-    if (item.lane === lane) {
-      return
+    if (item.lane === lane && requestedPosition === undefined) {
+      return cloneItem(item)
     }
 
     const originLane = item.lane
-    const destCount = this.items.filter(
-      (candidate) => candidate.boardId === item.boardId && candidate.lane === lane,
-    ).length
-    this.replace(item.id, { ...item, lane, position: destCount })
-    this.items = reindexLane(this.items, item.boardId, originLane)
+    const siblings = this.items
+      .filter(
+        (candidate) =>
+          candidate.boardId === item.boardId &&
+          candidate.lane === lane &&
+          candidate.id !== item.id,
+      )
+      .slice()
+      .sort((left, right) => left.position - right.position)
+    const destPosition = Math.max(0, Math.min(requestedPosition ?? siblings.length, siblings.length))
+    const moved: WorkItemDetail = {
+      ...item,
+      lane,
+      position: destPosition,
+      ...(lane === 'blocked' && requestedLifecycle.blockedBy !== undefined && requestedLifecycle.unblockWhen !== undefined
+        ? {
+            blocker: {
+              actor: requestedLifecycle.blockedBy,
+              smallestUnblock: requestedLifecycle.unblockWhen,
+            },
+          }
+        : {}),
+    }
+    siblings.splice(destPosition, 0, moved)
+    const positioned = new Map(
+      siblings.map((candidate, index) => [candidate.id, index] as const),
+    )
+    this.items = this.items.map((candidate) => {
+      const nextPosition = positioned.get(candidate.id)
+      if (nextPosition === undefined) {
+        return candidate
+      }
+
+      return { ...candidate, lane, position: nextPosition }
+    })
+    if (originLane !== lane) {
+      this.items = reindexLane(this.items, item.boardId, originLane)
+    }
+    return cloneItem(this.requireItem(humanId, itemId))
   }
 
   async createWorkItem(

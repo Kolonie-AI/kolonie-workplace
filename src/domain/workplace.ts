@@ -154,6 +154,14 @@ export type UpdateWorkItemInput = Partial<
   >
 >
 
+export interface WorkItemMoveInput {
+  readonly lane: Lane
+  readonly position?: number
+  readonly blockedBy?: string
+  readonly unblockWhen?: string
+  readonly outcome?: string
+}
+
 export interface ReorderWorkItemInput {
   readonly lane: Lane
   readonly position: number

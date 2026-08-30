@@ -17,6 +17,7 @@ import type {
   WorkItemAssignee,
   WorkItemDetail,
   WorkItemLabel,
+  WorkItemMoveInput,
 } from '@/domain/workplace'
 import type { ItemDetailStatus } from '@/detail/use-item-detail'
 import ActivitySection from '@/detail/ActivitySection.vue'
@@ -42,11 +43,12 @@ const props = defineProps<{
   now: Date
   currentHumanName: string | null
   showsPreviewData: boolean
+  supportsMultipleAssignees: boolean
 }>()
 
 const emit = defineEmits<{
   close: []
-  move: [itemId: string, lane: Lane]
+  move: [itemId: string, lane: Lane, lifecycle?: Omit<WorkItemMoveInput, 'lane' | 'position'>]
   update: [input: UpdateWorkItemInput]
   createChecklistItem: [title: string]
   updateChecklistItem: [checklistItemId: ChecklistItemId, input: UpdateChecklistItemInput]
@@ -82,6 +84,9 @@ const labelListId = `label-options-${useId()}`
 const assigneeListId = `assignee-options-${useId()}`
 const labelColours = ['#1973ff', '#00db60', '#ff4136', '#8338ec'] as const
 const selectedLabelColour = ref<(typeof labelColours)[number]>(labelColours[0])
+const blockedByDraft = ref('')
+const unblockWhenDraft = ref('')
+const outcomeDraft = ref('')
 
 const filteredLabels = computed(() => {
   const selected = new Set(props.item?.labels.map((label) => label.id) ?? [])
@@ -176,6 +181,9 @@ watch(
   async (item) => {
     titleDraft.value = item?.title ?? ''
     descriptionDraft.value = sanitizeDescription(item?.description ?? '')
+    blockedByDraft.value = item?.blocker?.actor ?? ''
+    unblockWhenDraft.value = item?.blocker?.smallestUnblock ?? ''
+    outcomeDraft.value = ''
     await nextTick()
     paintDescription()
   },
@@ -186,6 +194,29 @@ function onLaneChange(event: Event): void {
   const chosen = (event.target as HTMLSelectElement).value
 
   if (props.item !== null && isLane(chosen) && chosen !== props.item.lane) {
+    if (props.showsPreviewData) {
+      emit('move', props.item.id, chosen)
+      return
+    }
+    if (chosen === 'blocked') {
+      const blockedBy = blockedByDraft.value.trim()
+      const unblockWhen = unblockWhenDraft.value.trim()
+      if (blockedBy === '' || unblockWhen === '') {
+        ;(event.target as HTMLSelectElement).value = props.item.lane
+        return
+      }
+      emit('move', props.item.id, chosen, { blockedBy, unblockWhen })
+      return
+    }
+    if (chosen === 'done') {
+      const outcome = outcomeDraft.value.trim()
+      if (outcome === '') {
+        ;(event.target as HTMLSelectElement).value = props.item.lane
+        return
+      }
+      emit('move', props.item.id, chosen, { outcome })
+      return
+    }
     emit('move', props.item.id, chosen)
   }
 }
@@ -357,7 +388,11 @@ function removeLabel(label: WorkItemLabel): void {
 }
 
 function addAssignee(assignee: WorkItemAssignee): void {
-  updateAssignees([...(props.item?.assignees ?? []), assignee])
+  updateAssignees(
+    props.supportsMultipleAssignees
+      ? [...(props.item?.assignees ?? []), assignee]
+      : [assignee],
+  )
 }
 
 function removeAssignee(assignee: WorkItemAssignee): void {
@@ -751,7 +786,53 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
             />
 
             <section
-              v-if="item.blocker !== undefined"
+              v-if="!showsPreviewData && item.lane !== 'done'"
+              class="detail-pane__section"
+              data-testid="detail-lifecycle-inputs"
+            >
+              <h3 class="detail-pane__section-title">
+                Lifecycle record
+              </h3>
+              <label class="detail-pane__move-label">
+                Blocked by
+                <input
+                  v-model="blockedByDraft"
+                  maxlength="500"
+                >
+              </label>
+              <label class="detail-pane__move-label">
+                Unblock when
+                <input
+                  v-model="unblockWhenDraft"
+                  maxlength="500"
+                >
+              </label>
+              <label class="detail-pane__move-label">
+                Outcome
+                <input
+                  v-model="outcomeDraft"
+                  maxlength="500"
+                >
+              </label>
+              <label class="detail-pane__move-label">
+                Move to
+                <select
+                  :value="item.lane"
+                  @change="onLaneChange"
+                >
+                  <option
+                    v-for="lane in WORKPLACE_LANES"
+                    :key="lane"
+                    :value="lane"
+                  >
+                    {{ WORKPLACE_LANE_LABELS[lane] }}
+                  </option>
+                </select>
+              </label>
+            </section>
+
+            <section
+              v-if="item.lane === 'blocked' && item.blocker !== undefined"
               class="detail-pane__section detail-pane__section--blocked"
               data-testid="detail-blocker"
               aria-label="Blocker"
@@ -996,15 +1077,15 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
             </div>
 
             <button
+              v-if="showsPreviewData"
               class="detail-pane__rail-button"
               type="button"
-              :aria-expanded="railPopover === 'members' ? 'true' : 'false'"
               @click="toggleRail('members')"
             >
               Members
             </button>
             <div
-              v-if="railPopover === 'members'"
+              v-if="showsPreviewData && railPopover === 'members'"
               class="detail-pane__popover"
               role="dialog"
               aria-label="Members"

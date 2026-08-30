@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/vue'
 import App from '@/App.vue'
 import { createFixtureWorkplaceSession } from '@/session/fixture-workplace-session'
+import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
 
 /**
  * Application tests exercise the shell with an injected fixture session. #2
@@ -12,7 +13,10 @@ import { createFixtureWorkplaceSession } from '@/session/fixture-workplace-sessi
  */
 function renderFixtureApp() {
   return render(App, {
-    props: { session: createFixtureWorkplaceSession() },
+    props: {
+      session: createFixtureWorkplaceSession(),
+      gateway: createFixtureTaskGateway(),
+    },
   })
 }
 

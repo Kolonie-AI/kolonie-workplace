@@ -42,7 +42,8 @@ describe('port boundary — shell and board components see only the port', () =>
     )
 
     expect(composition).toContain('auth0-workplace-session')
-    expect(composition).not.toContain('fixture-workplace-session')
+    expect(composition).toContain('fixture-workplace-session')
+    expect(composition).toContain('isWorkplaceConfigAbsent(env)')
   })
 
   it('types the fixture picker as one implementation behind the interface', () => {
@@ -128,8 +129,7 @@ describe('port boundary — authentication stays out of the board and the port',
     const elsewhere = [
       ...MUST_STAY_CLEAN,
       'src/session/auth0-workplace-session.ts',
-      'src/session/human-directory.ts',
-      'src/session/colony-human-directory.ts',
+      'src/session/workplace-me.ts',
     ]
 
     for (const path of elsewhere) {

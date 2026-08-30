@@ -4,6 +4,7 @@ import type { HumanId, VisibleBoard } from '@/domain/workplace'
 import { BoardAccessRefused } from '@/gateway/refusals'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
+import { WorkplaceForbidden, WorkplaceUnauthorized } from '@/gateway/workplace-http-errors'
 import { FIXTURE_BOARDS, FIXTURE_HUMANS } from '@/fixtures/catalogue'
 import { useBoardList } from '@/boards/use-board-list'
 
@@ -143,6 +144,28 @@ describe('useBoardList — failure is not emptiness', () => {
 
     expect(list.status.value).toBe('error')
     expect(list.boards.value).toEqual([])
+    expect(list.isEmpty.value).toBe(false)
+  })
+})
+
+describe('useBoardList — authentication and deployment failures', () => {
+  function refusingList(error: Error): TaskGateway {
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'listVisibleBoards').mockRejectedValue(error)
+    return gateway
+  }
+
+  it('keeps a 401 as sign-in-again rather than generic error or emptiness', async () => {
+    const list = await settled(FIXTURE_HUMANS.wren, refusingList(new WorkplaceUnauthorized()))
+
+    expect(list.status.value).toBe('unauthorized')
+    expect(list.isEmpty.value).toBe(false)
+  })
+
+  it('keeps origin 403 as deployment configuration rather than generic error or emptiness', async () => {
+    const list = await settled(FIXTURE_HUMANS.wren, refusingList(new WorkplaceForbidden()))
+
+    expect(list.status.value).toBe('forbidden')
     expect(list.isEmpty.value).toBe(false)
   })
 })

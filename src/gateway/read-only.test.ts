@@ -3,7 +3,7 @@ import { FixtureTaskGateway, createFixtureTaskGateway } from '@/gateway/fixture-
 import { PREVIEW_DATA_GATEWAY } from '@/gateway/task-gateway'
 import { fixtureBoards, fixtureWorkItems, FIXTURE_BOARDS, FIXTURE_HUMANS } from '@/fixtures/catalogue'
 
-const WRITE_LIKE = /^(create|update|delete|remove|save|persist|write|set|move|add|patch|put|sync|reorder)/
+const WRITE_LIKE = /^(create|update|delete|remove|save|persist|write|set|move|add|patch|put|sync|reorder|archive|rename)/
 
 describe('the gateway write surface', () => {
   it('exposes the reads and named writes without persistence', () => {
@@ -14,6 +14,8 @@ describe('the gateway write surface', () => {
 
     expect(methods.sort()).toEqual([
       'addAttachment',
+      'archiveBoard',
+      'createBoard',
       'createChecklistItem',
       'createComment',
       'createWorkItem',
@@ -25,6 +27,7 @@ describe('the gateway write surface', () => {
       'getItemDetail',
       'listVisibleBoards',
       'moveItemToLane',
+      'renameBoard',
       'reorderChecklistItem',
       'reorderWorkItem',
       'updateChecklistItem',
@@ -33,6 +36,8 @@ describe('the gateway write surface', () => {
     ])
     expect(methods.filter((name) => WRITE_LIKE.test(name)).sort()).toEqual([
       'addAttachment',
+      'archiveBoard',
+      'createBoard',
       'createChecklistItem',
       'createComment',
       'createWorkItem',
@@ -41,6 +46,7 @@ describe('the gateway write surface', () => {
       'deleteComment',
       'deleteWorkItem',
       'moveItemToLane',
+      'renameBoard',
       'reorderChecklistItem',
       'reorderWorkItem',
       'updateChecklistItem',

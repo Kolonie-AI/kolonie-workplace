@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/vue'
@@ -9,57 +9,48 @@ import { createAuth0WorkplaceSession } from '@/session/auth0-workplace-session'
 import SignedOutView from '@/session/SignedOutView.vue'
 import { WORKPLACE_SESSION } from '@/session/workplace-session'
 
-/**
- * A complete environment for composing the application: the tenant
- * configuration from #2 and the preview identity mapping from #39. Both are
- * required, so a test that composes a session has to supply both — the refusals
- * for each missing piece live in `auth0-config.test.ts` and
- * `preview-identity-boundary.test.ts`.
- *
- * Every value is fictional. The real ones arrive from the environment at build
- * time and are written down nowhere in this repository.
- */
 const CONFIGURED = {
   VITE_AUTH0_DOMAIN: 'configured-domain',
   VITE_AUTH0_CLIENT_ID: 'configured-client-id',
   VITE_AUTH0_CALLBACK: 'https://workplace.example.invalid/sign-in/callback',
-  VITE_PREVIEW_IDENTITY_PROVIDER: 'configured-provider',
-  VITE_PREVIEW_IDENTITY_SUBJECT: 'configured-subject',
+  VITE_AUTH0_AUDIENCE: 'configured-audience',
+  VITE_PLATFORM_API_ORIGIN: 'https://platform.example.invalid',
 } as const
 
-describe('the fixture picker is unreachable from application composition', () => {
-  it('chooses the Auth0 session when configuration is present', () => {
+describe('application composition chooses one complete data path', () => {
+  it('chooses the Auth0 session when live configuration is complete', () => {
     const session = chooseWorkplaceSession({ env: CONFIGURED })
 
     expect(asDevelopmentSignIn(session)).toBeNull()
   })
 
-  it('refuses to start rather than falling back when configuration is missing', () => {
-    expect(() => chooseWorkplaceSession({ env: {} })).toThrow(
-      /VITE_AUTH0_DOMAIN/,
-    )
+  it('uses the fixture session only when every live value is absent', () => {
+    const session = chooseWorkplaceSession({ env: {} })
+
+    expect(asDevelopmentSignIn(session)).not.toBeNull()
   })
 
-  it('never answers application composition with a session that lists humans', () => {
+  it('refuses partial live configuration instead of falling back to fixtures', () => {
+    expect(() => chooseWorkplaceSession({
+      env: { VITE_AUTH0_DOMAIN: 'configured-domain' },
+    })).toThrow(/VITE_AUTH0_CLIENT_ID/)
+  })
+
+  it('never answers live composition with a session that lists fixture humans', () => {
     const session = chooseWorkplaceSession({ env: CONFIGURED })
 
     expect((session as { listSignInCandidates?: unknown }).listSignInCandidates)
       .toBeUndefined()
   })
 
-  it('refuses missing configuration on a development machine too', () => {
-    expect(() => chooseWorkplaceSession({ env: {} })).toThrow(
-      /VITE_AUTH0_CLIENT_ID/,
-    )
-  })
-  it('never imports the fixture session in the application composition point', () => {
+  it('keeps the fixture session behind the all-values-absent branch', () => {
     const composition = readFileSync(
       resolve(process.cwd(), 'src/session/provide-session.ts'),
       'utf8',
     )
 
-    expect(composition).not.toContain('fixture-workplace-session')
-    expect(composition).not.toContain('createFixtureWorkplaceSession')
+    expect(composition).toContain('isWorkplaceConfigAbsent(env)')
+    expect(composition).toContain('createFixtureWorkplaceSession()')
   })
 })
 
@@ -70,10 +61,10 @@ describe('the signed-out view offers the hosted login, not a list of humans', ()
         loginWithRedirect: vi.fn(async () => undefined),
         handleRedirectCallback: vi.fn(async () => undefined),
         isAuthenticated: vi.fn(async () => false),
-        getSubject: vi.fn(async () => null),
+        getAccessToken: vi.fn(async () => 'access-token'),
         logout: vi.fn(async () => undefined),
       },
-      { resolve: vi.fn(async () => null) },
+      { me: vi.fn() },
     )
 
     render(SignedOutView, {
@@ -92,10 +83,10 @@ describe('the signed-out view offers the hosted login, not a list of humans', ()
         loginWithRedirect,
         handleRedirectCallback: vi.fn(async () => undefined),
         isAuthenticated: vi.fn(async () => false),
-        getSubject: vi.fn(async () => null),
+        getAccessToken: vi.fn(async () => 'access-token'),
         logout: vi.fn(async () => undefined),
       },
-      { resolve: vi.fn(async () => null) },
+      { me: vi.fn() },
     )
 
     render(SignedOutView, {
@@ -126,6 +117,8 @@ describe('no tenant value reaches the repository', () => {
       'VITE_AUTH0_DOMAIN',
       'VITE_AUTH0_CLIENT_ID',
       'VITE_AUTH0_CALLBACK',
+      'VITE_AUTH0_AUDIENCE',
+      'VITE_PLATFORM_API_ORIGIN',
     ]) {
       expect(example).toContain(`${name}=`)
       expect(example).toMatch(new RegExp(`^${name}=\\s*$`, 'm'))
@@ -159,7 +152,7 @@ describe('no tenant value reaches the repository', () => {
   it('names no tenant anywhere in src, including in the tests', () => {
     const tree = execSync('git ls-files src .env.example', { encoding: 'utf8' })
       .split('\n')
-      .filter((path) => path.length > 0)
+      .filter((path) => path.length > 0 && existsSync(resolve(process.cwd(), path)))
 
     for (const path of tree) {
       const source = readFileSync(resolve(process.cwd(), path), 'utf8')
