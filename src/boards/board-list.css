@@ -1,3 +1,67 @@
+.board-list__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.board-list__action {
+  min-inline-size: 2rem;
+  min-block-size: 2rem;
+  border: 0;
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--color-sidebar-text-strong);
+  cursor: pointer;
+  font: inherit;
+}
+
+.board-list__composer {
+  display: grid;
+  gap: var(--space-2);
+  margin-block-end: var(--space-3);
+  padding: var(--space-2);
+  border-radius: var(--radius-medium);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.board-list__composer label {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-caption);
+}
+
+.board-list__composer input {
+  inline-size: 100%;
+  min-block-size: 2.25rem;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  font: inherit;
+}
+
+.board-list__composer-actions,
+.board-list__row-actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.board-list__composer-actions button,
+.board-list__row-actions button {
+  border: 0;
+  border-radius: var(--radius-small);
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-caption);
+}
+
+.board-list__row-actions {
+  padding: 0 var(--space-3) var(--space-2);
+}
+
 .board-list__title {
   margin: 0 0 var(--space-3);
   font-size: var(--text-small);

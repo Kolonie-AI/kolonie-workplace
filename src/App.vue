@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import SessionGate from '@/session/SessionGate.vue'
 import { provideWorkplaceClock } from '@/clock/workplace-clock'
-import { provideTaskGateway } from '@/gateway/provide-gateway'
+import { createTaskGateway, provideTaskGateway } from '@/gateway/provide-gateway'
 import { provideWorkplaceSession } from '@/session/provide-session'
 import type { WorkplaceSession } from '@/session/workplace-session'
+import type { TaskGateway } from '@/gateway/task-gateway'
 import '@/styles/tokens.css'
 
 /**
@@ -12,11 +13,14 @@ import '@/styles/tokens.css'
  * between the callback and the resolved human. With none given, one is created
  * here exactly as before.
  */
-const props = defineProps<{ session?: WorkplaceSession }>()
+const props = defineProps<{
+  session?: WorkplaceSession
+  gateway?: TaskGateway
+}>()
 
-provideWorkplaceSession(props.session)
+const session = provideWorkplaceSession(props.session)
 provideWorkplaceClock()
-provideTaskGateway()
+provideTaskGateway(props.gateway ?? createTaskGateway(session))
 </script>
 
 <template>

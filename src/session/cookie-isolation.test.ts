@@ -7,10 +7,10 @@ import { createAuth0WorkplaceSession } from '@/session/auth0-workplace-session'
 const SESSION_SOURCES = [
   'src/session/auth0-client-adapter.ts',
   'src/session/auth0-workplace-session.ts',
-  'src/session/auth0-config.ts',
+  'src/session/live-config.ts',
   'src/session/sign-in-callback.ts',
-  'src/session/provide-session.ts',
-  'src/session/colony-human-directory.ts',
+  'src/session/workplace-me.ts',
+  'src/session/workplace-me.ts',
   'src/mount.ts',
 ] as const
 
@@ -47,7 +47,10 @@ describe('the workplace session is not a cookie the console could have set', () 
         /document\s*\.\s*cookie/,
       )
       expect(source, `${path} must not read a token from storage`).not.toMatch(
-        /localStorage|sessionStorage/,
+        /localStorage/,
+      )
+      expect(source, `${path} must not persist a token`).not.toMatch(
+        /sessionStorage/,
       )
     }
   })
@@ -59,11 +62,12 @@ describe('the workplace session is not a cookie the console could have set', () 
         loginWithRedirect: vi.fn(async () => undefined),
         handleRedirectCallback: vi.fn(async () => ({})),
         isAuthenticated,
-        getUser: vi.fn(async () => undefined),
+        getTokenSilently: vi.fn(async () => 'access-token'),
         logout: vi.fn(async () => undefined),
       },
       'https://workplace.example.invalid/sign-in/callback',
       'https://workplace.example.invalid',
+      'workplace-audience',
     )
 
     document.cookie = 'kolonie_console_session=a-console-session-value'
@@ -80,10 +84,10 @@ describe('the workplace session is not a cookie the console could have set', () 
         loginWithRedirect: vi.fn(async () => undefined),
         handleRedirectCallback: vi.fn(async () => undefined),
         isAuthenticated: vi.fn(async () => false),
-        getSubject: vi.fn(async () => null),
+        getAccessToken: vi.fn(async () => 'access-token'),
         logout: vi.fn(async () => undefined),
       },
-      { resolve: vi.fn(async () => null) },
+      { me: vi.fn() },
     )
 
     await session.restore()
@@ -99,11 +103,12 @@ describe('the workplace session is not a cookie the console could have set', () 
         loginWithRedirect: vi.fn(async () => undefined),
         handleRedirectCallback: vi.fn(async () => ({})),
         isAuthenticated: vi.fn(async () => false),
-        getUser: vi.fn(async () => undefined),
+        getTokenSilently: vi.fn(async () => 'access-token'),
         logout,
       },
       'https://workplace.example.invalid/sign-in/callback',
       'https://workplace.example.invalid',
+      'workplace-audience',
     )
 
     await adapter.logout()
@@ -134,16 +139,10 @@ describe('the workplace session is not a cookie the console could have set', () 
         loginWithRedirect: vi.fn(async () => undefined),
         handleRedirectCallback: vi.fn(async () => undefined),
         isAuthenticated: vi.fn(async () => false),
-        getSubject: vi.fn(async () => null),
+        getAccessToken: vi.fn(async () => 'access-token'),
         logout: vi.fn(async () => undefined),
       },
-      {
-        resolve: vi.fn(async () => ({
-          id: 'human-wren',
-          name: 'Fictional Human Wren',
-          agentIds: [],
-        })),
-      },
+      { me: vi.fn() },
     )
 
     await session.restore()

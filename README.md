@@ -129,19 +129,17 @@ docker buildx build \
   --secret id=auth0_domain,src="$SECRETS_DIR/auth0_domain" \
   --secret id=auth0_client_id,src="$SECRETS_DIR/auth0_client_id" \
   --secret id=auth0_callback,src="$SECRETS_DIR/auth0_callback" \
-  --secret id=preview_identity_provider,src="$SECRETS_DIR/preview_identity_provider" \
-  --secret id=preview_identity_subject,src="$SECRETS_DIR/preview_identity_subject" \
+  --secret id=auth0_audience,src="$SECRETS_DIR/auth0_audience" \
+  --secret id=platform_api_origin,src="$SECRETS_DIR/platform_api_origin" \
   --provenance=false \
   -t kolonie-workplace:local --load .
 docker run --rm -p 8080:80 kolonie-workplace:local
 ```
 
-All five are required and are read by Vite in the build stage. A missing or
-empty value stops the build before any bundle is produced, so an image that
-exists is an image that was configured. Three carry the Auth0 tenant
-configuration (#2); two carry the preview identity mapping (#39), which lets one
-designated account resolve to a fixture human — the boards it then sees stay
-labelled `Example data`.
+All five live values are required for the production image and are read by Vite
+in the build stage. A missing or empty value stops the build before any bundle
+is produced. Local development uses the fixture session and gateway only when
+all five values are absent; partial live configuration is refused.
 
 They are passed as **secret mounts and never as build arguments**. A build
 argument is recorded in the SLSA provenance attached to a published image and is
@@ -152,10 +150,10 @@ public PKCE client, so there is no Auth0 client secret.
 
 In CI the same five values come from Actions **repository secrets** named
 `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, `VITE_AUTH0_CALLBACK`,
-`VITE_PREVIEW_IDENTITY_PROVIDER` and `VITE_PREVIEW_IDENTITY_SUBJECT`. Secrets
-rather than variables because the runner masks a secret in the public log and
-does not mask a variable — the masking is what is wanted, not a claim that these
-are credentials.
+`VITE_AUTH0_AUDIENCE` and `VITE_PLATFORM_API_ORIGIN`. Secrets rather than
+variables because the runner masks a secret in the public log and does not mask
+a variable — the masking is what is wanted, not a claim that these are
+credentials.
 
 - `/` serves the application.
 - `/health` returns 200 and the body `ok` — its own exact-match location, so a

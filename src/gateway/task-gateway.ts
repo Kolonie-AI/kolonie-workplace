@@ -32,6 +32,9 @@ export function isPreviewDataGateway(gateway: TaskGateway): boolean {
 export interface TaskGateway {
   readonly [PREVIEW_DATA_GATEWAY]?: true
   listVisibleBoards(humanId: HumanId): Promise<readonly VisibleBoard[]>
+  createBoard?(humanId: HumanId, title: string): Promise<VisibleBoard>
+  renameBoard?(humanId: HumanId, boardId: BoardId, title: string): Promise<VisibleBoard>
+  archiveBoard?(humanId: HumanId, boardId: BoardId): Promise<void>
   getBoardItems(humanId: HumanId, boardId: BoardId): Promise<readonly WorkItemSummary[]>
   getItemDetail(humanId: HumanId, itemId: WorkItemId): Promise<WorkItemDetail>
   moveItemToLane(humanId: HumanId, itemId: WorkItemId, lane: Lane): Promise<void>

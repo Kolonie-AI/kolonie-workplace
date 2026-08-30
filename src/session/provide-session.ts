@@ -1,9 +1,13 @@
 import { provide } from 'vue'
 import { Auth0Client as Auth0SpaClient } from '@auth0/auth0-spa-js'
-import { readAuth0Config } from '@/session/auth0-config'
 import { Auth0ClientAdapter } from '@/session/auth0-client-adapter'
 import { createAuth0WorkplaceSession } from '@/session/auth0-workplace-session'
-import { createColonyHumanDirectory } from '@/session/colony-human-directory'
+import { createFixtureWorkplaceSession } from '@/session/fixture-workplace-session'
+import {
+  isWorkplaceConfigAbsent,
+  readLiveWorkplaceConfig,
+} from '@/session/live-config'
+import { createWorkplaceMeClient } from '@/session/workplace-me'
 import { WORKPLACE_SESSION, type WorkplaceSession } from '@/session/workplace-session'
 
 /**
@@ -15,41 +19,32 @@ export interface SessionChoice {
   readonly env: Readonly<Record<string, string | undefined>>
 }
 
-/**
- * The application signs people in with Auth0 or it does not start.
- *
- * **There is deliberately no build-mode branch and no fallback.** The fixture
- * picker signs anybody in as anybody with no credential at all, so composing it
- * here would not be a degraded experience — it would be an open door, and one
- * that a mis-set build flag or a stripped environment would open silently. When
- * configuration is missing the application refuses, loudly, naming the
- * variables it wants.
- *
- * The fixture session survives for tests and for the visual work of #11, which
- * inject it directly. What it no longer has is a route into a running
- * application: nothing this function can return lists a human to become.
- *
- * The same environment carries the preview identity mapping (#39), which is why
- * `env` reaches the directory as well as the tenant configuration. Both refuse
- * loudly and for the same reason: a missing mapping would otherwise mean a
- * deployed preview that refuses the one account meant to reach it, and a
- * half-present one would mean a login matching on half a key.
- */
 export function chooseWorkplaceSession({ env }: SessionChoice): WorkplaceSession {
-  const config = readAuth0Config(env)
+  if (isWorkplaceConfigAbsent(env)) {
+    return createFixtureWorkplaceSession()
+  }
+
+  const config = readLiveWorkplaceConfig(env)
+  const sdk = new Auth0SpaClient({
+    domain: config.domain,
+    clientId: config.clientId,
+    authorizationParams: {
+      redirect_uri: config.callback,
+      audience: config.audience,
+    },
+    cacheLocation: 'memory',
+    useRefreshTokens: true,
+  })
+  const client = new Auth0ClientAdapter(
+    sdk,
+    config.callback,
+    new URL(config.callback).origin,
+    config.audience,
+  )
 
   return createAuth0WorkplaceSession(
-    new Auth0ClientAdapter(
-      new Auth0SpaClient({
-        domain: config.domain,
-        clientId: config.clientId,
-        authorizationParams: { redirect_uri: config.callback },
-        useRefreshTokens: true,
-      }),
-      config.callback,
-      new URL(config.callback).origin,
-    ),
-    createColonyHumanDirectory(env),
+    client,
+    createWorkplaceMeClient({ origin: config.platformOrigin }),
   )
 }
 

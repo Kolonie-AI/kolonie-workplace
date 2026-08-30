@@ -516,7 +516,12 @@ async function closeDetail(): Promise<void> {
         :groups="boardList.groups.value"
         :is-empty="boardList.isEmpty.value"
         :active-board-id="boardList.activeBoard.value?.id ?? null"
+        :can-manage="boardList.canManage.value"
+        :mutation-error="boardList.mutationError.value"
         @select="selectBoard"
+        @create="boardList.createBoard"
+        @rename="boardList.renameBoard"
+        @archive="boardList.archiveBoard"
       />
     </aside>
 

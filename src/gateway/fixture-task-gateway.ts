@@ -175,21 +175,75 @@ function withCoverInvariant(
 export class FixtureTaskGateway implements TaskGateway {
   readonly [PREVIEW_DATA_GATEWAY] = true as const
   private items: WorkItemDetail[] = fixtureWorkItems.map(cloneItem)
+  private boards: VisibleBoard[] = fixtureBoards.map((board) => {
+    const agent = fixtureAgents.find((candidate) => candidate.id === board.agentId)
+    return {
+      ...board,
+      agentName: agent?.name ?? 'Unknown agent',
+      profession: agent?.profession ?? null,
+    }
+  })
+  private archivedBoardIds = new Set<BoardId>()
+  private createdBoardHumanIds = new Map<BoardId, HumanId>()
 
   async listVisibleBoards(humanId: HumanId): Promise<readonly VisibleBoard[]> {
     const visible = visibleBoardIdsFor(humanId)
 
-    return fixtureBoards
-      .filter((board) => visible.has(board.id))
-      .map((board) => {
-        const agent = fixtureAgents.find((candidate) => candidate.id === board.agentId)
+    return this.boards
+      .filter(
+        (board) =>
+          (visible.has(board.id) || this.createdBoardHumanIds.get(board.id) === humanId) &&
+          !this.archivedBoardIds.has(board.id),
+      )
+      .map((board) => ({ ...board }))
+  }
 
-        return {
-          ...board,
-          agentName: agent?.name ?? 'Unknown agent',
-          profession: agent?.profession ?? null,
-        }
-      })
+  async createBoard(humanId: HumanId, title: string): Promise<VisibleBoard> {
+    const human = fixtureHumans.find((candidate) => candidate.id === humanId)
+    const agentId = human?.agentIds[0]
+    const agent = fixtureAgents.find((candidate) => candidate.id === agentId)
+    if (agentId === undefined || agent === undefined) {
+      throw new BoardAccessRefused('new-board')
+    }
+
+    const board: VisibleBoard = {
+      id: nextId('fictional-board-created', this.boards.map((candidate) => candidate.id)),
+      agentId,
+      agentName: agent.name,
+      profession: agent.profession ?? null,
+      title,
+    }
+    this.boards = [...this.boards, board]
+    this.createdBoardHumanIds.set(board.id, humanId)
+    return { ...board }
+  }
+
+  async renameBoard(
+    humanId: HumanId,
+    boardId: BoardId,
+    title: string,
+  ): Promise<VisibleBoard> {
+    const visible = visibleBoardIdsFor(humanId)
+    const board = this.boards.find((candidate) => candidate.id === boardId)
+    if (
+      board === undefined ||
+      (!visible.has(boardId) && this.createdBoardHumanIds.get(boardId) !== humanId) ||
+      this.archivedBoardIds.has(boardId)
+    ) {
+      throw new BoardAccessRefused(boardId)
+    }
+
+    const renamed = { ...board, title }
+    this.boards = this.boards.map((candidate) => candidate.id === boardId ? renamed : candidate)
+    return { ...renamed }
+  }
+
+  async archiveBoard(humanId: HumanId, boardId: BoardId): Promise<void> {
+    const visible = visibleBoardIdsFor(humanId)
+    if (!visible.has(boardId) && this.createdBoardHumanIds.get(boardId) !== humanId) {
+      throw new BoardAccessRefused(boardId)
+    }
+    this.archivedBoardIds.add(boardId)
   }
 
   async getBoardItems(

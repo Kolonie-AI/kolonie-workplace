@@ -15,12 +15,14 @@ export interface Auth0Config {
   readonly domain: string
   readonly clientId: string
   readonly callback: string
+  readonly audience: string
 }
 
 export const AUTH0_ENVIRONMENT_VARIABLES = [
   'VITE_AUTH0_DOMAIN',
   'VITE_AUTH0_CLIENT_ID',
   'VITE_AUTH0_CALLBACK',
+  'VITE_AUTH0_AUDIENCE',
 ] as const
 
 export class MissingAuth0Configuration extends Error {
@@ -65,5 +67,6 @@ export function readAuth0Config(
     domain: present(source, 'VITE_AUTH0_DOMAIN') as string,
     clientId: present(source, 'VITE_AUTH0_CLIENT_ID') as string,
     callback: present(source, 'VITE_AUTH0_CALLBACK') as string,
+    audience: present(source, 'VITE_AUTH0_AUDIENCE') as string,
   }
 }

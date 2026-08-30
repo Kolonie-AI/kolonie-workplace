@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/vue'
+import { ref } from 'vue'
+import type { Human } from '@/domain/workplace'
 import {
   FIXTURE_HUMANS,
   fixtureBoards,
@@ -81,6 +83,50 @@ describe('SessionGate — signed in', () => {
 
     expect(session.currentHuman.value?.id).toBe(FIXTURE_HUMANS.ash)
     expect(screen.getByTestId('signed-in-human').textContent).toContain('Fictional Human Ash')
+  })
+})
+
+describe('SessionGate — live citizen selection', () => {
+  function liveSession(agents: readonly { id: string; handle: string; status: string }[]): WorkplaceSession {
+    const currentHuman = ref<Human | null>(null)
+    const linkedAgents = ref(agents)
+    return {
+      currentHuman,
+      linkedAgents,
+      signIn: vi.fn(async () => undefined),
+      signOut: vi.fn(async () => undefined),
+      pickCitizen: vi.fn((citizenId: string) => {
+        const citizen = agents.find((candidate) => candidate.id === citizenId)
+        if (citizen !== undefined) {
+          currentHuman.value = {
+            id: citizen.id,
+            name: citizen.handle,
+            agentIds: [citizen.id],
+          }
+        }
+      }),
+    }
+  }
+
+  it('requires an explicit citizen pick before rendering the shell', async () => {
+    const session = liveSession([{ id: 'agent-quill', handle: 'quill', status: 'citizen' }])
+    renderGate(session)
+
+    expect(screen.getByTestId('citizen-gate')).toBeTruthy()
+    expect(screen.queryByTestId('sidebar')).toBeNull()
+
+    await fireEvent.click(screen.getByRole('button', { name: /continue as quill/i }))
+
+    expect(session.pickCitizen).toHaveBeenCalledWith('agent-quill')
+    expect(screen.getByTestId('sidebar')).toBeTruthy()
+  })
+
+  it('shows an honest empty state when the human operates nobody', () => {
+    renderGate(liveSession([]))
+
+    expect(screen.getByTestId('no-linked-citizens').textContent).toMatch(/operates nobody/i)
+    expect(screen.queryByTestId('sidebar')).toBeNull()
+    expect(screen.queryByTestId('fixture-sign-in')).toBeNull()
   })
 })
 
