@@ -8,6 +8,7 @@ import '@/session/session.css'
 const session = useOptionalWorkplaceSession()
 const human = useSignedInHuman()
 const agents = computed(() => session?.linkedAgents?.value ?? null)
+const failure = computed(() => session?.failure?.value ?? null)
 const isLiveSession = computed(() => session?.linkedAgents !== undefined)
 
 function pickCitizen(citizenId: string): void {
@@ -17,10 +18,49 @@ function pickCitizen(citizenId: string): void {
 async function signOut(): Promise<void> {
   await session?.signOut()
 }
+
+async function signInAgain(): Promise<void> {
+  await session?.signIn()
+}
 </script>
 
 <template>
   <AppShell v-if="human !== null" />
+  <section
+    v-else-if="failure === 'unauthorized'"
+    class="session-signed-out"
+    data-testid="session-unauthorized"
+  >
+    <div class="session-signed-out__panel">
+      <h1 class="session-signed-out__title">
+        Session expired
+      </h1>
+      <p class="session-signed-out__lead">
+        Sign in again to return to the workplace.
+      </p>
+      <button
+        class="session-signed-out__candidate"
+        type="button"
+        @click="signInAgain"
+      >
+        Sign in again
+      </button>
+    </div>
+  </section>
+  <section
+    v-else-if="failure === 'forbidden'"
+    class="session-signed-out"
+    data-testid="session-forbidden"
+  >
+    <div class="session-signed-out__panel">
+      <h1 class="session-signed-out__title">
+        Workplace deployment error
+      </h1>
+      <p class="session-signed-out__lead">
+        This origin is not allowed to call the Colony. Fix the deployment configuration.
+      </p>
+    </div>
+  </section>
   <section
     v-else-if="isLiveSession && agents !== null"
     class="session-signed-out"

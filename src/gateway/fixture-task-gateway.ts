@@ -17,6 +17,7 @@ import type {
   WorkItemComment,
   WorkItemDetail,
   WorkItemId,
+  WorkItemMoveInput,
   WorkItemSummary,
 } from '@/domain/workplace'
 import {
@@ -267,19 +268,64 @@ export class FixtureTaskGateway implements TaskGateway {
     return cloneItem(this.requireItem(humanId, itemId))
   }
 
-  async moveItemToLane(humanId: HumanId, itemId: WorkItemId, lane: Lane): Promise<void> {
+  async moveItemToLane(
+    humanId: HumanId,
+    itemId: WorkItemId,
+    laneOrInput: Lane | WorkItemMoveInput,
+    position?: number,
+    lifecycle: Omit<WorkItemMoveInput, 'lane' | 'position'> = {},
+  ): Promise<WorkItemDetail> {
     const item = this.requireItem(humanId, itemId)
+    const lane = typeof laneOrInput === 'string' ? laneOrInput : laneOrInput.lane
+    const requestedPosition =
+      typeof laneOrInput === 'string' ? position : laneOrInput.position
+    const requestedLifecycle =
+      typeof laneOrInput === 'string' ? lifecycle : laneOrInput
 
-    if (item.lane === lane) {
-      return
+    if (item.lane === lane && requestedPosition === undefined) {
+      return cloneItem(item)
     }
 
     const originLane = item.lane
-    const destCount = this.items.filter(
-      (candidate) => candidate.boardId === item.boardId && candidate.lane === lane,
-    ).length
-    this.replace(item.id, { ...item, lane, position: destCount })
-    this.items = reindexLane(this.items, item.boardId, originLane)
+    const siblings = this.items
+      .filter(
+        (candidate) =>
+          candidate.boardId === item.boardId &&
+          candidate.lane === lane &&
+          candidate.id !== item.id,
+      )
+      .slice()
+      .sort((left, right) => left.position - right.position)
+    const destPosition = Math.max(0, Math.min(requestedPosition ?? siblings.length, siblings.length))
+    const moved: WorkItemDetail = {
+      ...item,
+      lane,
+      position: destPosition,
+      ...(lane === 'blocked' && requestedLifecycle.blockedBy !== undefined && requestedLifecycle.unblockWhen !== undefined
+        ? {
+            blocker: {
+              actor: requestedLifecycle.blockedBy,
+              smallestUnblock: requestedLifecycle.unblockWhen,
+            },
+          }
+        : {}),
+    }
+    siblings.splice(destPosition, 0, moved)
+    const positioned = new Map(
+      siblings.map((candidate, index) => [candidate.id, index] as const),
+    )
+    this.items = this.items.map((candidate) => {
+      const nextPosition = positioned.get(candidate.id)
+      if (nextPosition === undefined) {
+        return candidate
+      }
+
+      return { ...candidate, lane, position: nextPosition }
+    })
+    if (originLane !== lane) {
+      this.items = reindexLane(this.items, item.boardId, originLane)
+    }
+    return cloneItem(this.requireItem(humanId, itemId))
   }
 
   async createWorkItem(

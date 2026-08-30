@@ -22,6 +22,7 @@ import type {
   CreateAttachmentInput,
   UpdateChecklistItemInput,
   UpdateWorkItemInput,
+  WorkItemMoveInput,
   WorkItemAssignee,
   WorkItemDetail,
   WorkItemId,
@@ -380,8 +381,12 @@ function applyDetail(updated: WorkItemDetail | null): WorkItemDetail | null {
   return updated
 }
 
-async function moveDetail(itemId: WorkItemId, lane: Lane): Promise<void> {
-  await items.moveItem(itemId, lane)
+async function moveDetail(
+  itemId: WorkItemId,
+  lane: Lane,
+  lifecycle?: Omit<WorkItemMoveInput, 'lane' | 'position'>,
+): Promise<void> {
+  await items.moveItem(itemId, lane, undefined, lifecycle)
   detail.applyLane(itemId, lane)
 }
 
@@ -851,6 +856,7 @@ async function closeDetail(): Promise<void> {
             :now="now"
             :current-human-name="human?.name ?? null"
             :shows-preview-data="showsPreviewData"
+            :supports-multiple-assignees="showsPreviewData"
             @update="updateDetail"
             @create-checklist-item="createChecklistItem"
             @update-checklist-item="updateChecklistItem"

@@ -8,6 +8,10 @@ const human = useSignedInHuman()
 async function signOut(): Promise<void> {
   await session?.signOut()
 }
+
+function switchCitizen(): void {
+  session?.switchCitizen?.()
+}
 </script>
 
 <template>
@@ -17,6 +21,14 @@ async function signOut(): Promise<void> {
     data-testid="signed-in-human"
   >
     <span class="session-human__name">Signed in as {{ human.name }}</span>
+    <button
+      v-if="session?.switchCitizen !== undefined"
+      class="session-human__sign-out"
+      type="button"
+      @click="switchCitizen"
+    >
+      Switch citizen
+    </button>
     <button
       class="session-human__sign-out"
       type="button"

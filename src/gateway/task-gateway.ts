@@ -14,6 +14,7 @@ import type {
   VisibleBoard,
   WorkItemDetail,
   WorkItemId,
+  WorkItemMoveInput,
   WorkItemSummary,
 } from '@/domain/workplace'
 
@@ -37,7 +38,13 @@ export interface TaskGateway {
   archiveBoard?(humanId: HumanId, boardId: BoardId): Promise<void>
   getBoardItems(humanId: HumanId, boardId: BoardId): Promise<readonly WorkItemSummary[]>
   getItemDetail(humanId: HumanId, itemId: WorkItemId): Promise<WorkItemDetail>
-  moveItemToLane(humanId: HumanId, itemId: WorkItemId, lane: Lane): Promise<void>
+  moveItemToLane(
+    humanId: HumanId,
+    itemId: WorkItemId,
+    lane: Lane | WorkItemMoveInput,
+    position?: number,
+    lifecycle?: Omit<WorkItemMoveInput, 'lane' | 'position'>,
+  ): Promise<WorkItemDetail | void>
   createWorkItem(humanId: HumanId, input: CreateWorkItemInput): Promise<WorkItemDetail>
   updateWorkItem(
     humanId: HumanId,

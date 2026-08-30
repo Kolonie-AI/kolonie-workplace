@@ -5,9 +5,13 @@ import {
   createSessionCitizenStorage,
   type CitizenStorage,
 } from '@/session/citizen-storage'
-import type { LinkedCitizen, WorkplaceSession } from '@/session/workplace-session'
+import type {
+  LinkedCitizen,
+  WorkplaceSession,
+  WorkplaceSessionFailure,
+} from '@/session/workplace-session'
 import type { WorkplaceMeClient } from '@/session/workplace-me'
-import { WorkplaceUnauthorized } from '@/gateway/workplace-http-errors'
+import { WorkplaceForbidden, WorkplaceUnauthorized } from '@/gateway/workplace-http-errors'
 
 export interface Auth0Client {
   loginWithRedirect(): Promise<void>
@@ -33,12 +37,14 @@ function asHuman(agent: LinkedCitizen): Human {
 export class Auth0Session implements Auth0WorkplaceSession {
   readonly #human: Ref<Human | null> = ref(null)
   readonly #agents: Ref<readonly LinkedCitizen[] | null> = ref(null)
+  readonly #failure: Ref<WorkplaceSessionFailure | null> = ref(null)
   readonly #client: Auth0Client
   readonly #me: WorkplaceMeClient
   readonly #storage: CitizenStorage
 
   readonly currentHuman: Readonly<Ref<Human | null>> = this.#human
   readonly linkedAgents: Readonly<Ref<readonly LinkedCitizen[] | null>> = this.#agents
+  readonly failure: Readonly<Ref<WorkplaceSessionFailure | null>> = this.#failure
 
   constructor(client: Auth0Client, me: WorkplaceMeClient, storage: CitizenStorage) {
     this.#client = client
@@ -47,6 +53,7 @@ export class Auth0Session implements Auth0WorkplaceSession {
   }
 
   async signIn(): Promise<void> {
+    this.#failure.value = null
     await this.#client.loginWithRedirect()
   }
 
@@ -62,8 +69,14 @@ export class Auth0Session implements Auth0WorkplaceSession {
   async signOut(): Promise<void> {
     this.#human.value = null
     this.#agents.value = null
+    this.#failure.value = null
     this.#storage.clear()
     await this.#client.logout()
+  }
+
+  switchCitizen(): void {
+    this.#human.value = null
+    this.#storage.clear()
   }
 
   pickCitizen(citizenId: string): void {
@@ -84,6 +97,7 @@ export class Auth0Session implements Auth0WorkplaceSession {
   async #adopt({ refuse }: { refuse: boolean }): Promise<void> {
     this.#human.value = null
     this.#agents.value = null
+    this.#failure.value = null
 
     const authenticated = await this.#client.isAuthenticated()
 
@@ -115,6 +129,11 @@ export class Auth0Session implements Auth0WorkplaceSession {
     } catch (error) {
       this.#agents.value = null
       this.#storage.clear()
+      if (error instanceof WorkplaceUnauthorized) {
+        this.#failure.value = 'unauthorized'
+      } else if (error instanceof WorkplaceForbidden) {
+        this.#failure.value = 'forbidden'
+      }
       if (refuse) {
         if (error instanceof WorkplaceUnauthorized) {
           throw new IdentityNotRecognised()

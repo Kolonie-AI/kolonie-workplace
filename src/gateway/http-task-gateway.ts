@@ -17,6 +17,7 @@ import type {
   WorkItemDetail,
   WorkItemId,
   WorkItemLabel,
+  WorkItemMoveInput,
   WorkItemPriority,
   WorkItemSummary,
 } from '@/domain/workplace'
@@ -27,6 +28,10 @@ import {
   WorkplaceCitizenRequired,
   WorkplaceConflict,
   WorkplaceForbidden,
+  WorkplaceHandoverRequired,
+  WorkplaceInvalidTransition,
+  WorkplaceLifecycleInputRequired,
+  WorkplaceMultipleOwnersUnsupported,
   WorkplaceUnauthorized,
 } from '@/gateway/workplace-http-errors'
 
@@ -46,6 +51,21 @@ export interface HttpTaskGatewayOptions {
 }
 
 type Json = Record<string, unknown>
+
+type CardState = {
+  readonly boardId: BoardId
+  readonly lane: Lane
+  readonly ownerId: string | null
+}
+
+const LEGAL_TRANSITIONS: Readonly<Record<Lane, readonly Lane[]>> = {
+  inbox: ['ready'],
+  ready: ['inbox', 'in_progress'],
+  in_progress: ['blocked', 'review', 'ready', 'done'],
+  blocked: ['in_progress', 'ready'],
+  review: ['in_progress', 'done', 'ready'],
+  done: [],
+}
 
 const PRIORITIES: readonly WorkItemPriority[] = [
   'unset',
@@ -102,6 +122,7 @@ export class HttpTaskGateway implements TaskGateway {
   readonly #fetch: typeof fetch
   readonly #boardVersions = new Map<BoardId, number>()
   readonly #cardVersions = new Map<WorkItemId, number>()
+  readonly #cardStates = new Map<WorkItemId, CardState>()
   readonly #cardChecklists = new Map<WorkItemId, string>()
 
   constructor(options: HttpTaskGatewayOptions) {
@@ -168,13 +189,57 @@ export class HttpTaskGateway implements TaskGateway {
   async moveItemToLane(
     _humanId: HumanId,
     itemId: WorkItemId,
-    lane: Lane,
-  ): Promise<void> {
-    const version = await this.#cardVersion(itemId)
-    await this.#request('POST', `${WORKPLACE_API_PREFIX}/cards/${itemId}/move`, {
-      json: { status: lane },
-      ifMatch: version,
-    })
+    laneOrInput: Lane | WorkItemMoveInput,
+    position?: number,
+    lifecycle: Omit<WorkItemMoveInput, 'lane' | 'position'> = {},
+  ): Promise<WorkItemDetail> {
+    const lane = typeof laneOrInput === 'string' ? laneOrInput : laneOrInput.lane
+    const requestedPosition =
+      typeof laneOrInput === 'string' ? position : laneOrInput.position
+    const requestedLifecycle =
+      typeof laneOrInput === 'string' ? lifecycle : laneOrInput
+    const state = this.#cardStates.get(itemId)
+    if (state === undefined) {
+      throw new WorkItemAccessRefused(itemId)
+    }
+
+    if (state.lane === lane) {
+      if (requestedPosition === undefined) {
+        return this.getItemDetail(_humanId, itemId)
+      }
+      return this.#move(itemId, lane, requestedPosition)
+    }
+
+    if (!LEGAL_TRANSITIONS[state.lane].includes(lane)) {
+      throw new WorkplaceInvalidTransition()
+    }
+
+    if (state.lane === 'ready' && lane === 'in_progress') {
+      return this.#lifecycle(itemId, 'claim')
+    }
+
+    if (lane === 'blocked') {
+      if (requestedLifecycle.blockedBy === undefined || requestedLifecycle.unblockWhen === undefined) {
+        throw new WorkplaceLifecycleInputRequired('blocker')
+      }
+      return this.#lifecycle(itemId, 'block', {
+        blockedBy: requestedLifecycle.blockedBy,
+        unblockWhen: requestedLifecycle.unblockWhen,
+      })
+    }
+
+    if (lane === 'review') {
+      return this.#lifecycle(itemId, 'request-review')
+    }
+
+    if (lane === 'done') {
+      if (requestedLifecycle.outcome === undefined) {
+        throw new WorkplaceLifecycleInputRequired('outcome')
+      }
+      return this.#lifecycle(itemId, 'complete', { outcome: requestedLifecycle.outcome })
+    }
+
+    return this.#move(itemId, lane, requestedPosition)
   }
 
   async createWorkItem(
@@ -200,6 +265,10 @@ export class HttpTaskGateway implements TaskGateway {
     itemId: WorkItemId,
     input: UpdateWorkItemInput,
   ): Promise<WorkItemDetail> {
+    if (input.assignees !== undefined && input.assignees.length > 1) {
+      throw new WorkplaceMultipleOwnersUnsupported()
+    }
+
     const json: Json = {}
     if (input.title !== undefined) {
       json.title = input.title
@@ -230,6 +299,37 @@ export class HttpTaskGateway implements TaskGateway {
       updated = this.#toDetailFromCard(body)
     }
 
+    if (input.assignees !== undefined) {
+      const state = this.#cardStates.get(itemId)
+      const nextOwner = input.assignees[0]
+      const ownerChanged =
+        state !== undefined && nextOwner !== undefined && state.ownerId !== null && nextOwner.id !== state.ownerId
+      if (ownerChanged) {
+        if (input.handover === undefined) {
+          throw new WorkplaceHandoverRequired()
+        }
+        const version = await this.#cardVersion(itemId)
+        const body = await this.#request(
+          'POST',
+          `${WORKPLACE_API_PREFIX}/cards/${itemId}/handover`,
+          {
+            json: {
+              toCitizenId: nextOwner.id,
+              done: input.handover.done,
+              learned: input.handover.learned,
+              next: input.handover.next,
+              ...(input.handover.blocked.trim() === ''
+                ? {}
+                : { blocked: input.handover.blocked }),
+              evidenceLinks: input.handover.evidence.map((entry) => entry.href),
+            },
+            ifMatch: version,
+          },
+        )
+        updated = this.#toDetailFromCard(body)
+      }
+    }
+
     return updated ?? this.getItemDetail(_humanId, itemId)
   }
 
@@ -245,11 +345,32 @@ export class HttpTaskGateway implements TaskGateway {
     itemId: WorkItemId,
     input: ReorderWorkItemInput,
   ): Promise<WorkItemDetail> {
+    return this.#move(itemId, input.lane, input.position)
+  }
+
+  async #move(itemId: WorkItemId, lane: Lane, position?: number): Promise<WorkItemDetail> {
     const version = await this.#cardVersion(itemId)
     const body = await this.#request('POST', `${WORKPLACE_API_PREFIX}/cards/${itemId}/move`, {
-      json: { status: input.lane, position: input.position },
+      json: { status: lane, ...(position === undefined ? {} : { position }) },
       ifMatch: version,
     })
+    return this.#toDetailFromCard(body)
+  }
+
+  async #lifecycle(
+    itemId: WorkItemId,
+    route: 'claim' | 'block' | 'request-review' | 'complete',
+    json?: Json,
+  ): Promise<WorkItemDetail> {
+    const version = await this.#cardVersion(itemId)
+    const body = await this.#request(
+      'POST',
+      `${WORKPLACE_API_PREFIX}/cards/${itemId}/${route}`,
+      {
+        ...(json === undefined ? {} : { json }),
+        ifMatch: version,
+      },
+    )
     return this.#toDetailFromCard(body)
   }
 
@@ -502,6 +623,12 @@ export class HttpTaskGateway implements TaskGateway {
     if (status === 409 || errorCode(body) === 'conflict') {
       return new WorkplaceConflict()
     }
+    if (errorCode(body) === 'workplace_invalid_transition') {
+      return new WorkplaceInvalidTransition()
+    }
+    if (errorCode(body) === 'workplace_handover_required') {
+      return new WorkplaceHandoverRequired()
+    }
     if (status === 404 || errorCode(body) === 'not_found') {
       if (path.includes('/boards/') && path.includes('/cards') === false && path.includes('/cards/') === false) {
         const boardId = path.split('/boards/')[1]?.split(/[/?]/)[0]
@@ -567,7 +694,13 @@ export class HttpTaskGateway implements TaskGateway {
     const id = text(row.id)
     const version = number(row.version, 0)
     if (id.length > 0 && version > 0 && typeof row.status === 'string') {
+      const lane = asLane(row.status, id)
       this.#cardVersions.set(id, version)
+      this.#cardStates.set(id, {
+        boardId: text(row.boardId),
+        lane,
+        ownerId: nullableText(row.ownerId),
+      })
     }
   }
 

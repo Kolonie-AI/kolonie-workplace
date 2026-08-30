@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 import type { BoardId, WorkItemSummary } from '@/domain/workplace'
 import { WorkItemAccessRefused } from '@/gateway/refusals'
+import { WorkplaceConflict } from '@/gateway/workplace-http-errors'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
 import { FIXTURE_BOARDS, FIXTURE_HUMANS, FIXTURE_ITEMS } from '@/fixtures/catalogue'
@@ -138,24 +139,51 @@ describe('lane move — rejection: the gateway refuses', () => {
     expect(items.rows.value.map((row) => `${row.item.id}:${row.lane}`)).toEqual(before)
   })
 
-  it('clears an earlier refusal once a later move is accepted', async () => {
+  it('uses one positioned move write rather than moving and then reordering', async () => {
     const gateway = createFixtureTaskGateway()
-    const move = vi
-      .spyOn(gateway, 'moveItemToLane')
-      .mockRejectedValueOnce(new WorkItemAccessRefused(FIXTURE_ITEMS.ready))
+    const move = vi.spyOn(gateway, 'moveItemToLane')
+    const reorder = vi.spyOn(gateway, 'reorderWorkItem')
     const items = boardItems(gateway)
     await settled()
 
-    await items.moveItem(FIXTURE_ITEMS.ready, 'done')
-    await settled()
-    expect(items.moveError.value).not.toBeNull()
-
-    move.mockResolvedValueOnce(undefined)
-    await items.moveItem(FIXTURE_ITEMS.ready, 'review')
+    await items.moveItem(FIXTURE_ITEMS.ready, 'in_progress', 0)
     await settled()
 
-    expect(items.moveError.value).toBeNull()
-    expect(laneOf(items, FIXTURE_ITEMS.ready)).toBe('review')
+    expect(move).toHaveBeenCalledTimes(1)
+    expect(move).toHaveBeenCalledWith(
+      FIXTURE_HUMANS.wren,
+      FIXTURE_ITEMS.ready,
+      'in_progress',
+      0,
+    )
+    expect(reorder).not.toHaveBeenCalled()
+  })
+
+  it('reloads the canonical board after a conflict instead of restoring the old lane', async () => {
+    const gateway = createFixtureTaskGateway()
+    const originalRead = gateway.getBoardItems.bind(gateway)
+    let reads = 0
+    vi.spyOn(gateway, 'getBoardItems').mockImplementation(async (humanId, boardId) => {
+      reads += 1
+      const current = await originalRead(humanId, boardId)
+      if (reads === 1) {
+        return current
+      }
+
+      return current.map((item) =>
+        item.id === FIXTURE_ITEMS.ready ? { ...item, lane: 'blocked' as const } : item,
+      )
+    })
+    vi.spyOn(gateway, 'moveItemToLane').mockRejectedValue(new WorkplaceConflict())
+    const items = boardItems(gateway)
+    await settled()
+
+    await items.moveItem(FIXTURE_ITEMS.ready, 'in_progress')
+    await settled()
+
+    expect(laneOf(items, FIXTURE_ITEMS.ready)).toBe('blocked')
+    expect(gateway.getBoardItems).toHaveBeenCalledTimes(2)
+    expect(items.moveError.value).toMatch(/changed|canonical/i)
   })
 })
 

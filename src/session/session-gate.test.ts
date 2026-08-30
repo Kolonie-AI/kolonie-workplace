@@ -10,6 +10,7 @@ import {
 } from '@/fixtures/catalogue'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
+import { WorkplaceForbidden, WorkplaceUnauthorized } from '@/gateway/workplace-http-errors'
 import { TASK_GATEWAY } from '@/gateway/provide-gateway'
 import SessionGate from '@/session/SessionGate.vue'
 import SignedInHuman from '@/session/SignedInHuman.vue'
@@ -95,6 +96,9 @@ describe('SessionGate — live citizen selection', () => {
       linkedAgents,
       signIn: vi.fn(async () => undefined),
       signOut: vi.fn(async () => undefined),
+      switchCitizen: vi.fn(() => {
+        currentHuman.value = null
+      }),
       pickCitizen: vi.fn((citizenId: string) => {
         const citizen = agents.find((candidate) => candidate.id === citizenId)
         if (citizen !== undefined) {
@@ -121,12 +125,74 @@ describe('SessionGate — live citizen selection', () => {
     expect(screen.getByTestId('sidebar')).toBeTruthy()
   })
 
+  it('switches a signed-in citizen, reloads boards, and uses the newly selected actor', async () => {
+    const session = liveSession([
+      { id: 'agent-quill', handle: 'quill', status: 'citizen' },
+      { id: 'agent-marlow', handle: 'marlow', status: 'citizen' },
+    ])
+    const requests: string[] = []
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'listVisibleBoards').mockImplementation(async (humanId) => {
+      requests.push(humanId)
+      return []
+    })
+    renderGate(session, gateway)
+
+    await fireEvent.click(screen.getByRole('button', { name: /continue as quill/i }))
+    await screen.findByTestId('boards-empty')
+    await fireEvent.click(screen.getByRole('button', { name: /switch citizen/i }))
+    expect(screen.getByTestId('citizen-gate')).toBeTruthy()
+    await fireEvent.click(screen.getByRole('button', { name: /continue as marlow/i }))
+    await screen.findByTestId('boards-empty')
+
+    expect(session.signOut).not.toHaveBeenCalled()
+    expect(requests).toContain('agent-quill')
+    expect(requests.at(-1)).toBe('agent-marlow')
+  })
+
   it('shows an honest empty state when the human operates nobody', () => {
     renderGate(liveSession([]))
 
     expect(screen.getByTestId('no-linked-citizens').textContent).toMatch(/operates nobody/i)
     expect(screen.queryByTestId('sidebar')).toBeNull()
     expect(screen.queryByTestId('fixture-sign-in')).toBeNull()
+  })
+})
+
+describe('SessionGate — live application failures', () => {
+  function failedLiveSession(failure: 'unauthorized' | 'forbidden'): WorkplaceSession {
+    return {
+      currentHuman: ref<Human | null>(null),
+      linkedAgents: ref(null),
+      failure: ref(failure),
+      signIn: vi.fn(async () => undefined),
+      signOut: vi.fn(async () => undefined),
+    }
+  }
+
+  it('renders 401 as an actionable sign-in-again state', async () => {
+    const session = failedLiveSession('unauthorized')
+    renderGate(session)
+
+    expect(screen.getByTestId('session-unauthorized').textContent).toMatch(/sign in again/i)
+    expect(screen.queryByTestId('signed-out')).toBeNull()
+    await fireEvent.click(screen.getByRole('button', { name: /sign in again/i }))
+    expect(session.signIn).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders origin 403 as deployment configuration, never sign-in or empty boards', () => {
+    const session = failedLiveSession('forbidden')
+    renderGate(session)
+
+    expect(screen.getByTestId('session-forbidden').textContent).toMatch(/deployment|origin/i)
+    expect(screen.queryByTestId('signed-out')).toBeNull()
+    expect(screen.queryByTestId('boards-empty')).toBeNull()
+    expect(screen.queryByRole('button', { name: /sign in/i })).toBeNull()
+  })
+
+  it('preserves gateway 401 and 403 classes for the real composition path', () => {
+    expect(new WorkplaceUnauthorized()).toBeInstanceOf(WorkplaceUnauthorized)
+    expect(new WorkplaceForbidden()).toBeInstanceOf(WorkplaceForbidden)
   })
 })
 

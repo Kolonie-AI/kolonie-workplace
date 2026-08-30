@@ -5,9 +5,11 @@ import type {
   HumanId,
   WorkItemDetail,
   WorkItemId,
+  WorkItemMoveInput,
   WorkItemSummary,
 } from '@/domain/workplace'
 import { BoardAccessRefused } from '@/gateway/refusals'
+import { WorkplaceConflict } from '@/gateway/workplace-http-errors'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import { applyBoardFilter, EMPTY_BOARD_FILTER, type BoardFilter } from '@/items/board-filter'
 import {
@@ -53,7 +55,12 @@ export interface BoardItems {
   readonly moveError: Readonly<Ref<string | null>>
   readonly createError: Readonly<Ref<string | null>>
   selectItem(itemId: WorkItemId): void
-  moveItem(itemId: WorkItemId, lane: Lane, position?: number): Promise<void>
+  moveItem(
+    itemId: WorkItemId,
+    lane: Lane,
+    position?: number,
+    lifecycle?: Omit<WorkItemMoveInput, 'lane' | 'position'>,
+  ): Promise<void>
   reorderItem(itemId: WorkItemId, lane: Lane, position: number): Promise<void>
   createItem(title: string, lane: Lane): Promise<void>
   replaceItem(item: WorkItemSummary): void
@@ -200,11 +207,17 @@ export function useBoardItems(
             : 'Creating this card failed.'
       }
     },
-    async moveItem(itemId: WorkItemId, lane: Lane, position?: number): Promise<void> {
+    async moveItem(
+      itemId: WorkItemId,
+      lane: Lane,
+      position?: number,
+      lifecycle?: Omit<WorkItemMoveInput, 'lane' | 'position'>,
+    ): Promise<void> {
       const currentHumanId = humanId.value
+      const boardId = activeBoardId.value
       const current = loaded.value.find((item) => item.id === itemId)
 
-      if (currentHumanId === null || current === undefined || current.lane === lane) {
+      if (currentHumanId === null || boardId === null || current === undefined || current.lane === lane) {
         return
       }
 
@@ -231,11 +244,34 @@ export function useBoardItems(
       loaded.value = [...rest, ...origin, ...positionedDest]
 
       try {
-        await gateway.moveItemToLane(currentHumanId, itemId, lane)
-        if (position !== undefined) {
-          await gateway.reorderWorkItem(currentHumanId, itemId, { lane, position: destPosition })
+        if (lifecycle === undefined) {
+          if (position === undefined) {
+            await gateway.moveItemToLane(currentHumanId, itemId, lane)
+          } else {
+            await gateway.moveItemToLane(currentHumanId, itemId, lane, destPosition)
+          }
+        } else {
+          await gateway.moveItemToLane(
+            currentHumanId,
+            itemId,
+            lane,
+            position === undefined ? undefined : destPosition,
+            lifecycle,
+          )
         }
       } catch (error) {
+        if (error instanceof WorkplaceConflict) {
+          try {
+            const items = await gateway.getBoardItems(currentHumanId, boardId)
+            loaded.value = items.filter((item) => item.boardId === boardId)
+            foreign.value = items.filter((item) => item.boardId !== boardId)
+          } catch {
+            loaded.value = previous
+          }
+          moveError.value = error.message
+          return
+        }
+
         loaded.value = previous
         moveError.value =
           error instanceof Error ? error.message : 'The move was refused.'

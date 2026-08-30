@@ -4,6 +4,8 @@ import { BoardAccessRefused } from '@/gateway/refusals'
 import {
   WorkplaceConflict,
   WorkplaceForbidden,
+  WorkplaceInvalidTransition,
+  WorkplaceMultipleOwnersUnsupported,
   WorkplaceUnauthorized,
 } from '@/gateway/workplace-http-errors'
 import { isPreviewDataGateway } from '@/gateway/task-gateway'
@@ -340,29 +342,192 @@ describe('live HTTP gateway — cards', () => {
     expect(JSON.parse(String(move?.init.body))).toEqual({ status: 'ready' })
   })
 
-  it('reorders a card in-lane by moving with the same status and a position', async () => {
+  it('walks the legal six-lane lifecycle through the Platform routes and required inputs', async () => {
+    let current = cardPayload()
+    const { fetchImpl, calls } = recordedFetch((url, init) => {
+      if (url === `${ORIGIN}/v1/workplace/boards/${BOARD_ID}/cards`) {
+        return jsonResponse(200, {
+          items: [cardSummaryPayload(current)],
+          nextCursor: null,
+        })
+      }
+
+      const body = init.body === undefined ? {} : JSON.parse(String(init.body)) as Record<string, unknown>
+      const nextVersion = Number(current.version) + 1
+      if (url.endsWith('/move') && body.status === 'ready') {
+        current = cardPayload({ status: 'ready', version: nextVersion })
+      } else if (url.endsWith('/claim')) {
+        current = cardPayload({ status: 'in_progress', ownerId: CITIZEN_ID, version: nextVersion })
+      } else if (url.endsWith('/block')) {
+        current = cardPayload({
+          status: 'blocked',
+          ownerId: CITIZEN_ID,
+          blockedBy: body.blockedBy,
+          unblockWhen: body.unblockWhen,
+          version: nextVersion,
+        })
+      } else if (url.endsWith('/move') && body.status === 'in_progress') {
+        current = cardPayload({ status: 'in_progress', ownerId: CITIZEN_ID, version: nextVersion })
+      } else if (url.endsWith('/request-review')) {
+        current = cardPayload({ status: 'review', ownerId: CITIZEN_ID, version: nextVersion })
+      } else if (url.endsWith('/complete')) {
+        current = cardPayload({
+          status: 'done',
+          ownerId: CITIZEN_ID,
+          outcome: body.outcome,
+          version: nextVersion,
+        })
+      } else {
+        return jsonResponse(404, { code: 'not_found' })
+      }
+
+      return jsonResponse(200, current, { ETag: String(nextVersion) })
+    })
+
+    const live = gateway(fetchImpl)
+    await live.getBoardItems(HUMAN_ID, BOARD_ID)
+    await live.moveItemToLane(HUMAN_ID, CARD_ID, { lane: 'ready', position: 0 })
+    await live.moveItemToLane(HUMAN_ID, CARD_ID, { lane: 'in_progress', position: 0 })
+    await live.moveItemToLane(HUMAN_ID, CARD_ID, {
+      lane: 'blocked',
+      position: 0,
+      blockedBy: 'Waiting on the operator.',
+      unblockWhen: 'The operator answers.',
+    })
+    await live.moveItemToLane(HUMAN_ID, CARD_ID, { lane: 'in_progress', position: 0 })
+    await live.moveItemToLane(HUMAN_ID, CARD_ID, { lane: 'review', position: 0 })
+    await live.moveItemToLane(HUMAN_ID, CARD_ID, {
+      lane: 'done',
+      position: 0,
+      outcome: 'The live cutover shipped.',
+    })
+
+    const writes = calls.filter((call) => call.init.method === 'POST')
+    expect(writes.map((call) => new URL(call.url).pathname)).toEqual([
+      `/v1/workplace/cards/${CARD_ID}/move`,
+      `/v1/workplace/cards/${CARD_ID}/claim`,
+      `/v1/workplace/cards/${CARD_ID}/block`,
+      `/v1/workplace/cards/${CARD_ID}/move`,
+      `/v1/workplace/cards/${CARD_ID}/request-review`,
+      `/v1/workplace/cards/${CARD_ID}/complete`,
+    ])
+    expect(JSON.parse(String(writes[0]?.init.body))).toEqual({ status: 'ready', position: 0 })
+    expect(writes[1]?.init.body).toBeUndefined()
+    expect(JSON.parse(String(writes[2]?.init.body))).toEqual({
+      blockedBy: 'Waiting on the operator.',
+      unblockWhen: 'The operator answers.',
+    })
+    expect(JSON.parse(String(writes[5]?.init.body))).toEqual({
+      outcome: 'The live cutover shipped.',
+    })
+    expect(writes.map((call) => header(call.init, 'If-Match'))).toEqual([
+      '3',
+      '4',
+      '5',
+      '6',
+      '7',
+      '8',
+    ])
+  })
+
+  it('refuses an illegal lifecycle move without sending a write', async () => {
     const { fetchImpl, calls } = recordedFetch((url) => {
       if (url === `${ORIGIN}/v1/workplace/boards/${BOARD_ID}/cards`) {
         return jsonResponse(200, {
-          items: [cardSummaryPayload({ status: 'ready', version: 2, position: 1000 })],
+          items: [cardSummaryPayload({ status: 'inbox', version: 3 })],
+          nextCursor: null,
+        })
+      }
+      return jsonResponse(500, { code: 'unexpected' })
+    })
+
+    const live = gateway(fetchImpl)
+    await live.getBoardItems(HUMAN_ID, BOARD_ID)
+
+    await expect(
+      live.moveItemToLane(HUMAN_ID, CARD_ID, {
+        lane: 'done',
+        outcome: 'This must not skip the lifecycle.',
+      }),
+    ).rejects.toBeInstanceOf(WorkplaceInvalidTransition)
+    expect(calls.filter((call) => call.init.method === 'POST')).toEqual([])
+  })
+
+  it('uses one atomic /move request for a positioned cross-lane drag', async () => {
+    const { fetchImpl, calls } = recordedFetch((url) => {
+      if (url === `${ORIGIN}/v1/workplace/boards/${BOARD_ID}/cards`) {
+        return jsonResponse(200, {
+          items: [cardSummaryPayload({ status: 'inbox', version: 3 })],
           nextCursor: null,
         })
       }
       if (url === `${ORIGIN}/v1/workplace/cards/${CARD_ID}/move`) {
-        return jsonResponse(200, cardPayload({ status: 'ready', version: 3, position: 1500 }), {
-          ETag: '3',
-        })
+        return jsonResponse(200, cardPayload({ status: 'ready', position: 7, version: 4 }))
       }
       return jsonResponse(404, { code: 'not_found' })
     })
 
     const live = gateway(fetchImpl)
     await live.getBoardItems(HUMAN_ID, BOARD_ID)
-    await live.reorderWorkItem(HUMAN_ID, CARD_ID, { lane: 'ready', position: 1500 })
+    await live.moveItemToLane(HUMAN_ID, CARD_ID, { lane: 'ready', position: 7 })
 
-    const move = calls.find((call) => call.init.method === 'POST')
-    expect(JSON.parse(String(move?.init.body))).toEqual({ status: 'ready', position: 1500 })
-    expect(header(move?.init, 'If-Match')).toBe('2')
+    const writes = calls.filter((call) => call.init.method === 'POST')
+    expect(writes).toHaveLength(1)
+    expect(writes[0]?.url).toBe(`${ORIGIN}/v1/workplace/cards/${CARD_ID}/move`)
+    expect(JSON.parse(String(writes[0]?.init.body))).toEqual({ status: 'ready', position: 7 })
+  })
+
+  it('maps one owner through handover and refuses a silently ignored second owner', async () => {
+    const { fetchImpl, calls } = recordedFetch((url, init) => {
+      if (url === `${ORIGIN}/v1/workplace/cards/${CARD_ID}` && (init.method ?? 'GET') === 'GET') {
+        return jsonResponse(200, {
+          card: cardPayload({ status: 'in_progress', ownerId: CITIZEN_ID, version: 3 }),
+          labels: [],
+          checklists: [],
+          comments: [],
+          links: [],
+          handover: null,
+        })
+      }
+      if (url.endsWith('/handover')) {
+        return jsonResponse(200, {
+          card: cardPayload({ status: 'in_progress', ownerId: OTHER_CITIZEN_ID, version: 4 }),
+          handover: {},
+        })
+      }
+      return jsonResponse(404, { code: 'not_found' })
+    })
+
+    const live = gateway(fetchImpl)
+    await live.getItemDetail(HUMAN_ID, CARD_ID)
+    await live.updateWorkItem(HUMAN_ID, CARD_ID, {
+      assignees: [{ id: OTHER_CITIZEN_ID, name: 'Someone' }],
+      handover: {
+        done: 'Prepared the card.',
+        learned: 'The owner must be singular.',
+        next: 'Continue the live cutover.',
+        blocked: '',
+        evidence: [],
+      },
+    })
+
+    const handover = calls.find((call) => call.url.endsWith('/handover'))
+    expect(JSON.parse(String(handover?.init.body))).toEqual({
+      toCitizenId: OTHER_CITIZEN_ID,
+      done: 'Prepared the card.',
+      learned: 'The owner must be singular.',
+      next: 'Continue the live cutover.',
+      evidenceLinks: [],
+    })
+
+    await expect(
+      live.updateWorkItem(HUMAN_ID, CARD_ID, {
+        assignees: [
+          { id: OTHER_CITIZEN_ID, name: 'Someone' },
+          { id: CITIZEN_ID, name: 'Quill' },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(WorkplaceMultipleOwnersUnsupported)
   })
 })
 

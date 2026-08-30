@@ -3,7 +3,7 @@ import { createAuth0WorkplaceSession } from '@/session/auth0-workplace-session'
 import type { Auth0Client } from '@/session/auth0-workplace-session'
 import type { CitizenStorage } from '@/session/citizen-storage'
 import type { WorkplaceMe, WorkplaceMeClient } from '@/session/workplace-me'
-import { WorkplaceUnauthorized } from '@/gateway/workplace-http-errors'
+import { WorkplaceForbidden, WorkplaceUnauthorized } from '@/gateway/workplace-http-errors'
 import { IdentityNotRecognised } from '@/session/refusals'
 
 const ME: WorkplaceMe = {
@@ -159,6 +159,24 @@ describe('Auth0 session — live Colony identity', () => {
     expect(auth0.logout).toHaveBeenCalledTimes(1)
   })
 
+  it('switches citizen without logging out of Auth0', async () => {
+    const saved = storage('agent-quill')
+    const auth0 = client({ isAuthenticated: vi.fn(async () => true) })
+    const session = createAuth0WorkplaceSession(auth0, meClient(), saved)
+    await session.restore()
+
+    session.switchCitizen?.()
+
+    expect(session.currentHuman.value).toBeNull()
+    expect(session.linkedAgents?.value).toEqual(ME.agents)
+    expect(saved.clear).toHaveBeenCalled()
+    expect(auth0.logout).not.toHaveBeenCalled()
+
+    session.pickCitizen?.('agent-marlow')
+    expect(session.currentHuman.value?.id).toBe('agent-marlow')
+    expect(saved.value).toBe('agent-marlow')
+  })
+
   it('returns the access token through the session port', async () => {
     const auth0 = client({ getAccessToken: vi.fn(async () => 'fresh-token') })
     const session = createAuth0WorkplaceSession(auth0, meClient(), storage())
@@ -194,6 +212,32 @@ describe('Auth0 session — rejection and quiet restore', () => {
     )
 
     await expect(session.completeSignIn()).rejects.toBe(failure)
+  })
+
+  it('preserves a forbidden origin as a deployment state during quiet restore', async () => {
+    const session = createAuth0WorkplaceSession(
+      client({ isAuthenticated: vi.fn(async () => true) }),
+      meClient(new WorkplaceForbidden()),
+      storage(),
+    )
+
+    await session.restore()
+
+    expect(session.failure?.value).toBe('forbidden')
+    expect(session.currentHuman.value).toBeNull()
+  })
+
+  it('preserves an expired token as a sign-in-again state during quiet restore', async () => {
+    const session = createAuth0WorkplaceSession(
+      client({ isAuthenticated: vi.fn(async () => true) }),
+      meClient(new WorkplaceUnauthorized()),
+      storage(),
+    )
+
+    await session.restore()
+
+    expect(session.failure?.value).toBe('unauthorized')
+    expect(session.currentHuman.value).toBeNull()
   })
 
   it('quietly clears state when restoring an expired session', async () => {
