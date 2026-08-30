@@ -64,7 +64,7 @@ function pane(): HTMLElement {
 }
 
 async function openRail(
-  name: 'Labels' | 'Members' | 'Dates' | 'Priority' | 'Cover',
+  name: 'Labels' | 'Members' | 'Dates' | 'Priority' | 'Cover' | 'Connection',
 ): Promise<void> {
   await fireEvent.click(within(pane()).getByRole('button', { name }))
 }
@@ -120,6 +120,7 @@ describe('detail pane — opened from the board, over it', () => {
     expect(within(pane()).getByRole('heading', { name: 'Comments and activity' })).toBeTruthy()
     expect(within(pane()).getByRole('button', { name: 'Checklist' })).toBeTruthy()
     expect(within(pane()).getByRole('button', { name: 'Attachment' })).toBeTruthy()
+    expect(within(pane()).getByRole('button', { name: 'Connection' })).toBeTruthy()
     expect(within(pane()).getByRole('button', { name: 'Cover' })).toBeTruthy()
   })
 
@@ -340,24 +341,97 @@ describe('detail pane — the blocker', () => {
   })
 })
 
-describe('detail pane — evidence and external references', () => {
-  it('renders external references as links to the external target', async () => {
-    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+describe('detail pane — typed connections', () => {
+  it('renders typed rows with a vault name only and an explicit unresolvable state', async () => {
+    const plantedValue = 'planted-value-never-rendered'
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'getItemDetail').mockImplementationOnce(async (humanId, itemId) => {
+      const current = await createFixtureTaskGateway().getItemDetail(humanId, itemId)
+      return {
+        ...current,
+        links: [
+          ...current.links,
+          {
+            id: 'fictional-link-unresolvable',
+            kind: 'account',
+            ref: 'fictional-account-id',
+            state: 'unresolvable',
+            summary: 'Not resolvable',
+          },
+          {
+            id: 'fictional-link-vault-value',
+            kind: 'vault',
+            ref: 'fictional/name-only',
+            state: 'resolved',
+            summary: 'fictional/name-only',
+            value: plantedValue,
+          } as never,
+        ],
+      }
+    })
+
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
     await openItem(FIXTURE_ITEMS.review)
 
-    const links = within(pane()).getAllByTestId('detail-reference')
-
-    expect(links).toHaveLength(1)
-    expect(links[0]?.tagName).toBe('A')
-    expect(links[0]?.getAttribute('href')).toBe('/fictional-reference/review')
-    expect(links[0]?.textContent).toContain('Fictional review reference')
+    const rows = within(pane()).getAllByTestId('detail-connection')
+    expect(rows.map((row) => row.getAttribute('data-link-kind'))).toEqual([
+      'url',
+      'vault',
+      'account',
+      'vault',
+    ])
+    expect(rows[2]?.textContent).toContain('Not resolvable')
+    expect(pane().textContent).toContain('fictional/name-only')
+    expect(pane().textContent).not.toContain(plantedValue)
   })
 
-  it('renders no reference list where an item carries none', async () => {
-    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
-    await openItem(FIXTURE_ITEMS.inbox)
+  it('adds account and vault connections, then removes one without reloading the board', async () => {
+    const gateway = createFixtureTaskGateway()
+    const adds = vi.spyOn(gateway, 'addCardLink')
+    const removes = vi.spyOn(gateway, 'removeCardLink')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.ready)
 
-    expect(within(pane()).queryByTestId('detail-reference')).toBeNull()
+    await openRail('Connection')
+    await fireEvent.update(within(pane()).getByLabelText('Account identifier'), 'fictional-account-id')
+    await fireEvent.update(within(pane()).getByLabelText('Connection note'), 'Primary account')
+    await fireEvent.click(within(pane()).getByRole('button', { name: 'Add connection' }))
+
+    await waitFor(() => expect(adds).toHaveBeenCalledWith(
+      FIXTURE_HUMANS.wren,
+      FIXTURE_ITEMS.ready,
+      { kind: 'account', ref: 'fictional-account-id', note: 'Primary account' },
+    ))
+
+    await fireEvent.update(within(pane()).getByLabelText('Connection kind'), 'vault')
+    await fireEvent.update(within(pane()).getByLabelText('Vault identifier'), 'fictional/mailbox')
+    await fireEvent.click(within(pane()).getByRole('button', { name: 'Add connection' }))
+
+    await waitFor(() => {
+      expect(within(pane()).getAllByTestId('detail-connection')).toHaveLength(2)
+    })
+    const accountRemove = within(pane()).getByRole('button', {
+      name: 'Remove Account connection fictional-account-id',
+    })
+    await fireEvent.click(accountRemove)
+    await waitFor(() => expect(removes).toHaveBeenCalledTimes(1))
+    expect(within(pane()).getAllByTestId('detail-connection')).toHaveLength(1)
+    expect(pane().textContent).toContain('fictional/mailbox')
+  })
+
+  it('rejects non-https external URLs before calling the gateway', async () => {
+    const gateway = createFixtureTaskGateway()
+    const adds = vi.spyOn(gateway, 'addCardLink')
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.ready)
+    await openRail('Connection')
+
+    await fireEvent.update(within(pane()).getByLabelText('Connection kind'), 'url')
+    await fireEvent.update(within(pane()).getByLabelText('URL identifier'), 'not-https')
+    await fireEvent.click(within(pane()).getByRole('button', { name: 'Add connection' }))
+
+    expect(within(pane()).getByRole('alert').textContent).toMatch(/https:\/\//)
+    expect(adds).not.toHaveBeenCalled()
   })
 })
 
@@ -1526,7 +1600,7 @@ describe('detail pane — rejection: an item on a board this human may not open'
     expect(within(surface).getByTestId('detail-refused')).toBeTruthy()
     expect(within(surface).queryByTestId('detail-handover')).toBeNull()
     expect(within(surface).queryByTestId('detail-blocker')).toBeNull()
-    expect(within(surface).queryByTestId('detail-reference')).toBeNull()
+    expect(within(surface).queryByTestId('detail-connections')).toBeNull()
     expect(surface.textContent).not.toContain('Prepare the fictional outreach list')
   })
 })

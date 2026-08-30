@@ -49,8 +49,23 @@ describe('board items', () => {
         { label: 'Fictional unit-test evidence', href: '/fictional-evidence/unit-test' },
       ],
     })
-    expect(review.externalReferences).toEqual([
-      { label: 'Fictional review reference', href: '/fictional-reference/review' },
+    expect(review.links).toEqual([
+      {
+        id: 'fictional-link-review-url',
+        kind: 'url',
+        ref: '/fictional-reference/review',
+        note: 'Fictional review reference',
+        state: 'resolved',
+        summary: 'Fictional review reference',
+      },
+      {
+        id: 'fictional-link-review-vault',
+        kind: 'vault',
+        ref: 'fictional/mailbox',
+        state: 'resolved',
+        summary: 'fictional/mailbox',
+      },
     ])
+    expect(review.links.every((link) => !('value' in link))).toBe(true)
   })
 })

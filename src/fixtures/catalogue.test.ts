@@ -22,7 +22,9 @@ const ALL_TEXT = [
       `${item.comments.map((comment) => `${comment.author} ${comment.body}`).join(' ')} ` +
       `${item.attachments.map((attachment) => attachment.name).join(' ')} ` +
       `${(item.handover?.evidence ?? []).map((entry) => `${entry.label} ${entry.href}`).join(' ')} ` +
-      item.externalReferences.map((reference) => `${reference.label} ${reference.href}`).join(' '),
+      item.links
+        .map((link) => `${link.kind} ${link.ref} ${link.summary} ${link.note ?? ''}`)
+        .join(' '),
   ),
 ].join('\n')
 

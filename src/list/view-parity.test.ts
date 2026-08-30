@@ -246,6 +246,9 @@ describe('view parity — rejection: an item the human may not see appears in ne
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     await renderShell(FIXTURE_HUMANS.wren, 'board-mine', gateway)
@@ -302,6 +305,9 @@ describe('view parity — rejection: an item the human may not see appears in ne
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     await renderShell(FIXTURE_HUMANS.wren, 'board-mine', gateway)

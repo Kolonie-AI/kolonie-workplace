@@ -165,7 +165,7 @@ export const fixtureWorkItems: readonly WorkItemDetail[] = [
     assignees: [{ id: FIXTURE_HUMANS.wren, name: 'Fictional Human Wren' }],
     priority: 'low',
     position: 0,
-    externalReferences: [],
+    links: [],
   },
   {
     id: FIXTURE_ITEMS.ready,
@@ -180,7 +180,7 @@ export const fixtureWorkItems: readonly WorkItemDetail[] = [
     dueDate: '2026-09-04',
     coverImageUrl: '/fictional-covers/outline.svg',
     position: 0,
-    externalReferences: [],
+    links: [],
   },
   {
     id: FIXTURE_ITEMS.inProgress,
@@ -245,7 +245,7 @@ export const fixtureWorkItems: readonly WorkItemDetail[] = [
     ],
     coverColour: '#1973ff',
     position: 0,
-    externalReferences: [],
+    links: [],
   },
   {
     id: FIXTURE_ITEMS.blocked,
@@ -263,7 +263,7 @@ export const fixtureWorkItems: readonly WorkItemDetail[] = [
       actor: 'Fictional Operator Ember',
       smallestUnblock: 'Choose one of the fictional delivery windows',
     },
-    externalReferences: [],
+    links: [],
   },
   {
     id: FIXTURE_ITEMS.review,
@@ -298,8 +298,22 @@ export const fixtureWorkItems: readonly WorkItemDetail[] = [
         { label: 'Fictional unit-test evidence', href: '/fictional-evidence/unit-test' },
       ],
     },
-    externalReferences: [
-      { label: 'Fictional review reference', href: '/fictional-reference/review' },
+    links: [
+      {
+        id: 'fictional-link-review-url',
+        kind: 'url',
+        ref: '/fictional-reference/review',
+        note: 'Fictional review reference',
+        state: 'resolved',
+        summary: 'Fictional review reference',
+      },
+      {
+        id: 'fictional-link-review-vault',
+        kind: 'vault',
+        ref: 'fictional/mailbox',
+        state: 'resolved',
+        summary: 'fictional/mailbox',
+      },
     ],
   },
   {
@@ -313,7 +327,7 @@ export const fixtureWorkItems: readonly WorkItemDetail[] = [
     priority: 'low',
     percentDone: 100,
     position: 0,
-    externalReferences: [],
+    links: [],
   },
   {
     id: 'fictional-item-foreign',
@@ -327,6 +341,6 @@ export const fixtureWorkItems: readonly WorkItemDetail[] = [
     priority: 'do_now',
     dueDate: '2026-08-28',
     position: 0,
-    externalReferences: [],
+    links: [],
   },
 ]

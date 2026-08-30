@@ -41,6 +41,48 @@ export type LabelId = string
 export type CommentId = string
 export type AttachmentId = string
 export type ChecklistItemId = string
+export type CardLinkId = string
+
+export const WORKPLACE_LINK_KINDS = [
+  'account',
+  'provider',
+  'vault',
+  'task',
+  'playbook',
+  'url',
+] as const
+
+export type CardLinkKind = (typeof WORKPLACE_LINK_KINDS)[number]
+
+export function isCardLinkKind(candidate: string): candidate is CardLinkKind {
+  return (WORKPLACE_LINK_KINDS as readonly string[]).includes(candidate)
+}
+
+export const WORKPLACE_LINK_KIND_LABELS: Readonly<Record<CardLinkKind, string>> = {
+  account: 'Account',
+  provider: 'Provider',
+  vault: 'Vault',
+  task: 'Task',
+  playbook: 'Playbook',
+  url: 'URL',
+}
+
+export type CardLinkState = 'resolved' | 'unresolvable'
+
+export interface CardLink {
+  readonly id: CardLinkId
+  readonly kind: CardLinkKind
+  readonly ref: string
+  readonly note?: string
+  readonly state: CardLinkState
+  readonly summary: string
+}
+
+export interface CreateCardLinkInput {
+  readonly kind: CardLinkKind
+  readonly ref: string
+  readonly note?: string
+}
 
 export type WorkItemPriority = 'unset' | 'low' | 'medium' | 'high' | 'urgent' | 'do_now'
 
@@ -120,7 +162,7 @@ export interface WorkItemSummary {
 export interface WorkItemDetail extends WorkItemSummary {
   readonly blocker?: Blocker
   readonly handover?: Handover
-  readonly externalReferences: readonly ExternalReference[]
+  readonly links: readonly CardLink[]
 }
 
 export interface CreateWorkItemInput {
@@ -150,7 +192,6 @@ export type UpdateWorkItemInput = Partial<
     | 'position'
     | 'blocker'
     | 'handover'
-    | 'externalReferences'
   >
 >
 

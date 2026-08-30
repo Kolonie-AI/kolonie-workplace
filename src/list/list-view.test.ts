@@ -227,6 +227,9 @@ describe('list view — empty, loading and failure states', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     await renderList(FIXTURE_HUMANS.wren, 'board-mine', gateway)
@@ -295,6 +298,9 @@ describe('list view — rejection: an item the human may not see', () => {
       updateChecklistItem: vi.fn(),
       reorderChecklistItem: vi.fn(),
       deleteChecklistItem: vi.fn(),
+      listCardLinks: vi.fn(),
+      addCardLink: vi.fn(),
+      removeCardLink: vi.fn(),
     }
 
     await renderList(FIXTURE_HUMANS.wren, 'board-mine', gateway)

@@ -2,10 +2,13 @@ import type { Lane } from '@/domain/lanes'
 import type {
   AttachmentId,
   BoardId,
+  CardLink,
+  CardLinkId,
   ChecklistItem,
   ChecklistItemId,
   CommentId,
   CreateAttachmentInput,
+  CreateCardLinkInput,
   CreateCommentInput,
   CreateWorkItemInput,
   HumanId,
@@ -51,7 +54,7 @@ function cloneItem(item: WorkItemDetail): WorkItemDetail {
     checklist: item.checklist.map((entry) => ({ ...entry })),
     comments: item.comments.map((comment) => ({ ...comment })),
     attachments: item.attachments.map((attachment) => ({ ...attachment })),
-    externalReferences: item.externalReferences.map((reference) => ({ ...reference })),
+    links: item.links.map((link) => ({ ...link })),
     ...(item.handover === undefined
       ? {}
       : {
@@ -360,7 +363,7 @@ export class FixtureTaskGateway implements TaskGateway {
       coverImageUrl: null,
       coverAttachmentId: null,
       position: input.position ?? laneItems.length,
-      externalReferences: [],
+      links: [],
     }
     this.items = [...this.items, created]
     return cloneItem(created)
@@ -578,6 +581,52 @@ export class FixtureTaskGateway implements TaskGateway {
       checklist: reindexChecklist(
         item.checklist.filter((entry) => entry.id !== checklistItemId),
       ),
+    })
+  }
+
+  async listCardLinks(humanId: HumanId, itemId: WorkItemId): Promise<readonly CardLink[]> {
+    return this.requireItem(humanId, itemId).links.map((link) => ({ ...link }))
+  }
+
+  async addCardLink(
+    humanId: HumanId,
+    itemId: WorkItemId,
+    input: CreateCardLinkInput,
+  ): Promise<CardLink> {
+    const item = this.requireItem(humanId, itemId)
+    const existing = item.links.find(
+      (link) => link.kind === input.kind && link.ref === input.ref,
+    )
+    if (existing !== undefined) {
+      return { ...existing }
+    }
+
+    const note = input.note?.trim()
+    const created: CardLink = {
+      id: nextId(
+        'fictional-link',
+        this.items.flatMap((candidate) => candidate.links.map((link) => link.id)),
+      ),
+      kind: input.kind,
+      ref: input.ref,
+      ...(note === undefined || note === '' ? {} : { note }),
+      state: 'resolved',
+      summary: input.kind === 'url' ? (note === undefined || note === '' ? input.ref : note) : input.ref,
+    }
+    this.replace(item.id, { ...item, links: [...item.links, created] })
+    return { ...created }
+  }
+
+  async removeCardLink(humanId: HumanId, linkId: CardLinkId): Promise<void> {
+    const holder = this.items.find((item) => item.links.some((link) => link.id === linkId))
+    if (holder === undefined) {
+      throw new WorkItemAccessRefused(linkId)
+    }
+
+    this.requireItem(humanId, holder.id)
+    this.replace(holder.id, {
+      ...holder,
+      links: holder.links.filter((link) => link.id !== linkId),
     })
   }
 
