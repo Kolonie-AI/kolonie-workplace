@@ -56,6 +56,7 @@ describe('port boundary — shell and board components see only the port', () =>
       currentHuman: { value: null } as WorkplaceSession['currentHuman'],
       signIn: async () => undefined,
       signOut: async () => undefined,
+      invalidateAuthentication: () => undefined,
     }
 
     expectTypeOf(stub).toMatchTypeOf<WorkplaceSession>()
@@ -168,6 +169,9 @@ describe('port boundary — the shell renders against any implementation of the 
       currentHuman: human,
       signIn: async () => undefined,
       signOut: async () => {
+        human.value = null
+      },
+      invalidateAuthentication: () => {
         human.value = null
       },
     }

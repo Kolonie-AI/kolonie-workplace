@@ -96,6 +96,7 @@ describe('SessionGate — live citizen selection', () => {
       linkedAgents,
       signIn: vi.fn(async () => undefined),
       signOut: vi.fn(async () => undefined),
+      invalidateAuthentication: vi.fn(),
       switchCitizen: vi.fn(() => {
         currentHuman.value = null
       }),
@@ -126,6 +127,7 @@ describe('SessionGate — live citizen selection', () => {
       failure,
       signIn,
       signOut: vi.fn(async () => undefined),
+      invalidateAuthentication: vi.fn(),
     }
     renderGate(session)
     expect(screen.getByTestId('sidebar')).toBeTruthy()
@@ -198,6 +200,7 @@ describe('SessionGate — live application failures', () => {
       failure: ref(failure),
       signIn: vi.fn(async () => undefined),
       signOut: vi.fn(async () => undefined),
+      invalidateAuthentication: vi.fn(),
     }
   }
 

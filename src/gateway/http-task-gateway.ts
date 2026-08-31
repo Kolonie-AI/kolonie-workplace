@@ -54,6 +54,7 @@ export interface HttpTaskGatewayOptions {
   readonly origin: string
   readonly getToken: () => Promise<string>
   readonly getCitizen: () => LinkedCitizen | null
+  readonly onUnauthorized?: () => void | undefined
   readonly fetch?: typeof fetch
 }
 
@@ -126,6 +127,7 @@ export class HttpTaskGateway implements TaskGateway {
   readonly #origin: string
   readonly #getToken: () => Promise<string>
   readonly #getCitizen: () => LinkedCitizen | null
+  readonly #onUnauthorized: () => void
   readonly #fetch: typeof fetch
   readonly #boardVersions = new Map<BoardId, number>()
   readonly #cardVersions = new Map<WorkItemId, number>()
@@ -136,6 +138,7 @@ export class HttpTaskGateway implements TaskGateway {
     this.#origin = originRoot(options.origin)
     this.#getToken = options.getToken
     this.#getCitizen = options.getCitizen
+    this.#onUnauthorized = options.onUnauthorized ?? (() => undefined)
     this.#fetch = options.fetch ?? fetch
   }
 
@@ -640,7 +643,11 @@ export class HttpTaskGateway implements TaskGateway {
     }
 
     if (!response.ok) {
-      throw this.#refusal(response.status, parsed, path)
+      const refusal = this.#refusal(response.status, parsed, path)
+      if (refusal instanceof WorkplaceUnauthorized) {
+        this.#onUnauthorized()
+      }
+      throw refusal
     }
 
     if (typeof parsed === 'object' && parsed !== null) {

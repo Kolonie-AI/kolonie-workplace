@@ -40,6 +40,7 @@ export interface WorkplaceSession {
   pickCitizen?(citizenId: string): void
   switchCitizen?(): void
   getAccessToken?(): Promise<string>
+  invalidateAuthentication(): void
 }
 
 export const WORKPLACE_SESSION: InjectionKey<WorkplaceSession> = Symbol('workplaceSession')

@@ -44,6 +44,10 @@ export class FixtureWorkplaceSession implements WorkplaceSession, DevelopmentSig
   async signOut(): Promise<void> {
     this.#human.value = null
   }
+
+  invalidateAuthentication(): void {
+    this.#human.value = null
+  }
 }
 
 export function createFixtureWorkplaceSession(): WorkplaceSession & DevelopmentSignIn {

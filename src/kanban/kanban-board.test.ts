@@ -1012,6 +1012,7 @@ describe('kanban board — any implementation of the session port', () => {
       currentHuman: { value: human } as WorkplaceSession['currentHuman'],
       signIn: async () => undefined,
       signOut: async () => undefined,
+      invalidateAuthentication: () => undefined,
     }
     const gateway: TaskGateway = {
       listVisibleBoards: vi.fn(async () => []),

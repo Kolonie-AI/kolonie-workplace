@@ -97,12 +97,17 @@ function jsonResponse(status: number, body: unknown, headers: Record<string, str
   })
 }
 
-function gateway(fetchImpl: typeof fetch, citizenId: string | null = CITIZEN_ID) {
+function gateway(
+  fetchImpl: typeof fetch,
+  citizenId: string | null = CITIZEN_ID,
+  onUnauthorized?: () => void | undefined,
+) {
   return createHttpTaskGateway({
     origin: ORIGIN,
     getToken: async () => TOKEN,
     getCitizen: () =>
       citizenId === null ? null : { id: citizenId, handle: 'quill' },
+    ...(onUnauthorized === undefined ? {} : { onUnauthorized }),
     fetch: fetchImpl,
   })
 }
@@ -753,15 +758,28 @@ describe('live HTTP gateway — rejection', () => {
     expect(calls).toEqual([])
   })
 
-  it('treats 401 as sign-in-again, never as an empty board', async () => {
+  it('notifies the central session invalidator for a response 401', async () => {
     const { fetchImpl } = recordedFetch(() =>
-      jsonResponse(401, { code: 'unauthorized', message: 'Sign in again.' }),
+      jsonResponse(401, { code: 'unauthorized' }),
     )
+    const onUnauthorized = vi.fn()
 
-    await expect(gateway(fetchImpl).listVisibleBoards(HUMAN_ID)).rejects.toBeInstanceOf(
-      WorkplaceUnauthorized,
-    )
+    await expect(gateway(fetchImpl, CITIZEN_ID, onUnauthorized).listVisibleBoards(HUMAN_ID))
+      .rejects.toBeInstanceOf(WorkplaceUnauthorized)
+
+    expect(onUnauthorized).toHaveBeenCalledTimes(1)
   })
+
+  it('does not notify the session invalidator for a generic board failure', async () => {
+    const { fetchImpl } = recordedFetch(() => jsonResponse(500, { code: 'failure' }))
+    const onUnauthorized = vi.fn()
+
+    await expect(gateway(fetchImpl, CITIZEN_ID, onUnauthorized).listVisibleBoards(HUMAN_ID))
+      .rejects.toThrow()
+
+    expect(onUnauthorized).not.toHaveBeenCalled()
+  })
+
 
   it('treats 403 as a deployment error, not a re-login', async () => {
     const { fetchImpl } = recordedFetch(() =>
