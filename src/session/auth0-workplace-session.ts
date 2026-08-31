@@ -91,7 +91,16 @@ export class Auth0Session implements Auth0WorkplaceSession {
   }
 
   async getAccessToken(): Promise<string> {
-    return this.#client.getAccessToken()
+    try {
+      return await this.#client.getAccessToken()
+    } catch (error) {
+      if (error instanceof WorkplaceUnauthorized) {
+        this.#human.value = null
+        this.#storage.clear()
+        this.#failure.value = 'unauthorized'
+      }
+      throw error
+    }
   }
 
   async #adopt({ refuse }: { refuse: boolean }): Promise<void> {

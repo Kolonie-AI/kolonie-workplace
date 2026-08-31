@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/vue'
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 import type { Human } from '@/domain/workplace'
 import {
   FIXTURE_HUMANS,
@@ -111,6 +111,37 @@ describe('SessionGate — live citizen selection', () => {
       }),
     }
   }
+
+  it('shows the sign-in-again state, not a shell over a dead token, when the audience grant is stale', async () => {
+    const human = ref<Human | null>({
+      id: 'agent-quill',
+      name: 'quill',
+      agentIds: ['agent-quill'],
+    })
+    const failure = ref<'unauthorized' | 'forbidden' | null>(null)
+    const signIn = vi.fn(async () => undefined)
+    const session: WorkplaceSession = {
+      currentHuman: human,
+      linkedAgents: ref([{ id: 'agent-quill', handle: 'quill', status: 'citizen' }]),
+      failure,
+      signIn,
+      signOut: vi.fn(async () => undefined),
+    }
+    renderGate(session)
+    expect(screen.getByTestId('sidebar')).toBeTruthy()
+
+    human.value = null
+    failure.value = 'unauthorized'
+    await nextTick()
+
+    expect(screen.getByTestId('session-unauthorized').textContent).toMatch(/sign in again/i)
+    expect(screen.queryByTestId('sidebar')).toBeNull()
+    expect(screen.queryByTestId('boards-error')).toBeNull()
+    expect(screen.queryByTestId('signed-in-human')).toBeNull()
+
+    await fireEvent.click(screen.getByRole('button', { name: /sign in again/i }))
+    expect(signIn).toHaveBeenCalledTimes(1)
+  })
 
   it('requires an explicit citizen pick before rendering the shell', async () => {
     const session = liveSession([{ id: 'agent-quill', handle: 'quill', status: 'citizen' }])

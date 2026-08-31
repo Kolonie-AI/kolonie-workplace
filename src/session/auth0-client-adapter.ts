@@ -1,4 +1,5 @@
 import type { Auth0Client } from '@/session/auth0-workplace-session'
+import { WorkplaceUnauthorized } from '@/gateway/workplace-http-errors'
 
 /**
  * The slice of `@auth0/auth0-spa-js` this adapter drives. Naming it here keeps
@@ -44,9 +45,13 @@ export class Auth0ClientAdapter implements Auth0Client {
   }
 
   async getAccessToken(): Promise<string> {
-    return this.#client.getTokenSilently({
-      authorizationParams: { audience: this.#audience },
-    })
+    try {
+      return await this.#client.getTokenSilently({
+        authorizationParams: { audience: this.#audience },
+      })
+    } catch {
+      throw new WorkplaceUnauthorized()
+    }
   }
 
   async logout(): Promise<void> {

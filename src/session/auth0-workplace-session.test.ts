@@ -183,6 +183,23 @@ describe('Auth0 session — live Colony identity', () => {
 
     await expect(session.getAccessToken?.()).resolves.toBe('fresh-token')
   })
+
+  it('clears a selected citizen when silent token acquisition loses the audience grant', async () => {
+    const saved = storage('agent-quill')
+    const auth0 = client({ isAuthenticated: vi.fn(async () => true) })
+    const me = meClient()
+    const session = createAuth0WorkplaceSession(auth0, me, saved)
+    await session.restore()
+    expect(session.currentHuman.value?.id).toBe('agent-quill')
+
+    const tokenFailure = new WorkplaceUnauthorized()
+    auth0.getAccessToken = vi.fn(async () => { throw tokenFailure })
+
+    await expect(session.getAccessToken?.()).rejects.toBe(tokenFailure)
+    expect(session.currentHuman.value).toBeNull()
+    expect(saved.clear).toHaveBeenCalled()
+    expect(session.failure?.value).toBe('unauthorized')
+  })
 })
 
 describe('Auth0 session — rejection and quiet restore', () => {

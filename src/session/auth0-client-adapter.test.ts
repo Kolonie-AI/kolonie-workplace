@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Auth0ClientAdapter } from '@/session/auth0-client-adapter'
 import type { Auth0SdkClient } from '@/session/auth0-client-adapter'
+import { WorkplaceUnauthorized } from '@/gateway/workplace-http-errors'
 
 function sdk(overrides: Partial<Auth0SdkClient> = {}): Auth0SdkClient {
   return {
@@ -78,18 +79,14 @@ describe('Auth0 client adapter — PKCE redirect and workplace-origin session', 
 })
 
 describe('Auth0 client adapter — access token', () => {
-  it('requests an audience-bound access token through the SDK', async () => {
-    const getTokenSilently = vi.fn(async () => 'access-token')
+  it('turns a stale audience grant into a Workplace authentication failure', async () => {
     const adapter = new Auth0ClientAdapter(
-      sdk({ getTokenSilently }),
+      sdk({ getTokenSilently: vi.fn(async () => { throw new Error('login_required') }) }),
       'https://workplace.example.invalid/sign-in/callback',
       'https://workplace.example.invalid',
       'workplace-audience',
     )
 
-    await expect(adapter.getAccessToken()).resolves.toBe('access-token')
-    expect(getTokenSilently).toHaveBeenCalledWith({
-      authorizationParams: { audience: 'workplace-audience' },
-    })
+    await expect(adapter.getAccessToken()).rejects.toBeInstanceOf(WorkplaceUnauthorized)
   })
 })
