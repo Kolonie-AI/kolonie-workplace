@@ -34,6 +34,7 @@ export function createTaskGateway(
   return createHttpTaskGateway({
     origin: config.platformOrigin,
     getToken: () => session.getAccessToken!(),
+    onUnauthorized: () => session.invalidateAuthentication(),
     getCitizen: () => {
       const selected = session.currentHuman.value
       return selected === null ? null : { id: selected.id, handle: selected.name }

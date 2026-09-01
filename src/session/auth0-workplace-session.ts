@@ -90,14 +90,18 @@ export class Auth0Session implements Auth0WorkplaceSession {
     this.#storage.write(agent.id)
   }
 
+  invalidateAuthentication(): void {
+    this.#human.value = null
+    this.#storage.clear()
+    this.#failure.value = 'unauthorized'
+  }
+
   async getAccessToken(): Promise<string> {
     try {
       return await this.#client.getAccessToken()
     } catch (error) {
       if (error instanceof WorkplaceUnauthorized) {
-        this.#human.value = null
-        this.#storage.clear()
-        this.#failure.value = 'unauthorized'
+        this.invalidateAuthentication()
       }
       throw error
     }

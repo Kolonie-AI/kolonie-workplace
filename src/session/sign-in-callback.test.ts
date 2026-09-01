@@ -8,6 +8,7 @@ function auth0Session(overrides: Partial<Auth0WorkplaceSession> = {}): Auth0Work
     currentHuman: { value: null } as WorkplaceSession['currentHuman'],
     signIn: vi.fn(async () => undefined),
     signOut: vi.fn(async () => undefined),
+      invalidateAuthentication: vi.fn(),
     completeSignIn: vi.fn(async () => undefined),
     restore: vi.fn(async () => undefined),
     ...overrides,
@@ -62,6 +63,7 @@ describe('starting the session on load', () => {
       currentHuman: { value: null } as WorkplaceSession['currentHuman'],
       signIn: vi.fn(async () => undefined),
       signOut: vi.fn(async () => undefined),
+      invalidateAuthentication: vi.fn(),
     }
 
     await expect(

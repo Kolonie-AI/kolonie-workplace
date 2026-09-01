@@ -491,6 +491,9 @@ describe('sidebar board list — any implementation of the session port', () => 
       signOut: async () => {
         human.value = null
       },
+      invalidateAuthentication: () => {
+        human.value = null
+      },
     }
     const gateway: TaskGateway = {
       listVisibleBoards: vi.fn(async () => []),
