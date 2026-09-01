@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/vue'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { nextTick, ref } from 'vue'
 import type { Human } from '@/domain/workplace'
 import {
@@ -11,7 +11,9 @@ import {
 import type { TaskGateway } from '@/gateway/task-gateway'
 import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
 import { WorkplaceForbidden, WorkplaceUnauthorized } from '@/gateway/workplace-http-errors'
-import { TASK_GATEWAY } from '@/gateway/provide-gateway'
+import { TASK_GATEWAY, createTaskGateway } from '@/gateway/provide-gateway'
+import { createAuth0WorkplaceSession } from '@/session/auth0-workplace-session'
+import type { CitizenStorage } from '@/session/citizen-storage'
 import SessionGate from '@/session/SessionGate.vue'
 import SignedInHuman from '@/session/SignedInHuman.vue'
 import { createFixtureWorkplaceSession } from '@/session/fixture-workplace-session'
@@ -22,6 +24,18 @@ function renderGate(session: WorkplaceSession, gateway: TaskGateway = createFixt
     global: { provide: { [WORKPLACE_SESSION]: session, [TASK_GATEWAY]: gateway } },
   })
 }
+
+const LIVE_CONFIG = {
+  VITE_AUTH0_DOMAIN: 'configured-domain',
+  VITE_AUTH0_CLIENT_ID: 'configured-client-id',
+  VITE_AUTH0_CALLBACK: 'https://workplace.example.invalid/sign-in/callback',
+  VITE_AUTH0_AUDIENCE: 'configured-audience',
+  VITE_PLATFORM_API_ORIGIN: 'https://platform.example.invalid',
+} as const
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 describe('SessionGate — signed out', () => {
   it('renders the sign-in offer and no board chrome at all', () => {
@@ -183,6 +197,89 @@ describe('SessionGate — live citizen selection', () => {
     expect(requests.at(-1)).toBe('agent-marlow')
   })
 
+  it('uses real composition to request and open the selected citizen default board', async () => {
+    const auth0 = {
+      loginWithRedirect: vi.fn(async () => undefined),
+      handleRedirectCallback: vi.fn(async () => undefined),
+      isAuthenticated: vi.fn(async () => true),
+      getAccessToken: vi.fn(async () => 'access-token'),
+      logout: vi.fn(async () => undefined),
+    }
+    const session = createAuth0WorkplaceSession(auth0, {
+      me: vi.fn(async () => ({
+        human: { id: 'human-operator' },
+        agents: [{ id: 'agent-quill', handle: 'quill', status: 'citizen' }],
+      })),
+    })
+    await session.restore()
+    const requests: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      requests.push(url)
+      if (url.endsWith('/v1/workplace/boards')) {
+        return new Response(JSON.stringify({
+          items: [{
+            id: 'board-default',
+            ownerId: 'agent-quill',
+            title: 'Citizen default board',
+            kind: 'default',
+            version: 1,
+          }],
+          nextCursor: null,
+        }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ items: [], nextCursor: null }), { status: 200 })
+    }))
+    const gateway = createTaskGateway(session, LIVE_CONFIG)
+    renderGate(session, gateway)
+
+    await fireEvent.click(screen.getByRole('button', { name: /continue as quill/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-board').textContent).toContain('Citizen default board')
+    })
+    expect(requests.some((url) => url.endsWith('/v1/workplace/boards'))).toBe(true)
+    expect(requests.some((url) => url.endsWith('/v1/workplace/boards/board-default/cards'))).toBe(true)
+    expect(screen.queryByTestId('boards-error')).toBeNull()
+  })
+
+  it('uses real composition to remove the shell and remembered citizen after a gateway 401', async () => {
+    const selected = { value: null as string | null }
+    const storage: CitizenStorage = {
+      read: vi.fn(() => selected.value),
+      write: vi.fn((id: string) => { selected.value = id }),
+      clear: vi.fn(() => { selected.value = null }),
+    }
+    const auth0 = {
+      loginWithRedirect: vi.fn(async () => undefined),
+      handleRedirectCallback: vi.fn(async () => undefined),
+      isAuthenticated: vi.fn(async () => true),
+      getAccessToken: vi.fn(async () => 'access-token'),
+      logout: vi.fn(async () => undefined),
+    }
+    const session = createAuth0WorkplaceSession(auth0, {
+      me: vi.fn(async () => ({
+        human: { id: 'human-operator' },
+        agents: [{ id: 'agent-quill', handle: 'quill', status: 'citizen' }],
+      })),
+    }, storage)
+    await session.restore()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 401 })))
+    const gateway = createTaskGateway(session, LIVE_CONFIG)
+    renderGate(session, gateway)
+
+    await fireEvent.click(screen.getByRole('button', { name: /continue as quill/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-unauthorized')).toBeTruthy()
+    })
+    expect(selected.value).toBeNull()
+    expect(session.currentHuman.value).toBeNull()
+    expect(session.linkedAgents?.value).toBeNull()
+    expect(screen.queryByTestId('app-shell')).toBeNull()
+    expect(screen.queryByTestId('boards-error')).toBeNull()
+    expect(screen.getByRole('button', { name: /sign in again/i })).toBeTruthy()
+  })
   it('shows an honest empty state when the human operates nobody', () => {
     renderGate(liveSession([]))
 

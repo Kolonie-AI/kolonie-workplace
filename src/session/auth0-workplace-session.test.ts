@@ -197,7 +197,33 @@ describe('Auth0 session — live Colony identity', () => {
 
     await expect(session.getAccessToken?.()).rejects.toBe(tokenFailure)
     expect(session.currentHuman.value).toBeNull()
+    expect(session.linkedAgents?.value).toBeNull()
     expect(saved.clear).toHaveBeenCalled()
+    expect(session.failure?.value).toBe('unauthorized')
+  })
+
+  it('sets reactive unauthorized state before best-effort storage cleanup', async () => {
+    const auth0 = client({ isAuthenticated: vi.fn(async () => true) })
+    const saved = storage('agent-quill')
+    const session = createAuth0WorkplaceSession(auth0, meClient(), saved)
+    await session.restore()
+    const statesDuringClear: unknown[] = []
+    saved.clear = vi.fn(() => {
+      statesDuringClear.push({
+        human: session.currentHuman.value,
+        agents: session.linkedAgents?.value,
+        failure: session.failure?.value,
+      })
+      throw new Error('storage unavailable')
+    })
+
+    const refusal = new WorkplaceUnauthorized()
+    auth0.getAccessToken = vi.fn(async () => { throw refusal })
+
+    await expect(session.getAccessToken?.()).rejects.toBe(refusal)
+    expect(statesDuringClear).toEqual([{ human: null, agents: null, failure: 'unauthorized' }])
+    expect(session.currentHuman.value).toBeNull()
+    expect(session.linkedAgents?.value).toBeNull()
     expect(session.failure?.value).toBe('unauthorized')
   })
 })

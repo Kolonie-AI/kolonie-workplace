@@ -65,6 +65,10 @@ export function useBoardList(
     try {
       loaded.value = await gateway.listVisibleBoards(currentHumanId)
       status.value = 'ready'
+      const defaultBoard = loaded.value.find((board) => board.kind === 'default')
+      if (active.value === null && defaultBoard !== undefined) {
+        await selectBoard(defaultBoard.id)
+      }
     } catch (error) {
       loaded.value = []
       active.value = null

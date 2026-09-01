@@ -101,10 +101,11 @@ function gateway(
   fetchImpl: typeof fetch,
   citizenId: string | null = CITIZEN_ID,
   onUnauthorized?: () => void | undefined,
+  getToken: () => Promise<string> = async () => TOKEN,
 ) {
   return createHttpTaskGateway({
     origin: ORIGIN,
-    getToken: async () => TOKEN,
+    getToken,
     getCitizen: () =>
       citizenId === null ? null : { id: citizenId, handle: 'quill' },
     ...(onUnauthorized === undefined ? {} : { onUnauthorized }),
@@ -758,14 +759,72 @@ describe('live HTTP gateway — rejection', () => {
     expect(calls).toEqual([])
   })
 
-  it('notifies the central session invalidator for a response 401', async () => {
-    const { fetchImpl } = recordedFetch(() =>
-      jsonResponse(401, { code: 'unauthorized' }),
+  it('issues the board request after token acquisition succeeds', async () => {
+    const getToken = vi.fn(async () => TOKEN)
+    const { fetchImpl, calls } = recordedFetch(() =>
+      jsonResponse(200, { items: [boardPayload()], nextCursor: null }),
     )
+
+    const boards = await gateway(fetchImpl, CITIZEN_ID, undefined, getToken)
+      .listVisibleBoards(HUMAN_ID)
+
+    expect(getToken).toHaveBeenCalledTimes(1)
+    expect(calls.map((call) => call.url)).toEqual([`${ORIGIN}/v1/workplace/boards`])
+    expect(boards[0]?.title).toBe('Live delivery board')
+  })
+
+  it('invalidates when typed unauthorized token acquisition fails before fetch', async () => {
+    const refusal = new WorkplaceUnauthorized()
+    const getToken = vi.fn(async () => { throw refusal })
+    const onUnauthorized = vi.fn()
+    const { fetchImpl, calls } = recordedFetch(() =>
+      jsonResponse(200, { items: [], nextCursor: null }),
+    )
+
+    await expect(
+      gateway(fetchImpl, CITIZEN_ID, onUnauthorized, getToken).listVisibleBoards(HUMAN_ID),
+    ).rejects.toBe(refusal)
+
+    expect(onUnauthorized).toHaveBeenCalledTimes(1)
+    expect(calls).toEqual([])
+  })
+
+  it('invalidates a response 401 before reading a rejecting body', async () => {
+    const bodyFailure = new Error('body unavailable')
+    const response = {
+      ok: false,
+      status: 401,
+      text: vi.fn(async () => { throw bodyFailure }),
+    } as unknown as Response
+    const { fetchImpl } = recordedFetch(() => response)
     const onUnauthorized = vi.fn()
 
     await expect(gateway(fetchImpl, CITIZEN_ID, onUnauthorized).listVisibleBoards(HUMAN_ID))
       .rejects.toBeInstanceOf(WorkplaceUnauthorized)
+
+    expect(onUnauthorized).toHaveBeenCalledTimes(1)
+    expect(response.text).not.toHaveBeenCalled()
+  })
+
+  it('preserves response unauthorized when the invalidator throws', async () => {
+    const { fetchImpl } = recordedFetch(() => jsonResponse(401, { code: 'unauthorized' }))
+    const onUnauthorized = vi.fn(() => { throw new Error('cleanup failed') })
+
+    await expect(gateway(fetchImpl, CITIZEN_ID, onUnauthorized).listVisibleBoards(HUMAN_ID))
+      .rejects.toBeInstanceOf(WorkplaceUnauthorized)
+
+    expect(onUnauthorized).toHaveBeenCalledTimes(1)
+  })
+
+  it('preserves token unauthorized when the invalidator throws', async () => {
+    const refusal = new WorkplaceUnauthorized()
+    const getToken = vi.fn(async () => { throw refusal })
+    const onUnauthorized = vi.fn(() => { throw new Error('cleanup failed') })
+    const { fetchImpl } = recordedFetch(() => jsonResponse(200, {}))
+
+    await expect(
+      gateway(fetchImpl, CITIZEN_ID, onUnauthorized, getToken).listVisibleBoards(HUMAN_ID),
+    ).rejects.toBe(refusal)
 
     expect(onUnauthorized).toHaveBeenCalledTimes(1)
   })

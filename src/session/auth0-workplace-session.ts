@@ -92,8 +92,13 @@ export class Auth0Session implements Auth0WorkplaceSession {
 
   invalidateAuthentication(): void {
     this.#human.value = null
-    this.#storage.clear()
+    this.#agents.value = null
     this.#failure.value = 'unauthorized'
+    try {
+      this.#storage.clear()
+    } catch {
+      return
+    }
   }
 
   async getAccessToken(): Promise<string> {

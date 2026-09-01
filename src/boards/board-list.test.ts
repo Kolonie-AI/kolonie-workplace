@@ -304,6 +304,24 @@ describe('sidebar board list — loading and failure', () => {
 })
 
 describe('sidebar board list — selecting a board', () => {
+  it('opens the default board immediately after it loads', async () => {
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'listVisibleBoards').mockResolvedValue([{
+      ...quillDelivery,
+      agentName: quill.name,
+      profession: quill.profession,
+      kind: 'default' as const,
+    }])
+
+    await renderForHuman(FIXTURE_HUMANS.wren, gateway)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-board').getAttribute('data-board-id')).toBe(
+        FIXTURE_BOARDS.quillDelivery,
+      )
+    })
+  })
+
   it('makes the selected board the active board in the canvas', async () => {
     await renderForHuman(FIXTURE_HUMANS.wren)
 
