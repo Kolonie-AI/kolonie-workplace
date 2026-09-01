@@ -34,6 +34,7 @@ export interface Board {
 export interface VisibleBoard extends Board {
   readonly agentName: string
   readonly profession: string | null
+  readonly kind?: 'default' | 'additional'
 }
 
 export type WorkItemId = string

@@ -611,7 +611,16 @@ export class HttpTaskGateway implements TaskGateway {
       throw new WorkplaceCitizenRequired()
     }
 
-    const token = await this.#getToken()
+    let token: string
+    try {
+      token = await this.#getToken()
+    } catch (error) {
+      if (error instanceof WorkplaceUnauthorized) {
+        this.#invalidateAuthentication()
+      }
+      throw error
+    }
+
     const headers = new Headers()
     headers.set('Authorization', `Bearer ${token}`)
     headers.set(WORKPLACE_CITIZEN_HEADER, citizen.id)
@@ -632,6 +641,11 @@ export class HttpTaskGateway implements TaskGateway {
     }
 
     const response = await this.#fetch(`${this.#origin}${path}`, init)
+    if (response.status === 401) {
+      this.#invalidateAuthentication()
+      throw new WorkplaceUnauthorized()
+    }
+
     const raw = await response.text()
     let parsed: unknown = {}
     if (raw.length > 0) {
@@ -643,11 +657,7 @@ export class HttpTaskGateway implements TaskGateway {
     }
 
     if (!response.ok) {
-      const refusal = this.#refusal(response.status, parsed, path)
-      if (refusal instanceof WorkplaceUnauthorized) {
-        this.#onUnauthorized()
-      }
-      throw refusal
+      throw this.#refusal(response.status, parsed, path)
     }
 
     if (typeof parsed === 'object' && parsed !== null) {
@@ -655,6 +665,14 @@ export class HttpTaskGateway implements TaskGateway {
     }
 
     return typeof parsed === 'object' && parsed !== null ? (parsed as Json) : {}
+  }
+
+  #invalidateAuthentication(): void {
+    try {
+      this.#onUnauthorized()
+    } catch {
+      return
+    }
   }
 
   #refusal(status: number, body: unknown, path: string): Error {
@@ -763,6 +781,9 @@ export class HttpTaskGateway implements TaskGateway {
       title: text(nested.title),
       agentName: citizen?.handle ?? 'Citizen',
       profession: null,
+      ...(nested.kind === 'default' || nested.kind === 'additional'
+        ? { kind: nested.kind }
+        : {}),
     }
   }
 
