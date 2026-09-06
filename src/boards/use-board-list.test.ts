@@ -4,7 +4,7 @@ import type { HumanId, VisibleBoard } from '@/domain/workplace'
 import { BoardAccessRefused } from '@/gateway/refusals'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
-import { WorkplaceForbidden, WorkplaceUnauthorized } from '@/gateway/workplace-http-errors'
+import { WorkplaceCitizenRequired, WorkplaceForbidden, WorkplaceUnauthorized } from '@/gateway/workplace-http-errors'
 import { FIXTURE_BOARDS, FIXTURE_HUMANS } from '@/fixtures/catalogue'
 import { useBoardList } from '@/boards/use-board-list'
 
@@ -172,6 +172,24 @@ describe('useBoardList — authentication and deployment failures', () => {
     const list = await settled(FIXTURE_HUMANS.wren, refusingList(new WorkplaceForbidden()))
 
     expect(list.status.value).toBe('forbidden')
+    expect(list.isEmpty.value).toBe(false)
+  })
+
+  /**
+   * #114. A board read attempted with no selected citizen never reaches the
+   * Colony, so it is not a failure to read the boards: it is the application
+   * asking before it was ready. Reporting it as the generic read failure was
+   * what put "your boards could not be loaded" under a signed-in shell in
+   * production, with no request on the wire to explain it.
+   */
+  it('keeps a missing citizen apart from a failure to read the boards', async () => {
+    const list = await settled(
+      FIXTURE_HUMANS.wren,
+      refusingList(new WorkplaceCitizenRequired()),
+    )
+
+    expect(list.status.value).toBe('citizen-required')
+    expect(list.status.value).not.toBe('error')
     expect(list.isEmpty.value).toBe(false)
   })
 })

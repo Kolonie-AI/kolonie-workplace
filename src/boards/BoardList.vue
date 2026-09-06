@@ -135,6 +135,15 @@ function archive(boardId: BoardId): void {
     </p>
 
     <p
+      v-else-if="status === 'citizen-required'"
+      class="board-list__state"
+      data-testid="boards-citizen-required"
+    >
+      Choose a citizen to see the boards it holds. Nothing was read, so this
+      says nothing about which boards exist.
+    </p>
+
+    <p
       v-else-if="isEmpty"
       class="board-list__state"
       data-testid="boards-empty"

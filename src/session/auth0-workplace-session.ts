@@ -101,6 +101,14 @@ export class Auth0Session implements Auth0WorkplaceSession {
     }
   }
 
+  /**
+   * The session is the one owner of its authentication state (#114). A typed
+   * unauthorized token acquisition invalidates here, once, before the error
+   * travels on to the gateway and the board composables — neither of which
+   * writes session state. This was previously done both here and in the
+   * gateway's token-failure path, which meant one state change was applied
+   * twice per failure.
+   */
   async getAccessToken(): Promise<string> {
     try {
       return await this.#client.getAccessToken()

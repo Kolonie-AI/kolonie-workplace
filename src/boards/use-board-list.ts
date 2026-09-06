@@ -3,14 +3,24 @@ import type { BoardId, HumanId, VisibleBoard } from '@/domain/workplace'
 import { groupBoardsByAgent, type BoardGroup } from '@/boards/board-groups'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import { BoardAccessRefused } from '@/gateway/refusals'
-import { WorkplaceForbidden, WorkplaceUnauthorized } from '@/gateway/workplace-http-errors'
+import {
+  WorkplaceCitizenRequired,
+  WorkplaceForbidden,
+  WorkplaceUnauthorized,
+} from '@/gateway/workplace-http-errors'
 
 /**
  * `loading` and `error` are kept distinct from `ready` with no boards on
  * purpose: a human who may open no boards and a gateway that failed must not
  * render the same way, and an empty board is a board rather than an absence.
  */
-export type BoardListStatus = 'loading' | 'ready' | 'error' | 'unauthorized' | 'forbidden'
+export type BoardListStatus =
+  | 'loading'
+  | 'ready'
+  | 'error'
+  | 'unauthorized'
+  | 'forbidden'
+  | 'citizen-required'
 
 /**
  * The two ways selecting a board can fail, kept apart for the same reason
@@ -77,7 +87,9 @@ export function useBoardList(
           ? 'unauthorized'
           : error instanceof WorkplaceForbidden
             ? 'forbidden'
-            : 'error'
+            : error instanceof WorkplaceCitizenRequired
+              ? 'citizen-required'
+              : 'error'
     }
   }
 

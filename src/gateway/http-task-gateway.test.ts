@@ -773,7 +773,13 @@ describe('live HTTP gateway — rejection', () => {
     expect(boards[0]?.title).toBe('Live delivery board')
   })
 
-  it('invalidates when typed unauthorized token acquisition fails before fetch', async () => {
+  /**
+   * #114 made the session the one owner of its own authentication state. A
+   * typed token-acquisition failure has already invalidated the session before
+   * it reaches the gateway, so the gateway does not write that state a second
+   * time. What it must still do is preserve the typed refusal and send nothing.
+   */
+  it('preserves a typed unauthorized token acquisition without a second invalidation', async () => {
     const refusal = new WorkplaceUnauthorized()
     const getToken = vi.fn(async () => { throw refusal })
     const onUnauthorized = vi.fn()
@@ -785,7 +791,7 @@ describe('live HTTP gateway — rejection', () => {
       gateway(fetchImpl, CITIZEN_ID, onUnauthorized, getToken).listVisibleBoards(HUMAN_ID),
     ).rejects.toBe(refusal)
 
-    expect(onUnauthorized).toHaveBeenCalledTimes(1)
+    expect(onUnauthorized).not.toHaveBeenCalled()
     expect(calls).toEqual([])
   })
 
@@ -816,7 +822,7 @@ describe('live HTTP gateway — rejection', () => {
     expect(onUnauthorized).toHaveBeenCalledTimes(1)
   })
 
-  it('preserves token unauthorized when the invalidator throws', async () => {
+  it('preserves token unauthorized whatever the session did while invalidating', async () => {
     const refusal = new WorkplaceUnauthorized()
     const getToken = vi.fn(async () => { throw refusal })
     const onUnauthorized = vi.fn(() => { throw new Error('cleanup failed') })
@@ -825,8 +831,6 @@ describe('live HTTP gateway — rejection', () => {
     await expect(
       gateway(fetchImpl, CITIZEN_ID, onUnauthorized, getToken).listVisibleBoards(HUMAN_ID),
     ).rejects.toBe(refusal)
-
-    expect(onUnauthorized).toHaveBeenCalledTimes(1)
   })
 
   it('does not notify the session invalidator for a generic board failure', async () => {
