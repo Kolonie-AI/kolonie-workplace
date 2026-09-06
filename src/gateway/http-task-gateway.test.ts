@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { FIXTURE_BOARDS, FIXTURE_ITEMS } from '@/fixtures/catalogue'
 import { BoardAccessRefused } from '@/gateway/refusals'
 import {
@@ -102,6 +104,7 @@ function gateway(
   citizenId: string | null = CITIZEN_ID,
   onUnauthorized?: () => void | undefined,
   getToken: () => Promise<string> = async () => TOKEN,
+  omitFetchOption = false,
 ) {
   return createHttpTaskGateway({
     origin: ORIGIN,
@@ -109,7 +112,7 @@ function gateway(
     getCitizen: () =>
       citizenId === null ? null : { id: citizenId, handle: 'quill' },
     ...(onUnauthorized === undefined ? {} : { onUnauthorized }),
-    fetch: fetchImpl,
+    ...(omitFetchOption ? {} : { fetch: fetchImpl }),
   })
 }
 
@@ -134,6 +137,64 @@ describe('live HTTP gateway — boards and cards from the Colony door', () => {
     const { fetchImpl } = recordedFetch(() => jsonResponse(500, { code: 'not_found' }))
 
     expect(isPreviewDataGateway(gateway(fetchImpl))).toBe(false)
+  })
+
+  /**
+   * #116. The browser's native `fetch` is defined on the global and demands its
+   * global receiver; calling it as `this.#fetch(...)` hands it the gateway
+   * instance instead and Firefox refuses before any request is issued —
+   * `'fetch' called on an object that does not implement interface Window.` —
+   * which surfaced in production as the generic boards failure with nothing on
+   * the wire. `vi.fn` tolerates any receiver, which is why this never failed
+   * before: this double reproduces the browser's contract, rejecting any call
+   * whose receiver is not the global object the function belongs to.
+   */
+  function receiverSensitiveFetch(
+    handler: (url: string, init: RequestInit) => Response | Promise<Response>,
+  ) {
+    const calls: { url: string; init: RequestInit; receiver: unknown }[] = []
+    const native = vi.fn(async function (this: unknown, input: RequestInfo | URL, init?: RequestInit) {
+      if (this !== globalThis) {
+        throw new TypeError("'fetch' called on an object that does not implement interface Window.")
+      }
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      const requestInit = init ?? {}
+      calls.push({ url, init: requestInit, receiver: this })
+      return handler(url, requestInit)
+    })
+    const bound = native.bind(globalThis)
+    void bound
+    return { native: native as unknown as typeof fetch, calls }
+  }
+
+  /**
+   * #116 again, as a statement about the source rather than the behaviour. The
+   * receiver-sensitive cases above prove the gateway works; this one keeps the
+   * *reason* it works from being edited away, because the failure it guards is
+   * invisible to every ordinary double and only appears in a real browser.
+   */
+  it('never stores the bare global fetch as the value it calls', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/gateway/http-task-gateway.ts'),
+      'utf8',
+    )
+
+    expect(source).not.toMatch(/#fetch\s*=\s*options\.fetch\s*\?\?\s*fetch\b/)
+    expect(source).toContain('globalThis.fetch.bind(globalThis)')
+  })
+
+  it('issues the board request when no fetch is injected, as the browser supplies it', async () => {
+    const { native, calls } = receiverSensitiveFetch(() =>
+      jsonResponse(200, { items: [boardPayload()], nextCursor: null }),
+    )
+    vi.stubGlobal('fetch', native)
+
+    const boards = await gateway(native, CITIZEN_ID, undefined, undefined, true)
+      .listVisibleBoards(HUMAN_ID)
+
+    expect(calls.map((call) => call.url)).toEqual([`${ORIGIN}/v1/workplace/boards`])
+    expect(calls[0]?.receiver).toBe(globalThis)
+    expect(boards[0]?.title).toBe('Live delivery board')
   })
 
   it('lists boards from GET /v1/workplace/boards, not from FIXTURE_*', async () => {
