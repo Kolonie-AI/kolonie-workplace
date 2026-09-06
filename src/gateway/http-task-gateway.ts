@@ -123,6 +123,33 @@ function errorCode(body: unknown): string | null {
   return typeof code === 'string' ? code : null
 }
 
+/**
+ * The browser's `fetch` is defined on the global object and is specified to
+ * reject any other receiver: WebIDL raises
+ * `'fetch' called on an object that does not implement interface Window.`
+ * before a request is issued. Storing the bare function in a class field and
+ * calling `this.#fetch(url, init)` is a method call, so the *gateway* becomes
+ * that receiver — which is why the deployed workplace threw before reaching the
+ * network and rendered a board-read failure with nothing on the wire (#116).
+ *
+ * Binding at the seam fixes it once, for every call in this class. It is done
+ * here rather than at each call site because a later `this.#fetch(...)` would
+ * silently reintroduce the same defect, and `vi.fn` accepts any receiver, so no
+ * ordinary double would catch it.
+ *
+ * An injected fetch is wrapped rather than bound: a test double is an ordinary
+ * function whose `this` is its own business, and binding it would change what
+ * the caller passed in. Wrapping keeps the injected function's own semantics
+ * while guaranteeing the gateway is never the receiver.
+ */
+function nativeFetchWrapper(injected: typeof fetch | undefined): typeof fetch {
+  if (injected !== undefined) {
+    return (input: RequestInfo | URL, init?: RequestInit) => injected(input, init)
+  }
+
+  return globalThis.fetch.bind(globalThis)
+}
+
 export class HttpTaskGateway implements TaskGateway {
   readonly #origin: string
   readonly #getToken: () => Promise<string>
@@ -139,7 +166,7 @@ export class HttpTaskGateway implements TaskGateway {
     this.#getToken = options.getToken
     this.#getCitizen = options.getCitizen
     this.#onUnauthorized = options.onUnauthorized ?? (() => undefined)
-    this.#fetch = options.fetch ?? fetch
+    this.#fetch = nativeFetchWrapper(options.fetch)
   }
 
   async listVisibleBoards(humanId: HumanId): Promise<readonly VisibleBoard[]> {

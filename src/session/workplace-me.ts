@@ -28,7 +28,16 @@ export function createWorkplaceMeClient(options: {
   fetch?: typeof fetch
 }): WorkplaceMeClient {
   const origin = originRoot(options.origin)
-  const fetchImpl = options.fetch ?? fetch
+  /**
+   * Bound to the global for the same reason the gateway binds it (#116): the
+   * browser's `fetch` refuses a foreign receiver. This call site happens to be
+   * safe today — `fetchImpl(...)` is a plain identifier call, so the receiver is
+   * `undefined` rather than an object — but that is a property of how the line
+   * is written, not of the value stored. Binding here states the requirement in
+   * the value itself, so moving this call onto an object cannot resurrect the
+   * production failure that took `/v1/workplace/boards` off the wire.
+   */
+  const fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis)
 
   return {
     async me(token: string): Promise<WorkplaceMe> {
