@@ -611,15 +611,13 @@ export class HttpTaskGateway implements TaskGateway {
       throw new WorkplaceCitizenRequired()
     }
 
-    let token: string
-    try {
-      token = await this.#getToken()
-    } catch (error) {
-      if (error instanceof WorkplaceUnauthorized) {
-        this.#invalidateAuthentication()
-      }
-      throw error
-    }
+    // The session owns its own authentication state (#114). When `getToken` is
+    // the live session's token acquisition, it has already invalidated itself
+    // before rethrowing (#108); calling the invalidator again here would be the
+    // second write of one state change. The gateway's callback remains the one
+    // seam that owns *response* 401s, below, because only the gateway sees
+    // those.
+    const token = await this.#getToken()
 
     const headers = new Headers()
     headers.set('Authorization', `Bearer ${token}`)

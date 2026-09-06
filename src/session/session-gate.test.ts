@@ -13,6 +13,7 @@ import { createFixtureTaskGateway } from '@/gateway/fixture-task-gateway'
 import { WorkplaceForbidden, WorkplaceUnauthorized } from '@/gateway/workplace-http-errors'
 import { TASK_GATEWAY, createTaskGateway } from '@/gateway/provide-gateway'
 import { createAuth0WorkplaceSession } from '@/session/auth0-workplace-session'
+import { Auth0ClientAdapter } from '@/session/auth0-client-adapter'
 import type { CitizenStorage } from '@/session/citizen-storage'
 import SessionGate from '@/session/SessionGate.vue'
 import SignedInHuman from '@/session/SignedInHuman.vue'
@@ -243,8 +244,62 @@ describe('SessionGate — live citizen selection', () => {
     expect(screen.queryByTestId('boards-error')).toBeNull()
   })
 
-  it('uses real composition to remove the shell and remembered citizen after a gateway 401', async () => {
-    const selected = { value: null as string | null }
+  it('uses the real adapter: a silent-token refusal after citizen selection removes the shell', async () => {
+    const getTokenSilently = vi.fn(async () => 'restore-token')
+    const sdk = {
+      loginWithRedirect: vi.fn(async () => undefined),
+      handleRedirectCallback: vi.fn(async () => ({ appState: undefined })),
+      isAuthenticated: vi.fn(async () => true),
+      getTokenSilently,
+      logout: vi.fn(async () => undefined),
+    }
+    const adapter = new Auth0ClientAdapter(
+      sdk,
+      'https://workplace.example.invalid/sign-in/callback',
+      'https://workplace.example.invalid',
+      'workplace-audience',
+    )
+    const session = createAuth0WorkplaceSession(adapter, {
+      me: vi.fn(async (token: string) => {
+        expect(token).toBe('restore-token')
+        return {
+          human: { id: 'human-operator' },
+          agents: [{ id: 'agent-quill', handle: 'quill', status: 'citizen' }],
+        }
+      }),
+    }, {
+      read: () => null,
+      write: () => undefined,
+      clear: () => undefined,
+    })
+    await session.restore()
+    expect(session.currentHuman.value).toBeNull()
+    expect(session.linkedAgents?.value).not.toBeNull()
+    getTokenSilently.mockRejectedValue(new Error('login_required'))
+
+    const requests: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      requests.push(url)
+      return new Response(JSON.stringify({ items: [], nextCursor: null }), { status: 200 })
+    }))
+    const gateway = createTaskGateway(session, LIVE_CONFIG)
+    renderGate(session, gateway)
+
+    expect(screen.getByTestId('citizen-gate')).toBeTruthy()
+    await fireEvent.click(screen.getByRole('button', { name: /continue as quill/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-unauthorized')).toBeTruthy()
+    })
+    expect(screen.queryByTestId('app-shell')).toBeNull()
+    expect(screen.queryByTestId('boards-error')).toBeNull()
+    expect(screen.queryByTestId('board-header')).toBeNull()
+    expect(screen.getByRole('button', { name: /sign in again/i })).toBeTruthy()
+    expect(requests).toEqual([])
+  })
+
+  it('uses real composition to remove the shell and remembered citizen after a gateway 401', async () => {    const selected = { value: null as string | null }
     const storage: CitizenStorage = {
       read: vi.fn(() => selected.value),
       write: vi.fn((id: string) => { selected.value = id }),

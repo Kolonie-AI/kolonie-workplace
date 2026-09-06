@@ -37,6 +37,24 @@ describe('container configuration — /health is not swallowed by the SPA fallba
     expect(config).toMatch(/listen\s+80;/)
     expect(config).toMatch(/listen\s+\[::\]:80;/)
   })
+
+  /**
+   * #114. `/assets/` is fingerprinted and cached for a year; the shell that
+   * names which fingerprint to load is not, and nothing said so. A browser
+   * holding a cached `index.html` keeps loading the bundle that document names
+   * — so a deploy can be green, its assets present, and the tab still running
+   * the previous build. That is indistinguishable from an application defect
+   * from the outside, which is exactly how it was reported.
+   */
+  it('never lets a browser cache the shell that names the bundle', () => {
+    expect(config).toMatch(
+      /location\s*=\s*\/index\.html\s*\{[^}]*add_header\s+Cache-Control\s+"no-store[^"]*";[^}]*\}/s,
+    )
+  })
+
+  it('still caches the fingerprinted assets hard', () => {
+    expect(config).toMatch(/location\s+\/assets\/\s*\{[^}]*Cache-Control\s+"public,\s*immutable";[^}]*\}/s)
+  })
 })
 
 describe('container configuration — the runtime image carries no toolchain', () => {
