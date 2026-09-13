@@ -142,6 +142,85 @@ describe('item detail — writes update the open item', () => {
     expect(detail.updateError.value).toBeNull()
   })
 
+  it('loads canonical history and outcome independently from card detail', async () => {
+    const gateway = createFixtureTaskGateway()
+    const selectedItemId = ref<WorkItemId | null>(FIXTURE_ITEMS.done)
+    const detail = useItemDetail(gateway, ref(FIXTURE_HUMANS.wren), selectedItemId)
+    await settled()
+
+    expect(detail.status.value).toBe('ready')
+    expect(detail.historyStatus.value).toBe('ready')
+    expect(detail.historyEvents.value.map((event) => event.id)).toEqual([
+      'fictional-event-created',
+      'fictional-event-moved',
+      'fictional-event-closed',
+    ])
+    expect(detail.outcomeStatus.value).toBe('ready')
+    expect(detail.outcomeClosures.value.map((closure) => closure.revision)).toEqual([2, 1])
+  })
+
+  it('prepends earlier events without moving or duplicating the loaded page', async () => {
+    const gateway = createFixtureTaskGateway()
+    const all = await gateway.listCardEvents?.(FIXTURE_HUMANS.wren, FIXTURE_ITEMS.done)
+    const events = all?.items ?? []
+    vi.spyOn(gateway, 'listCardEvents').mockImplementation(async (_human, _item, cursor) =>
+      cursor === undefined
+        ? { items: [events[0]!, events[1]!], nextCursor: 'earlier' }
+        : { items: [events[1]!, events[2]!], nextCursor: null },
+    )
+    const selectedItemId = ref<WorkItemId | null>(FIXTURE_ITEMS.done)
+    const detail = useItemDetail(gateway, ref(FIXTURE_HUMANS.wren), selectedItemId)
+    await settled()
+
+    expect(detail.historyEvents.value.map((event) => event.id)).toEqual([
+      'fictional-event-moved',
+      'fictional-event-closed',
+    ])
+    expect(detail.historyHasEarlier.value).toBe(true)
+
+    await detail.loadEarlierEvents()
+
+    expect(detail.historyEvents.value.map((event) => event.id)).toEqual([
+      'fictional-event-created',
+      'fictional-event-moved',
+      'fictional-event-closed',
+    ])
+    expect(detail.historyHasEarlier.value).toBe(false)
+  })
+
+  it('keeps Discussion and Outcome available when History fails, then retries only History', async () => {
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'listCardEvents').mockRejectedValueOnce(new Error('history unavailable'))
+    const selectedItemId = ref<WorkItemId | null>(FIXTURE_ITEMS.done)
+    const detail = useItemDetail(gateway, ref(FIXTURE_HUMANS.wren), selectedItemId)
+    await settled()
+
+    expect(detail.item.value).not.toBeNull()
+    expect(detail.historyStatus.value).toBe('error')
+    expect(detail.outcomeStatus.value).toBe('ready')
+
+    detail.retryHistory()
+    await settled()
+
+    expect(detail.historyStatus.value).toBe('ready')
+    expect(detail.historyEvents.value.length).toBeGreaterThan(0)
+  })
+
+  it('clears card, history and outcome when a memory endpoint returns the non-disclosing 404', async () => {
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'listCardEvents').mockRejectedValueOnce(
+      new WorkItemAccessRefused(FIXTURE_ITEMS.done),
+    )
+    const selectedItemId = ref<WorkItemId | null>(FIXTURE_ITEMS.done)
+    const detail = useItemDetail(gateway, ref(FIXTURE_HUMANS.wren), selectedItemId)
+    await settled()
+
+    expect(detail.status.value).toBe('refused')
+    expect(detail.item.value).toBeNull()
+    expect(detail.historyEvents.value).toEqual([])
+    expect(detail.outcomeClosures.value).toEqual([])
+  })
+
   it('restores the previous detail when a write fails', async () => {
     const gateway = createFixtureTaskGateway()
     vi.spyOn(gateway, 'updateWorkItem').mockRejectedValue(new Error('write unavailable'))

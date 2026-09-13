@@ -224,3 +224,90 @@ export interface CreateAttachmentInput {
 export type UpdateChecklistItemInput = Partial<
   Pick<ChecklistItem, 'title' | 'done'>
 >
+
+export const WORKPLACE_CARD_EVENT_VERBS = [
+  'card.created',
+  'card.updated',
+  'card.claimed',
+  'card.moved',
+  'card.blocked',
+  'card.review_requested',
+  'card.closed',
+  'card.handover_started',
+  'card.archived',
+  'card.label_attached',
+  'card.label_detached',
+  'card.checklist_created',
+  'card.checklist_updated',
+  'card.checklist_deleted',
+  'card.checklist_item_created',
+  'card.checklist_item_updated',
+  'card.checklist_item_deleted',
+  'card.comment_created',
+  'card.comment_updated',
+  'card.comment_deleted',
+  'card.link_created',
+  'card.link_deleted',
+] as const
+
+export type CardEventVerb = (typeof WORKPLACE_CARD_EVENT_VERBS)[number]
+
+export const WORKPLACE_EVENT_ACTOR_KINDS = ['citizen', 'human-linked', 'system'] as const
+
+export type CardEventActorKind = (typeof WORKPLACE_EVENT_ACTOR_KINDS)[number]
+
+export interface CardEvent {
+  readonly id: string
+  readonly boardId: BoardId
+  readonly cardId: WorkItemId
+  readonly actorId: string | null
+  readonly actorKind: CardEventActorKind
+  readonly actorHumanId: string | null
+  readonly subjectAgentId: string | null
+  readonly delegationId: string | null
+  readonly verb: string
+  readonly payload: Readonly<Record<string, unknown>>
+  readonly legacy: boolean
+  readonly createdAt: string
+}
+
+export interface CardEventPage {
+  readonly items: readonly CardEvent[]
+  readonly nextCursor: string | null
+}
+
+export const WORKPLACE_CARD_CLOSURE_RESULTS = [
+  'shipped',
+  'failed_experiment',
+  'abandoned',
+  'superseded',
+] as const
+
+export type CardClosureResult = (typeof WORKPLACE_CARD_CLOSURE_RESULTS)[number]
+
+export type CardClosureNext =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'card'; readonly cardId: WorkItemId }
+  | { readonly kind: 'sentence'; readonly text: string }
+
+export interface CardClosure {
+  readonly id: string
+  readonly boardId: BoardId
+  readonly cardId: WorkItemId
+  readonly actorId: string | null
+  readonly revision: number
+  readonly result: CardClosureResult
+  readonly summary: string
+  readonly learned: string
+  readonly evidenceLinkIds: readonly CardLinkId[]
+  readonly evidenceLinks: readonly CardLink[]
+  readonly next: CardClosureNext
+  readonly legacy: boolean
+  readonly supersedesClosureId: string | null
+  readonly createdAt: string
+}
+
+export interface CardClosurePage {
+  readonly items: readonly CardClosure[]
+  readonly nextCursor: string | null
+}

@@ -106,10 +106,11 @@ function confirmDelete(comment: WorkItemComment): void {
   <section
     class="detail-pane__section"
     data-testid="detail-activity"
-    aria-label="Comments and activity"
+    data-surface="discussion"
+    aria-label="Discussion"
   >
     <h3 class="detail-pane__section-title">
-      Comments and activity
+      Discussion
     </h3>
 
     <p
@@ -117,7 +118,7 @@ function confirmDelete(comment: WorkItemComment): void {
       class="detail-pane__empty"
       data-testid="detail-activity-empty"
     >
-      No comments yet.
+      No comments yet. Discussion is editable commentary, never lifecycle history.
     </p>
 
     <ul

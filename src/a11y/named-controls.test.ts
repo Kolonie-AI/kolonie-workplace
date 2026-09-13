@@ -25,6 +25,9 @@ function vueFiles(): readonly string[] {
   return [
     'src/shell/AppShell.vue',
     'src/detail/DetailPane.vue',
+    'src/detail/HistorySection.vue',
+    'src/detail/OutcomeSection.vue',
+    'src/detail/ActivitySection.vue',
     'src/kanban/LaneComposer.vue',
     'src/kanban/KanbanCard.vue',
     'src/kanban/KanbanBoard.vue',

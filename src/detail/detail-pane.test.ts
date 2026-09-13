@@ -117,7 +117,11 @@ describe('detail pane — opened from the board, over it', () => {
     expect(within(pane()).queryByTestId('detail-assignees')).toBeNull()
     expect(within(pane()).getByRole('heading', { name: 'Checklist' })).toBeTruthy()
     expect(within(pane()).getByRole('heading', { name: 'Attachments' })).toBeTruthy()
-    expect(within(pane()).getByRole('heading', { name: 'Comments and activity' })).toBeTruthy()
+    expect(within(pane()).getByRole('heading', { name: 'History' })).toBeTruthy()
+    expect(within(pane()).getByRole('heading', { name: 'Outcome' })).toBeTruthy()
+    expect(within(pane()).getByRole('heading', { name: 'Discussion' })).toBeTruthy()
+    expect(within(pane()).getByRole('heading', { name: 'History' })).toBeTruthy()
+    expect(within(pane()).getByRole('heading', { name: 'Outcome' })).toBeTruthy()
     expect(within(pane()).getByRole('button', { name: 'Checklist' })).toBeTruthy()
     expect(within(pane()).getByRole('button', { name: 'Attachment' })).toBeTruthy()
     expect(within(pane()).getByRole('button', { name: 'Connection' })).toBeTruthy()
@@ -1172,7 +1176,7 @@ describe('detail pane — comments and activity', () => {
     const activity = within(pane()).getByTestId('detail-activity')
     const comments = within(activity).getAllByTestId('detail-comment')
 
-    expect(within(activity).getByRole('heading', { name: 'Comments and activity' })).toBeTruthy()
+    expect(within(activity).getByRole('heading', { name: 'Discussion' })).toBeTruthy()
     expect(comments.map((entry) => entry.getAttribute('data-comment-id'))).toEqual([
       'fictional-comment-start',
       'fictional-comment-mid',
@@ -1319,6 +1323,121 @@ describe('detail pane — comments and activity', () => {
     expect(composer.value).toBe('<p>Please review the fictional outline.</p>')
     expect(within(activity).getByTestId('detail-activity-empty').textContent).toMatch(/no comments yet/i)
     expect(within(pane()).getByRole('alert').textContent).not.toMatch(/no comments yet/i)
+  })
+})
+
+describe('detail pane — canonical history and outcomes', () => {
+  it('renders the canonical timeline oldest first and comments only in Discussion', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    await openItem(FIXTURE_ITEMS.done)
+
+    await waitFor(() => {
+      expect(within(pane()).getAllByTestId('detail-history-event')).toHaveLength(3)
+    })
+    const history = within(pane()).getByTestId('detail-history')
+    const events = within(history).getAllByTestId('detail-history-event')
+
+    expect(history.querySelector('ol')).toBeTruthy()
+    expect(events.map((event) => event.getAttribute('data-event-id'))).toEqual([
+      'fictional-event-created',
+      'fictional-event-moved',
+      'fictional-event-closed',
+    ])
+    expect(within(history).getByText('Created')).toBeTruthy()
+    expect(within(history).getByText('review → done')).toBeTruthy()
+    expect(history.textContent).not.toContain('No comments yet')
+    expect(within(pane()).getByTestId('detail-activity').getAttribute('aria-label')).toBe('Discussion')
+  })
+
+  it('shows the latest close prominently and older revisions in a keyboard-accessible disclosure', async () => {
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery)
+    await openItem(FIXTURE_ITEMS.done)
+
+    await waitFor(() => {
+      expect(within(pane()).getByTestId('detail-outcome-latest')).toBeTruthy()
+    })
+    const outcome = within(pane()).getByTestId('detail-outcome')
+
+    expect(within(outcome).getByTestId('detail-outcome-result').textContent).toContain('Shipped')
+    expect(within(outcome).getByTestId('detail-outcome-summary').textContent).toContain(
+      'Archived the intake note',
+    )
+    const evidence = within(outcome).getByTestId('detail-outcome-evidence')
+    const link = within(evidence).getByRole('link')
+    expect(link.getAttribute('href')).toBe('https://example.invalid/fictional-result')
+    expect(link.getAttribute('target')).toBe('_blank')
+
+    const disclosure = within(outcome).getByText('Previous outcome revisions')
+    expect(disclosure.tagName).toBe('SUMMARY')
+    expect(within(outcome).getByTestId('detail-outcome-revision').textContent).toContain(
+      'Failed experiment',
+    )
+  })
+
+  it('renders non-URL evidence as copyable text and never interpolates its markup', async () => {
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'listCardClosures').mockResolvedValueOnce({
+      items: [
+        {
+          id: 'fictional-copy-closure',
+          boardId: FIXTURE_BOARDS.quillDelivery,
+          cardId: FIXTURE_ITEMS.done,
+          actorId: null,
+          revision: 1,
+          result: 'abandoned',
+          summary: '<img src=x onerror=alert(1)>Stopped deliberately.',
+          learned: '<script>alert(2)</script>Nothing was published.',
+          evidenceLinkIds: ['fictional-plain-ref'],
+          evidenceLinks: [
+            {
+              id: 'fictional-plain-ref',
+              kind: 'vault',
+              ref: '<svg/onload=alert(3)>fictional/repository-ref',
+              state: 'resolved',
+              summary: '<b>fictional artifact</b>',
+            },
+          ],
+          next: { kind: 'sentence', text: '<iframe>Try another route.</iframe>' },
+          legacy: true,
+          supersedesClosureId: null,
+          createdAt: '2026-08-26T11:00:00.000Z',
+        },
+      ],
+      nextCursor: null,
+    })
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.done)
+
+    await waitFor(() => {
+      expect(within(pane()).getByTestId('detail-outcome-latest')).toBeTruthy()
+    })
+    const outcome = within(pane()).getByTestId('detail-outcome')
+    const copy = within(outcome).getByRole('button', { name: /copy vault evidence/i })
+
+    expect(copy.textContent).toContain('<b>fictional artifact</b>')
+    expect(copy.querySelector('b')).toBeNull()
+    expect(outcome.querySelector('script')).toBeNull()
+    expect(outcome.querySelector('img')).toBeNull()
+    expect(outcome.querySelector('iframe')).toBeNull()
+    expect(within(outcome).queryByRole('link')).toBeNull()
+  })
+
+  it('keeps Discussion usable when History and Outcome fail independently', async () => {
+    const gateway = createFixtureTaskGateway()
+    vi.spyOn(gateway, 'listCardEvents').mockRejectedValue(new Error('history unavailable'))
+    vi.spyOn(gateway, 'listCardClosures').mockRejectedValue(new Error('outcome unavailable'))
+    await renderBoard(FIXTURE_HUMANS.wren, FIXTURE_BOARDS.quillDelivery, gateway)
+    await openItem(FIXTURE_ITEMS.ready)
+
+    await waitFor(() => {
+      expect(within(pane()).getByTestId('detail-history-error')).toBeTruthy()
+      expect(within(pane()).getByTestId('detail-outcome-error')).toBeTruthy()
+    })
+    const discussion = within(pane()).getByTestId('detail-activity')
+
+    expect(within(discussion).getByPlaceholderText('Write a comment…')).toBeTruthy()
+    expect(within(pane()).getByRole('button', { name: 'Retry history' })).toBeTruthy()
+    expect(within(pane()).getByRole('button', { name: 'Retry outcome' })).toBeTruthy()
   })
 })
 
