@@ -54,11 +54,13 @@ import {
 } from '@/gateway/workplace-http-errors'
 
 export const WORKPLACE_CITIZEN_HEADER = 'X-Kolonie-Citizen'
+export const WORKPLACE_DELEGATION_HEADER = 'X-Kolonie-Delegation'
 export const WORKPLACE_API_PREFIX = '/v1/workplace'
 
 export interface LinkedCitizen {
   readonly id: string
   readonly handle: string
+  readonly delegationId?: string
 }
 
 export interface HttpTaskGatewayOptions {
@@ -710,6 +712,9 @@ export class HttpTaskGateway implements TaskGateway {
     const headers = new Headers()
     headers.set('Authorization', `Bearer ${token}`)
     headers.set(WORKPLACE_CITIZEN_HEADER, citizen.id)
+    if (citizen.delegationId !== undefined) {
+      headers.set(WORKPLACE_DELEGATION_HEADER, citizen.delegationId)
+    }
     if (options.json !== undefined) {
       headers.set('Content-Type', 'application/json')
     }

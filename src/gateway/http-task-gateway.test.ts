@@ -21,6 +21,7 @@ const BOARD_ID = '00000000-0000-4000-8000-0000000000b1'
 const CARD_ID = '00000000-0000-4000-8000-0000000000a1'
 const ACCOUNT_ID = '00000000-0000-4000-8000-0000000000d1'
 const LINK_ID = '00000000-0000-4000-8000-0000000000e1'
+const DELEGATION_ID = '00000000-0000-4000-8000-0000000000f1'
 const ORIGIN = 'https://platform.example.invalid'
 const TOKEN = 'test-access-token'
 
@@ -105,12 +106,19 @@ function gateway(
   onUnauthorized?: () => void | undefined,
   getToken: () => Promise<string> = async () => TOKEN,
   omitFetchOption = false,
+  delegationId?: string | null,
 ) {
   return createHttpTaskGateway({
     origin: ORIGIN,
     getToken,
     getCitizen: () =>
-      citizenId === null ? null : { id: citizenId, handle: 'quill' },
+      citizenId === null
+        ? null
+        : {
+            id: citizenId,
+            handle: 'quill',
+            ...(delegationId === undefined || delegationId === null ? {} : { delegationId }),
+          },
     ...(onUnauthorized === undefined ? {} : { onUnauthorized }),
     ...(omitFetchOption ? {} : { fetch: fetchImpl }),
   })
@@ -942,6 +950,30 @@ describe('live HTTP gateway — rejection', () => {
     await expect(live.moveItemToLane(HUMAN_ID, CARD_ID, 'ready')).rejects.toBeInstanceOf(
       WorkplaceConflict,
     )
+  })
+
+  it('sends the via citizen and delegation headers on every delegated request', async () => {
+    const { fetchImpl, calls } = recordedFetch(() =>
+      jsonResponse(200, { items: [boardPayload()], nextCursor: null }),
+    )
+
+    await gateway(fetchImpl, CITIZEN_ID, undefined, undefined, false, DELEGATION_ID)
+      .listVisibleBoards(HUMAN_ID)
+
+    expect(calls).toHaveLength(1)
+    expect(header(calls[0]?.init, 'X-Kolonie-Citizen')).toBe(CITIZEN_ID)
+    expect(header(calls[0]?.init, 'X-Kolonie-Delegation')).toBe(DELEGATION_ID)
+  })
+
+  it('omits the delegation header for a directly operated citizen', async () => {
+    const { fetchImpl, calls } = recordedFetch(() =>
+      jsonResponse(200, { items: [boardPayload()], nextCursor: null }),
+    )
+
+    await gateway(fetchImpl).listVisibleBoards(HUMAN_ID)
+
+    expect(header(calls[0]?.init, 'X-Kolonie-Citizen')).toBe(CITIZEN_ID)
+    expect(header(calls[0]?.init, 'X-Kolonie-Delegation')).toBeNull()
   })
 
   it('does not send X-Kolonie-Citizen when no citizen is selected', async () => {
