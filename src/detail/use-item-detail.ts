@@ -2,6 +2,8 @@ import { ref, watch, type Ref } from 'vue'
 import type { Lane } from '@/domain/lanes'
 import type {
   AttachmentId,
+  CardClosure,
+  CardEvent,
   CardLinkId,
   ChecklistItemId,
   CommentId,
@@ -23,6 +25,7 @@ import { WorkItemAccessRefused } from '@/gateway/refusals'
  * permission boundary, which is the more alarming of the two to show wrongly.
  */
 export type ItemDetailStatus = 'idle' | 'loading' | 'ready' | 'refused' | 'error'
+export type DetailReadStatus = 'idle' | 'loading' | 'ready' | 'error'
 
 /**
  * The detail of one opened item, and only of the opened one.
@@ -37,6 +40,14 @@ export interface ItemDetail {
   readonly status: Readonly<Ref<ItemDetailStatus>>
   readonly item: Readonly<Ref<WorkItemDetail | null>>
   readonly updateError: Readonly<Ref<string | null>>
+  readonly historyStatus: Readonly<Ref<DetailReadStatus>>
+  readonly historyEvents: Readonly<Ref<readonly CardEvent[]>>
+  readonly historyHasEarlier: Readonly<Ref<boolean>>
+  readonly outcomeStatus: Readonly<Ref<DetailReadStatus>>
+  readonly outcomeClosures: Readonly<Ref<readonly CardClosure[]>>
+  loadEarlierEvents(): Promise<void>
+  retryHistory(): void
+  retryOutcome(): void
   updateItem(input: UpdateWorkItemInput): Promise<WorkItemDetail | null>
   createChecklistItem(title: string): Promise<WorkItemDetail | null>
   updateChecklistItem(
@@ -66,6 +77,145 @@ export function useItemDetail(
   const status = ref<ItemDetailStatus>('idle')
   const item = ref<WorkItemDetail | null>(null)
   const updateError = ref<string | null>(null)
+  const historyStatus = ref<DetailReadStatus>('idle')
+  const historyEvents = ref<readonly CardEvent[]>([])
+  const historyCursor = ref<string | null>(null)
+  const historyHasEarlier = ref(false)
+  const outcomeStatus = ref<DetailReadStatus>('idle')
+  const outcomeClosures = ref<readonly CardClosure[]>([])
+
+  function clearMemoryReads(): void {
+    historyStatus.value = 'idle'
+    historyEvents.value = []
+    historyCursor.value = null
+    historyHasEarlier.value = false
+    outcomeStatus.value = 'idle'
+    outcomeClosures.value = []
+  }
+
+  function stillSelected(currentHumanId: HumanId, itemId: WorkItemId): boolean {
+    return humanId.value === currentHumanId && selectedItemId.value === itemId
+  }
+
+  async function loadHistory(currentHumanId: HumanId, itemId: WorkItemId): Promise<void> {
+    historyStatus.value = 'loading'
+    try {
+      const page = gateway.listCardEvents === undefined
+        ? { items: [], nextCursor: null }
+        : await gateway.listCardEvents(currentHumanId, itemId, undefined, 20)
+      if (!stillSelected(currentHumanId, itemId) || status.value !== 'ready') {
+        return
+      }
+
+      historyEvents.value = [...page.items].reverse()
+      historyCursor.value = page.nextCursor
+      historyHasEarlier.value = page.nextCursor !== null
+      historyStatus.value = 'ready'
+    } catch (error: unknown) {
+      if (!stillSelected(currentHumanId, itemId)) {
+        return
+      }
+
+      historyEvents.value = []
+      historyCursor.value = null
+      historyHasEarlier.value = false
+      if (error instanceof WorkItemAccessRefused) {
+        item.value = null
+        status.value = 'refused'
+        clearMemoryReads()
+        return
+      }
+
+      historyStatus.value = 'error'
+    }
+  }
+
+  async function loadOutcome(currentHumanId: HumanId, itemId: WorkItemId): Promise<void> {
+    outcomeStatus.value = 'loading'
+    try {
+      const page = gateway.listCardClosures === undefined
+        ? { items: [], nextCursor: null }
+        : await gateway.listCardClosures(currentHumanId, itemId, undefined, 100)
+      if (!stillSelected(currentHumanId, itemId) || status.value !== 'ready') {
+        return
+      }
+
+      outcomeClosures.value = page.items
+      outcomeStatus.value = 'ready'
+    } catch (error: unknown) {
+      if (!stillSelected(currentHumanId, itemId)) {
+        return
+      }
+
+      outcomeClosures.value = []
+      if (error instanceof WorkItemAccessRefused) {
+        item.value = null
+        status.value = 'refused'
+        clearMemoryReads()
+        return
+      }
+
+      outcomeStatus.value = 'error'
+    }
+  }
+
+  async function loadEarlierEvents(): Promise<void> {
+    const currentHumanId = humanId.value
+    const itemId = selectedItemId.value
+    const cursor = historyCursor.value
+    if (
+      currentHumanId === null ||
+      itemId === null ||
+      cursor === null ||
+      gateway.listCardEvents === undefined
+    ) {
+      return
+    }
+
+    historyStatus.value = 'loading'
+    try {
+      const page = await gateway.listCardEvents(currentHumanId, itemId, cursor, 20)
+      if (!stillSelected(currentHumanId, itemId)) {
+        return
+      }
+
+      const known = new Set(historyEvents.value.map((event) => event.id))
+      const earlier = [...page.items].reverse().filter((event) => !known.has(event.id))
+      historyEvents.value = [...earlier, ...historyEvents.value]
+      historyCursor.value = page.nextCursor
+      historyHasEarlier.value = page.nextCursor !== null
+      historyStatus.value = 'ready'
+    } catch (error: unknown) {
+      if (!stillSelected(currentHumanId, itemId)) {
+        return
+      }
+
+      if (error instanceof WorkItemAccessRefused) {
+        item.value = null
+        status.value = 'refused'
+        clearMemoryReads()
+        return
+      }
+
+      historyStatus.value = 'error'
+    }
+  }
+
+  function retryHistory(): void {
+    const currentHumanId = humanId.value
+    const itemId = selectedItemId.value
+    if (currentHumanId !== null && itemId !== null) {
+      void loadHistory(currentHumanId, itemId)
+    }
+  }
+
+  function retryOutcome(): void {
+    const currentHumanId = humanId.value
+    const itemId = selectedItemId.value
+    if (currentHumanId !== null && itemId !== null) {
+      void loadOutcome(currentHumanId, itemId)
+    }
+  }
 
   async function load(): Promise<void> {
     const currentHumanId = humanId.value
@@ -73,7 +223,7 @@ export function useItemDetail(
 
     item.value = null
     updateError.value = null
-
+    clearMemoryReads()
     if (currentHumanId === null || itemId === null) {
       status.value = 'idle'
       return
@@ -100,6 +250,8 @@ export function useItemDetail(
 
     item.value = detail
     status.value = 'ready'
+    void loadHistory(currentHumanId, itemId)
+    void loadOutcome(currentHumanId, itemId)
   }
 
   watch([humanId, selectedItemId], () => void load(), { immediate: true })
@@ -328,6 +480,14 @@ export function useItemDetail(
     status,
     item,
     updateError,
+    historyStatus,
+    historyEvents,
+    historyHasEarlier,
+    outcomeStatus,
+    outcomeClosures,
+    loadEarlierEvents,
+    retryHistory,
+    retryOutcome,
     updateItem,
     createChecklistItem,
     updateChecklistItem,

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { FIXTURE_BOARDS, FIXTURE_ITEMS } from '@/fixtures/catalogue'
-import { BoardAccessRefused } from '@/gateway/refusals'
+import { BoardAccessRefused, WorkItemAccessRefused } from '@/gateway/refusals'
 import {
   WorkplaceConflict,
   WorkplaceForbidden,
@@ -783,6 +783,141 @@ describe('live HTTP gateway — typed card links', () => {
     await expect(
       gateway(fetchImpl).addCardLink(HUMAN_ID, CARD_ID, { kind: 'account', ref: ACCOUNT_ID }),
     ).rejects.toBeInstanceOf(WorkplaceLinkUnresolvable)
+  })
+})
+
+describe('live HTTP gateway — canonical history and closures', () => {
+  it('reads a card event page with a cursor, newest first', async () => {
+    const { fetchImpl, calls } = recordedFetch((url) => {
+      if (url.startsWith(`${ORIGIN}/v1/workplace/cards/${CARD_ID}/events`)) {
+        return jsonResponse(200, {
+          items: [
+            {
+              id: '00000000-0000-4000-8000-0000000000a2',
+              boardId: BOARD_ID,
+              cardId: CARD_ID,
+              actorId: CITIZEN_ID,
+              actorKind: 'citizen',
+              actorHumanId: null,
+              subjectAgentId: null,
+              delegationId: null,
+              verb: 'card.moved',
+              payload: { fromStatus: 'review', toStatus: 'done' },
+              legacy: false,
+              createdAt: NOW,
+            },
+          ],
+          nextCursor: 'earlier-page',
+        })
+      }
+      return jsonResponse(404, { code: 'not_found' })
+    })
+
+    const page = await gateway(fetchImpl).listCardEvents?.(HUMAN_ID, CARD_ID, 'from-cursor', 20)
+
+    expect(page?.items).toHaveLength(1)
+    expect(page?.items[0]).toMatchObject({ verb: 'card.moved', legacy: false })
+    expect(page?.nextCursor).toBe('earlier-page')
+    expect(calls[0]?.url).toBe(
+      `${ORIGIN}/v1/workplace/cards/${CARD_ID}/events?limit=20&cursor=from-cursor`,
+    )
+    expect(header(calls[0]?.init, 'X-Kolonie-Citizen')).toBe(CITIZEN_ID)
+  })
+
+  it('keeps a legacy verb the closed union does not name, marked legacy', async () => {
+    const { fetchImpl } = recordedFetch((url) => {
+      if (url.startsWith(`${ORIGIN}/v1/workplace/cards/${CARD_ID}/events`)) {
+        return jsonResponse(200, {
+          items: [
+            {
+              id: '00000000-0000-4000-8000-0000000000a3',
+              boardId: BOARD_ID,
+              cardId: CARD_ID,
+              actorId: null,
+              actorKind: 'system',
+              actorHumanId: null,
+              subjectAgentId: null,
+              delegationId: null,
+              verb: 'recurrence.skipped',
+              payload: { reason: 'cooldown' },
+              legacy: true,
+              createdAt: NOW,
+            },
+          ],
+          nextCursor: null,
+        })
+      }
+      return jsonResponse(404, { code: 'not_found' })
+    })
+
+    const page = await gateway(fetchImpl).listCardEvents?.(HUMAN_ID, CARD_ID)
+
+    expect(page?.items[0]).toMatchObject({ verb: 'recurrence.skipped', legacy: true })
+    expect(page?.nextCursor).toBeNull()
+  })
+
+  it('reads a card closure page with resolved evidence links', async () => {
+    const { fetchImpl, calls } = recordedFetch((url) => {
+      if (url.startsWith(`${ORIGIN}/v1/workplace/cards/${CARD_ID}/closures`)) {
+        return jsonResponse(200, {
+          items: [
+            {
+              id: '00000000-0000-4000-8000-0000000000c3',
+              boardId: BOARD_ID,
+              cardId: CARD_ID,
+              actorId: CITIZEN_ID,
+              revision: 2,
+              result: 'shipped',
+              summary: 'Published the result.',
+              learned: 'The reader could use it.',
+              evidenceLinkIds: [LINK_ID],
+              evidenceLinks: [
+                {
+                  id: LINK_ID,
+                  cardId: CARD_ID,
+                  kind: 'url',
+                  ref: 'https://example.invalid/result',
+                  target: { state: 'resolved', kind: 'url' },
+                },
+              ],
+              next: { kind: 'none' },
+              legacy: false,
+              supersedesClosureId: '00000000-0000-4000-8000-0000000000c2',
+              createdAt: NOW,
+            },
+          ],
+          nextCursor: null,
+        })
+      }
+      return jsonResponse(404, { code: 'not_found' })
+    })
+
+    const page = await gateway(fetchImpl).listCardClosures?.(HUMAN_ID, CARD_ID)
+
+    expect(page?.items).toHaveLength(1)
+    expect(page?.items[0]).toMatchObject({
+      revision: 2,
+      result: 'shipped',
+      evidenceLinkIds: [LINK_ID],
+    })
+    expect(page?.items[0]?.evidenceLinks[0]).toMatchObject({
+      kind: 'url',
+      state: 'resolved',
+      summary: 'https://example.invalid/result',
+    })
+    expect(page?.nextCursor).toBeNull()
+    expect(calls[0]?.url).toBe(`${ORIGIN}/v1/workplace/cards/${CARD_ID}/closures?limit=20`)
+  })
+
+  it('refuses event and closure reads for a card it is not on, same as a missing one', async () => {
+    const { fetchImpl } = recordedFetch(() => jsonResponse(404, { code: 'not_found' }))
+
+    await expect(
+      gateway(fetchImpl).listCardEvents?.(HUMAN_ID, CARD_ID),
+    ).rejects.toBeInstanceOf(WorkItemAccessRefused)
+    await expect(
+      gateway(fetchImpl).listCardClosures?.(HUMAN_ID, CARD_ID),
+    ).rejects.toBeInstanceOf(WorkItemAccessRefused)
   })
 })
 

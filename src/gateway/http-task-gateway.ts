@@ -2,6 +2,13 @@ import { isLane, type Lane } from '@/domain/lanes'
 import type {
   AttachmentId,
   BoardId,
+  CardClosure,
+  CardClosureNext,
+  CardClosurePage,
+  CardClosureResult,
+  CardEvent,
+  CardEventActorKind,
+  CardEventPage,
   CardLink,
   CardLinkId,
   CardLinkKind,
@@ -26,7 +33,11 @@ import type {
   WorkItemPriority,
   WorkItemSummary,
 } from '@/domain/workplace'
-import { isCardLinkKind } from '@/domain/workplace'
+import {
+  isCardLinkKind,
+  WORKPLACE_CARD_CLOSURE_RESULTS,
+  WORKPLACE_EVENT_ACTOR_KINDS,
+} from '@/domain/workplace'
 import { BoardAccessRefused, WorkItemAccessRefused } from '@/gateway/refusals'
 import type { TaskGateway } from '@/gateway/task-gateway'
 import {
@@ -108,6 +119,20 @@ function number(value: unknown, fallback = 0): number {
 
 function nullableText(value: unknown): string | null {
   return typeof value === 'string' ? value : null
+}
+
+function asActorKind(value: unknown): CardEventActorKind {
+  return typeof value === 'string' &&
+    (WORKPLACE_EVENT_ACTOR_KINDS as readonly string[]).includes(value)
+    ? (value as CardEventActorKind)
+    : 'citizen'
+}
+
+function asClosureResult(value: unknown): CardClosureResult | null {
+  return typeof value === 'string' &&
+    (WORKPLACE_CARD_CLOSURE_RESULTS as readonly string[]).includes(value)
+    ? (value as CardClosureResult)
+    : null
 }
 
 function originRoot(origin: string): string {
@@ -494,6 +519,42 @@ export class HttpTaskGateway implements TaskGateway {
     await this.#request('DELETE', `${WORKPLACE_API_PREFIX}/links/${linkId}`)
   }
 
+  async listCardEvents(
+    _humanId: HumanId,
+    itemId: WorkItemId,
+    cursor?: string,
+    limit = 20,
+  ): Promise<CardEventPage> {
+    const query = new URLSearchParams({ limit: String(limit) })
+    if (cursor !== undefined && cursor.length > 0) {
+      query.set('cursor', cursor)
+    }
+
+    const body = await this.#request(
+      'GET',
+      `${WORKPLACE_API_PREFIX}/cards/${itemId}/events?${query.toString()}`,
+    )
+    return this.#eventPage(body)
+  }
+
+  async listCardClosures(
+    _humanId: HumanId,
+    itemId: WorkItemId,
+    cursor?: string,
+    limit = 20,
+  ): Promise<CardClosurePage> {
+    const query = new URLSearchParams({ limit: String(limit) })
+    if (cursor !== undefined && cursor.length > 0) {
+      query.set('cursor', cursor)
+    }
+
+    const body = await this.#request(
+      'GET',
+      `${WORKPLACE_API_PREFIX}/cards/${itemId}/closures?${query.toString()}`,
+    )
+    return this.#closurePage(body)
+  }
+
   async createChecklistItem(
     humanId: HumanId,
     itemId: WorkItemId,
@@ -770,6 +831,120 @@ export class HttpTaskGateway implements TaskGateway {
         this.#cardChecklists.set(cardId, checklistId)
       }
     }
+  }
+
+  #eventPage(body: Json): CardEventPage {
+    const rows = Array.isArray(body.items) ? body.items : []
+    const items = rows.flatMap((entry): CardEvent[] => {
+      if (typeof entry !== 'object' || entry === null) {
+        return []
+      }
+
+      const row = entry as Json
+      const id = text(row.id)
+      const boardId = text(row.boardId)
+      const cardId = text(row.cardId)
+      const verb = text(row.verb)
+      const createdAt = text(row.createdAt)
+      if (id.length === 0 || boardId.length === 0 || cardId.length === 0 || verb.length === 0 || createdAt.length === 0) {
+        return []
+      }
+
+      const payload = typeof row.payload === 'object' && row.payload !== null
+        ? (row.payload as Json)
+        : {}
+      return [{
+        id,
+        boardId,
+        cardId,
+        actorId: nullableText(row.actorId),
+        actorKind: asActorKind(row.actorKind),
+        actorHumanId: nullableText(row.actorHumanId),
+        subjectAgentId: nullableText(row.subjectAgentId),
+        delegationId: nullableText(row.delegationId),
+        verb,
+        payload,
+        legacy: row.legacy === true,
+        createdAt,
+      }]
+    })
+
+    return {
+      items,
+      nextCursor: nullableText(body.nextCursor),
+    }
+  }
+
+  #closurePage(body: Json): CardClosurePage {
+    const rows = Array.isArray(body.items) ? body.items : []
+    const items = rows.flatMap((entry): CardClosure[] => {
+      if (typeof entry !== 'object' || entry === null) {
+        return []
+      }
+
+      const row = entry as Json
+      const result = asClosureResult(row.result)
+      const next = this.#closureNext(row.next)
+      const id = text(row.id)
+      const boardId = text(row.boardId)
+      const cardId = text(row.cardId)
+      const revision = number(row.revision)
+      const createdAt = text(row.createdAt)
+      if (
+        result === null ||
+        next === null ||
+        id.length === 0 ||
+        boardId.length === 0 ||
+        cardId.length === 0 ||
+        revision < 1 ||
+        createdAt.length === 0
+      ) {
+        return []
+      }
+
+      return [{
+        id,
+        boardId,
+        cardId,
+        actorId: nullableText(row.actorId),
+        revision,
+        result,
+        summary: text(row.summary),
+        learned: text(row.learned),
+        evidenceLinkIds: Array.isArray(row.evidenceLinkIds)
+          ? row.evidenceLinkIds.filter((value): value is string => typeof value === 'string')
+          : [],
+        evidenceLinks: this.#links(row.evidenceLinks),
+        next,
+        legacy: row.legacy === true,
+        supersedesClosureId: nullableText(row.supersedesClosureId),
+        createdAt,
+      }]
+    })
+
+    return {
+      items,
+      nextCursor: nullableText(body.nextCursor),
+    }
+  }
+
+  #closureNext(value: unknown): CardClosureNext | null {
+    if (typeof value !== 'object' || value === null) {
+      return null
+    }
+
+    const row = value as Json
+    if (row.kind === 'none') {
+      return { kind: 'none' }
+    }
+    if (row.kind === 'card' && typeof row.cardId === 'string') {
+      return { kind: 'card', cardId: row.cardId }
+    }
+    if (row.kind === 'sentence' && typeof row.text === 'string') {
+      return { kind: 'sentence', text: row.text }
+    }
+
+    return null
   }
 
   #rememberBoard(row: Json): void {

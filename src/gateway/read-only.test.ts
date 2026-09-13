@@ -26,6 +26,8 @@ describe('the gateway write surface', () => {
       'deleteWorkItem',
       'getBoardItems',
       'getItemDetail',
+      'listCardClosures',
+      'listCardEvents',
       'listCardLinks',
       'listVisibleBoards',
       'moveItemToLane',

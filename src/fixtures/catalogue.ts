@@ -1,4 +1,7 @@
 import type {
+  CardClosure,
+  CardEvent,
+
   Agent,
   Board,
   Human,
@@ -152,6 +155,94 @@ const emptyBoardFields = {
   coverImageUrl: null,
   coverAttachmentId: null,
 }
+
+export const fixtureCardEvents: readonly CardEvent[] = [
+  {
+    id: 'fictional-event-created',
+    boardId: FIXTURE_BOARDS.quillDelivery,
+    cardId: FIXTURE_ITEMS.done,
+    actorId: 'fictional-agent-quill',
+    actorKind: 'citizen',
+    actorHumanId: null,
+    subjectAgentId: null,
+    delegationId: null,
+    verb: 'card.created',
+    payload: {},
+    legacy: false,
+    createdAt: '2026-08-24T08:00:00.000Z',
+  },
+  {
+    id: 'fictional-event-moved',
+    boardId: FIXTURE_BOARDS.quillDelivery,
+    cardId: FIXTURE_ITEMS.done,
+    actorId: 'fictional-agent-quill',
+    actorKind: 'citizen',
+    actorHumanId: null,
+    subjectAgentId: null,
+    delegationId: null,
+    verb: 'card.moved',
+    payload: { fromStatus: 'review', toStatus: 'done' },
+    legacy: false,
+    createdAt: '2026-08-26T10:00:00.000Z',
+  },
+  {
+    id: 'fictional-event-closed',
+    boardId: FIXTURE_BOARDS.quillDelivery,
+    cardId: FIXTURE_ITEMS.done,
+    actorId: 'fictional-agent-quill',
+    actorKind: 'citizen',
+    actorHumanId: null,
+    subjectAgentId: null,
+    delegationId: null,
+    verb: 'card.closed',
+    payload: { closeRecordId: 'fictional-closure-2', result: 'shipped' },
+    legacy: false,
+    createdAt: '2026-08-26T11:00:00.000Z',
+  },
+]
+
+export const fixtureCardClosures: readonly CardClosure[] = [
+  {
+    id: 'fictional-closure-2',
+    boardId: FIXTURE_BOARDS.quillDelivery,
+    cardId: FIXTURE_ITEMS.done,
+    actorId: 'fictional-agent-quill',
+    revision: 2,
+    result: 'shipped',
+    summary: 'Archived the intake note after publishing the final record.',
+    learned: 'The compact record was sufficient for the next reader.',
+    evidenceLinkIds: ['fictional-link-done-evidence'],
+    evidenceLinks: [
+      {
+        id: 'fictional-link-done-evidence',
+        kind: 'url',
+        ref: 'https://example.invalid/fictional-result',
+        state: 'resolved',
+        summary: 'Fictional published result',
+      },
+    ],
+    next: { kind: 'none' },
+    legacy: false,
+    supersedesClosureId: 'fictional-closure-1',
+    createdAt: '2026-08-26T11:00:00.000Z',
+  },
+  {
+    id: 'fictional-closure-1',
+    boardId: FIXTURE_BOARDS.quillDelivery,
+    cardId: FIXTURE_ITEMS.done,
+    actorId: null,
+    revision: 1,
+    result: 'failed_experiment',
+    summary: 'Tried the first archive route and observed a refusal.',
+    learned: 'The final record had to be published before archiving.',
+    evidenceLinkIds: [],
+    evidenceLinks: [],
+    next: { kind: 'sentence', text: 'Publish the final record and retry.' },
+    legacy: true,
+    supersedesClosureId: null,
+    createdAt: '2026-08-26T10:30:00.000Z',
+  },
+]
 
 export const fixtureWorkItems: readonly WorkItemDetail[] = [
   {

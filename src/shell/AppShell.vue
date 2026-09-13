@@ -483,6 +483,10 @@ function openItem(itemId: string): void {
   items.selectItem(itemId)
 }
 
+function copyEvidence(ref: string): void {
+  void navigator.clipboard?.writeText(ref)
+}
+
 async function closeDetail(): Promise<void> {
   const itemId = items.selectedItemId.value
   items.clearSelection()
@@ -867,6 +871,11 @@ async function closeDetail(): Promise<void> {
             :current-human-name="human?.name ?? null"
             :shows-preview-data="showsPreviewData"
             :supports-multiple-assignees="showsPreviewData"
+            :history-status="detail.historyStatus.value"
+            :history-events="detail.historyEvents.value"
+            :history-has-earlier="detail.historyHasEarlier.value"
+            :outcome-status="detail.outcomeStatus.value"
+            :outcome-closures="detail.outcomeClosures.value"
             @update="updateDetail"
             @create-checklist-item="createChecklistItem"
             @update-checklist-item="updateChecklistItem"
@@ -882,6 +891,10 @@ async function closeDetail(): Promise<void> {
             @remove-card-link="removeCardLink"
             @move="moveDetail"
             @close="closeDetail"
+            @load-earlier-history="detail.loadEarlierEvents"
+            @retry-history="detail.retryHistory"
+            @retry-outcome="detail.retryOutcome"
+            @copy-evidence="copyEvidence"
           />
         </div>
       </main>

@@ -2,6 +2,10 @@ import type { Lane } from '@/domain/lanes'
 import type {
   AttachmentId,
   BoardId,
+  CardClosure,
+  CardClosurePage,
+  CardEvent,
+  CardEventPage,
   CardLink,
   CardLinkId,
   ChecklistItem,
@@ -26,6 +30,8 @@ import type {
 import {
   fixtureAgents,
   fixtureBoards,
+  fixtureCardClosures,
+  fixtureCardEvents,
   fixtureHumans,
   fixtureWorkItems,
 } from '@/fixtures/catalogue'
@@ -628,6 +634,50 @@ export class FixtureTaskGateway implements TaskGateway {
       ...holder,
       links: holder.links.filter((link) => link.id !== linkId),
     })
+  }
+
+  async listCardEvents(
+    humanId: HumanId,
+    itemId: WorkItemId,
+    cursor?: string,
+    limit = 20,
+  ): Promise<CardEventPage> {
+    this.requireItem(humanId, itemId)
+    const events = fixtureCardEvents
+      .filter((event) => event.cardId === itemId)
+      .slice()
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    const offset = cursor === undefined ? 0 : Number.parseInt(cursor, 10)
+    const start = Number.isFinite(offset) && offset >= 0 ? offset : 0
+    const items = events.slice(start, start + limit).map((event): CardEvent => ({
+      ...event,
+      payload: { ...event.payload },
+    }))
+    const next = start + items.length
+    return { items, nextCursor: next < events.length ? String(next) : null }
+  }
+
+  async listCardClosures(
+    humanId: HumanId,
+    itemId: WorkItemId,
+    cursor?: string,
+    limit = 20,
+  ): Promise<CardClosurePage> {
+    this.requireItem(humanId, itemId)
+    const closures = fixtureCardClosures
+      .filter((closure) => closure.cardId === itemId)
+      .slice()
+      .sort((left, right) => right.revision - left.revision)
+    const offset = cursor === undefined ? 0 : Number.parseInt(cursor, 10)
+    const start = Number.isFinite(offset) && offset >= 0 ? offset : 0
+    const items = closures.slice(start, start + limit).map((closure): CardClosure => ({
+      ...closure,
+      evidenceLinkIds: [...closure.evidenceLinkIds],
+      evidenceLinks: closure.evidenceLinks.map((link) => ({ ...link })),
+      next: { ...closure.next },
+    }))
+    const next = start + items.length
+    return { items, nextCursor: next < closures.length ? String(next) : null }
   }
 
   private requireItem(humanId: HumanId, itemId: WorkItemId): WorkItemDetail {

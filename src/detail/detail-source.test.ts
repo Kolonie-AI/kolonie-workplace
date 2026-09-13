@@ -27,6 +27,12 @@ const styles = withoutComments(
 const activity = withoutComments(
   readFileSync(resolve(root, 'src/detail/ActivitySection.vue'), 'utf8'),
 )
+const history = withoutComments(
+  readFileSync(resolve(root, 'src/detail/HistorySection.vue'), 'utf8'),
+)
+const outcome = withoutComments(
+  readFileSync(resolve(root, 'src/detail/OutcomeSection.vue'), 'utf8'),
+)
 const attachments = withoutComments(
   readFileSync(resolve(root, 'src/detail/AttachmentSection.vue'), 'utf8'),
 )
@@ -45,6 +51,19 @@ describe('detail source — writes through the parent, never a gateway of its ow
     expect(activity).toMatch(/sanitizeDescription/)
     expect(activity).not.toMatch(/DOMPurify|sanitizeHtml|sanitizeComment/)
     expect(activity).toMatch(/Write a comment…/)
+    expect(activity).toMatch(/Discussion/)
+    expect(activity).not.toMatch(/Comments and activity/)
+  })
+
+  it('renders canonical history and outcome without synthesizing lifecycle sentences', () => {
+    expect(history).toMatch(/History/)
+    expect(history).toMatch(/cardEventVerbLabel/)
+    expect(history).not.toMatch(/JSON\.stringify|added this card/)
+    expect(outcome).toMatch(/Outcome/)
+    expect(outcome).toMatch(/Previous outcome revisions/)
+    expect(outcome).not.toMatch(/innerHTML/)
+    expect(composable).toMatch(/listCardEvents/)
+    expect(composable).toMatch(/listCardClosures/)
   })
 
   it('attaches through parent emits and never reaches for a gateway of its own', () => {
@@ -69,7 +88,7 @@ describe('detail source — the detail is fetched, never taken from the board pa
 
 describe('detail source — original Colony code', () => {
   it('names no third-party task model, file, class or asset', () => {
-    for (const source of [pane, composable, styles, activity, attachments]) {
+    for (const source of [pane, composable, styles, activity, history, outcome, attachments]) {
       expect(source).not.toMatch(/TaskDetailView/i)
       expect(source).not.toMatch(/\bis-(loading|active|done)\b/)
       expect(source).not.toMatch(/\bbucket\b|\btask-id\b|\bITask\b/i)
@@ -88,7 +107,9 @@ describe('detail source — original Colony code', () => {
     expect(pane).toMatch(/Change list for this card/)
     expect(pane).toMatch(/Checklist/)
     expect(pane).toMatch(/Attachment/)
-    expect(pane).toMatch(/Activity/)
+    expect(pane).toMatch(/HistorySection/)
+    expect(pane).toMatch(/OutcomeSection/)
+    expect(activity).toMatch(/Discussion/)
     expect(pane).toMatch(/Add to card/)
   })
 

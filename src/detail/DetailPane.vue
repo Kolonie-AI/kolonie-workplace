@@ -11,6 +11,8 @@ import {
   WORKPLACE_LINK_KIND_LABELS,
   WORKPLACE_LINK_KINDS,
   type AttachmentId,
+  type CardClosure,
+  type CardEvent,
   type CardLinkId,
   type CardLinkKind,
   type ChecklistItemId,
@@ -24,8 +26,10 @@ import {
   type WorkItemLabel,
   type WorkItemMoveInput,
 } from '@/domain/workplace'
-import type { ItemDetailStatus } from '@/detail/use-item-detail'
+import type { DetailReadStatus, ItemDetailStatus } from '@/detail/use-item-detail'
 import ActivitySection from '@/detail/ActivitySection.vue'
+import HistorySection from '@/detail/HistorySection.vue'
+import OutcomeSection from '@/detail/OutcomeSection.vue'
 import AttachmentSection from '@/detail/AttachmentSection.vue'
 import ChecklistSection from '@/detail/ChecklistSection.vue'
 import { renderHandover } from '@/detail/handover-parts'
@@ -49,6 +53,11 @@ const props = defineProps<{
   currentHumanName: string | null
   showsPreviewData: boolean
   supportsMultipleAssignees: boolean
+  historyStatus: DetailReadStatus
+  historyEvents: readonly CardEvent[]
+  historyHasEarlier: boolean
+  outcomeStatus: DetailReadStatus
+  outcomeClosures: readonly CardClosure[]
 }>()
 
 const emit = defineEmits<{
@@ -67,6 +76,10 @@ const emit = defineEmits<{
   deleteAttachment: [attachmentId: AttachmentId]
   addCardLink: [input: CreateCardLinkInput]
   removeCardLink: [linkId: CardLinkId]
+  loadEarlierHistory: []
+  retryHistory: []
+  retryOutcome: []
+  copyEvidence: [ref: string]
 }>()
 
 type RailPopover = 'labels' | 'members' | 'dates' | 'priority' | 'cover' | 'connection' | null
@@ -808,6 +821,22 @@ function onAssigneeKeydown(event: KeyboardEvent): void {
               @add="emit('addAttachment', $event)"
               @remove="emit('deleteAttachment', $event)"
               @set-cover="setImageCover"
+            />
+
+            <HistorySection
+              :status="historyStatus"
+              :events="historyEvents"
+              :has-earlier="historyHasEarlier"
+              :now="now"
+              @load-earlier="emit('loadEarlierHistory')"
+              @retry="emit('retryHistory')"
+            />
+
+            <OutcomeSection
+              :status="outcomeStatus"
+              :closures="outcomeClosures"
+              @retry="emit('retryOutcome')"
+              @copy-evidence="emit('copyEvidence', $event)"
             />
 
             <ActivitySection

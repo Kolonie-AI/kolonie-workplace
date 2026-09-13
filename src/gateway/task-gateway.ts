@@ -2,6 +2,8 @@ import type { Lane } from '@/domain/lanes'
 import type {
   AttachmentId,
   BoardId,
+  CardClosurePage,
+  CardEventPage,
   CardLink,
   CardLinkId,
   ChecklistItemId,
@@ -115,4 +117,16 @@ export interface TaskGateway {
     input: CreateCardLinkInput,
   ): Promise<CardLink>
   removeCardLink(humanId: HumanId, linkId: CardLinkId): Promise<void>
+  listCardEvents?(
+    humanId: HumanId,
+    itemId: WorkItemId,
+    cursor?: string,
+    limit?: number,
+  ): Promise<CardEventPage>
+  listCardClosures?(
+    humanId: HumanId,
+    itemId: WorkItemId,
+    cursor?: string,
+    limit?: number,
+  ): Promise<CardClosurePage>
 }
