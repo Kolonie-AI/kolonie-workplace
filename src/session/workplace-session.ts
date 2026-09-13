@@ -7,6 +7,16 @@ export interface LinkedCitizen {
   readonly status: string
 }
 
+export interface DelegatedCitizen {
+  readonly delegationId: string
+  readonly viaAgentId: string
+  readonly viaHandle: string
+  readonly subjectId: string
+  readonly subjectHandle: string
+  readonly status: string
+  readonly capabilities: readonly string[]
+}
+
 /**
  * The port the workplace signs in through.
  *
@@ -36,8 +46,11 @@ export interface WorkplaceSession {
   signIn(request?: SignInRequest): Promise<void>
   signOut(): Promise<void>
   readonly linkedAgents?: Readonly<Ref<readonly LinkedCitizen[] | null>>
+  readonly delegatedCitizens?: Readonly<Ref<readonly DelegatedCitizen[] | null>>
+  readonly activeDelegation?: Readonly<Ref<DelegatedCitizen | null>>
   readonly failure?: Readonly<Ref<WorkplaceSessionFailure | null>>
   pickCitizen?(citizenId: string): void
+  pickDelegatedCitizen?(delegationId: string): void
   switchCitizen?(): void
   getAccessToken?(): Promise<string>
   invalidateAuthentication(): void

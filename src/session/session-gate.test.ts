@@ -18,7 +18,11 @@ import type { CitizenStorage } from '@/session/citizen-storage'
 import SessionGate from '@/session/SessionGate.vue'
 import SignedInHuman from '@/session/SignedInHuman.vue'
 import { createFixtureWorkplaceSession } from '@/session/fixture-workplace-session'
-import { WORKPLACE_SESSION, type WorkplaceSession } from '@/session/workplace-session'
+import {
+  WORKPLACE_SESSION,
+  type DelegatedCitizen,
+  type WorkplaceSession,
+} from '@/session/workplace-session'
 
 function renderGate(session: WorkplaceSession, gateway: TaskGateway = createFixtureTaskGateway()) {
   return render(SessionGate, {
@@ -103,25 +107,55 @@ describe('SessionGate — signed in', () => {
 })
 
 describe('SessionGate — live citizen selection', () => {
-  function liveSession(agents: readonly { id: string; handle: string; status: string }[]): WorkplaceSession {
+  function liveSession(
+    agents: readonly { id: string; handle: string; status: string }[],
+    delegations: readonly {
+      delegationId: string
+      viaAgentId: string
+      viaHandle: string
+      subjectId: string
+      subjectHandle: string
+      status: string
+      capabilities: readonly string[]
+    }[] = [],
+  ): WorkplaceSession {
     const currentHuman = ref<Human | null>(null)
     const linkedAgents = ref(agents)
+    const delegatedCitizens = ref(delegations)
+    const activeDelegation = ref<DelegatedCitizen | null>(null)
     return {
       currentHuman,
       linkedAgents,
+      delegatedCitizens,
+      activeDelegation,
       signIn: vi.fn(async () => undefined),
       signOut: vi.fn(async () => undefined),
       invalidateAuthentication: vi.fn(),
       switchCitizen: vi.fn(() => {
         currentHuman.value = null
+        activeDelegation.value = null
       }),
       pickCitizen: vi.fn((citizenId: string) => {
         const citizen = agents.find((candidate) => candidate.id === citizenId)
         if (citizen !== undefined) {
+          activeDelegation.value = null
           currentHuman.value = {
             id: citizen.id,
             name: citizen.handle,
             agentIds: [citizen.id],
+          }
+        }
+      }),
+      pickDelegatedCitizen: vi.fn((delegationId: string) => {
+        const delegation = delegations.find(
+          (candidate) => candidate.delegationId === delegationId,
+        )
+        if (delegation !== undefined) {
+          activeDelegation.value = delegation
+          currentHuman.value = {
+            id: delegation.subjectId,
+            name: delegation.subjectHandle,
+            agentIds: [delegation.subjectId],
           }
         }
       }),
@@ -165,6 +199,9 @@ describe('SessionGate — live citizen selection', () => {
     renderGate(session)
 
     expect(screen.getByTestId('citizen-gate')).toBeTruthy()
+    expect(screen.getByTestId('direct-citizen-choices')).toBeTruthy()
+    expect(screen.queryByTestId('delegated-citizen-choices')).toBeNull()
+    expect(screen.queryByTestId('delegated-perspective')).toBeNull()
     expect(screen.queryByTestId('sidebar')).toBeNull()
 
     await fireEvent.click(screen.getByRole('button', { name: /continue as quill/i }))
@@ -196,6 +233,64 @@ describe('SessionGate — live citizen selection', () => {
     expect(session.signOut).not.toHaveBeenCalled()
     expect(requests).toContain('agent-quill')
     expect(requests.at(-1)).toBe('agent-marlow')
+  })
+
+  it('uses real composition to send the via citizen and delegation on each request', async () => {
+    const auth0 = {
+      loginWithRedirect: vi.fn(async () => undefined),
+      handleRedirectCallback: vi.fn(async () => undefined),
+      isAuthenticated: vi.fn(async () => true),
+      getAccessToken: vi.fn(async () => 'access-token'),
+      logout: vi.fn(async () => undefined),
+    }
+    const session = createAuth0WorkplaceSession(auth0, {
+      me: vi.fn(async () => ({
+        human: { id: 'human-operator' },
+        agents: [{ id: 'agent-quill', handle: 'quill', status: 'citizen' }],
+        delegations: [{
+          delegationId: 'delegation-aurora',
+          viaAgentId: 'agent-quill',
+          viaHandle: 'quill',
+          subjectId: 'agent-aurora',
+          subjectHandle: 'aurora',
+          status: 'active',
+          capabilities: ['workplace-read'],
+        }],
+      })),
+    })
+    await session.restore()
+    const requests: { url: string; headers: Headers }[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      requests.push({ url, headers: new Headers(init?.headers) })
+      if (url.endsWith('/v1/workplace/boards')) {
+        return new Response(JSON.stringify({
+          items: [{
+            id: 'board-default',
+            ownerId: 'agent-aurora',
+            title: 'Delegated default board',
+            kind: 'default',
+            version: 1,
+          }],
+          nextCursor: null,
+        }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ items: [], nextCursor: null }), { status: 200 })
+    }))
+    const gateway = createTaskGateway(session, LIVE_CONFIG)
+    renderGate(session, gateway)
+
+    await fireEvent.click(screen.getByRole('button', { name: /operate aurora \(via quill\)/i }))
+
+    await waitFor(() => {
+      expect(requests.some(({ url }) => url.endsWith('/v1/workplace/boards/board-default/cards')))
+        .toBe(true)
+    })
+    expect(requests.length).toBeGreaterThanOrEqual(2)
+    expect(requests.every(({ headers }) =>
+      headers.get('X-Kolonie-Citizen') === 'agent-quill' &&
+      headers.get('X-Kolonie-Delegation') === 'delegation-aurora',
+    )).toBe(true)
   })
 
   it('uses real composition to request and open the selected citizen default board', async () => {
@@ -339,8 +434,77 @@ describe('SessionGate — live citizen selection', () => {
     renderGate(liveSession([]))
 
     expect(screen.getByTestId('no-linked-citizens').textContent).toMatch(/operates nobody/i)
+    expect(screen.queryByTestId('direct-citizen-choices')).toBeNull()
+    expect(screen.queryByTestId('delegated-citizen-choices')).toBeNull()
     expect(screen.queryByTestId('sidebar')).toBeNull()
     expect(screen.queryByTestId('fixture-sign-in')).toBeNull()
+  })
+
+  it('lists delegated citizens separately from directly operated ones', () => {
+    renderGate(
+      liveSession(
+        [{ id: 'agent-quill', handle: 'quill', status: 'citizen' }],
+        [
+          {
+            delegationId: 'delegation-aurora',
+            viaAgentId: 'agent-quill',
+            viaHandle: 'quill',
+            subjectId: 'agent-aurora',
+            subjectHandle: 'aurora',
+            status: 'active',
+            capabilities: ['workplace-read'],
+          },
+        ],
+      ),
+    )
+
+    expect(screen.getByTestId('direct-citizen-choices').textContent).toMatch(/continue as quill/i)
+    expect(screen.getByTestId('delegated-citizen-choices').textContent).toMatch(
+      /operate aurora \(via quill\)/i,
+    )
+    expect(screen.queryByTestId('sidebar')).toBeNull()
+  })
+
+  it('opens a delegated perspective and names it in the header banner', async () => {
+    const session = liveSession(
+      [{ id: 'agent-quill', handle: 'quill', status: 'citizen' }],
+      [
+        {
+          delegationId: 'delegation-aurora',
+          viaAgentId: 'agent-quill',
+          viaHandle: 'quill',
+          subjectId: 'agent-aurora',
+          subjectHandle: 'aurora',
+          status: 'active',
+          capabilities: ['workplace-read'],
+        },
+      ],
+    )
+    renderGate(session)
+
+    await fireEvent.click(screen.getByRole('button', { name: /operate aurora \(via quill\)/i }))
+
+    expect(session.pickDelegatedCitizen).toHaveBeenCalledWith('delegation-aurora')
+    expect(screen.getByTestId('sidebar')).toBeTruthy()
+    expect(screen.getByTestId('delegated-perspective').textContent).toMatch(
+      /operating aurora via quill/i,
+    )
+    expect(screen.getByTestId('signed-in-human').textContent).toContain('aurora')
+  })
+
+  it('does not invent a delegated list when the directory omitted it', () => {
+    const session: WorkplaceSession = {
+      currentHuman: ref(null),
+      linkedAgents: ref([{ id: 'agent-quill', handle: 'quill', status: 'citizen' }]),
+      signIn: vi.fn(async () => undefined),
+      signOut: vi.fn(async () => undefined),
+      invalidateAuthentication: vi.fn(),
+      pickCitizen: vi.fn(),
+    }
+    renderGate(session)
+
+    expect(screen.getByTestId('direct-citizen-choices')).toBeTruthy()
+    expect(screen.queryByTestId('delegated-citizen-choices')).toBeNull()
   })
 })
 

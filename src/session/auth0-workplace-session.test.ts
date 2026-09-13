@@ -12,6 +12,17 @@ const ME: WorkplaceMe = {
     { id: 'agent-quill', handle: 'quill', status: 'citizen' },
     { id: 'agent-marlow', handle: 'marlow', status: 'citizen' },
   ],
+  delegations: [
+    {
+      delegationId: 'delegation-aurora',
+      viaAgentId: 'agent-quill',
+      viaHandle: 'quill',
+      subjectId: 'agent-aurora',
+      subjectHandle: 'aurora',
+      status: 'active',
+      capabilities: ['workplace-read', 'workplace-write'],
+    },
+  ],
 }
 
 function client(overrides: Partial<Auth0Client> = {}): Auth0Client {
@@ -51,11 +62,13 @@ function storage(initial: string | null = null): CitizenStorage & { value: strin
 }
 
 describe('Auth0 session — live Colony identity', () => {
-  it('holds nobody and no linked citizens before authentication', () => {
+  it('holds nobody and no linked or delegated citizens before authentication', () => {
     const session = createAuth0WorkplaceSession(client(), meClient(), storage())
 
     expect(session.currentHuman.value).toBeNull()
     expect(session.linkedAgents?.value).toBeNull()
+    expect(session.delegatedCitizens?.value).toBeNull()
+    expect(session.activeDelegation?.value).toBeNull()
   })
 
   it('sends the human to hosted login without asking the SPA for an identity', async () => {
@@ -77,7 +90,41 @@ describe('Auth0 session — live Colony identity', () => {
 
     expect(me.me).toHaveBeenCalledWith('access-token')
     expect(session.linkedAgents?.value).toEqual(ME.agents)
+    expect(session.delegatedCitizens?.value).toEqual(ME.delegations)
     expect(session.currentHuman.value).toBeNull()
+  })
+
+  it('exposes delegated perspectives returned by /me', async () => {
+    const session = createAuth0WorkplaceSession(
+      client({ isAuthenticated: vi.fn(async () => true) }),
+      meClient(),
+      storage(),
+    )
+
+    await session.restore()
+
+    expect(session.delegatedCitizens?.value).toEqual(ME.delegations)
+    expect(session.activeDelegation?.value).toBeNull()
+  })
+
+  it('selects a delegated subject through its operated citizen', async () => {
+    const saved = storage()
+    const session = createAuth0WorkplaceSession(
+      client({ isAuthenticated: vi.fn(async () => true) }),
+      meClient(),
+      saved,
+    )
+    await session.restore()
+
+    session.pickDelegatedCitizen?.('delegation-aurora')
+
+    expect(session.currentHuman.value).toEqual({
+      id: 'agent-aurora',
+      name: 'aurora',
+      agentIds: ['agent-aurora'],
+    })
+    expect(session.activeDelegation?.value).toEqual(ME.delegations?.[0])
+    expect(saved.value).toBe('delegation:delegation-aurora')
   })
 
   it('requires an explicit citizen pick even when /me returns one citizen', async () => {
@@ -114,7 +161,40 @@ describe('Auth0 session — live Colony identity', () => {
       name: 'marlow',
       agentIds: ['agent-marlow'],
     })
+    expect(session.activeDelegation?.value).toBeNull()
     expect(saved.read).toHaveBeenCalledTimes(1)
+  })
+
+  it('restores a selected delegated perspective that is still offered', async () => {
+    const saved = storage('delegation:delegation-aurora')
+    const session = createAuth0WorkplaceSession(
+      client({ isAuthenticated: vi.fn(async () => true) }),
+      meClient(),
+      saved,
+    )
+
+    await session.restore()
+
+    expect(session.currentHuman.value).toEqual({
+      id: 'agent-aurora',
+      name: 'aurora',
+      agentIds: ['agent-aurora'],
+    })
+    expect(session.activeDelegation?.value).toEqual(ME.delegations?.[0])
+  })
+
+  it('drops a stored delegation the directory no longer offers', async () => {
+    const saved = storage('delegation:delegation-gone')
+    const session = createAuth0WorkplaceSession(
+      client({ isAuthenticated: vi.fn(async () => true) }),
+      meClient(),
+      saved,
+    )
+
+    await session.restore()
+
+    expect(session.currentHuman.value).toBeNull()
+    expect(session.activeDelegation?.value).toBeNull()
   })
 
   it('ignores an unlinked citizen id and never persists it', async () => {
@@ -127,21 +207,24 @@ describe('Auth0 session — live Colony identity', () => {
     await session.restore()
 
     session.pickCitizen?.('agent-stranger')
+    session.pickDelegatedCitizen?.('delegation-stranger')
 
     expect(session.currentHuman.value).toBeNull()
+    expect(session.activeDelegation?.value).toBeNull()
     expect(saved.write).not.toHaveBeenCalled()
   })
 
-  it('keeps an empty agents response as an honest empty state', async () => {
+  it('keeps empty direct and delegated responses as an honest empty state', async () => {
     const session = createAuth0WorkplaceSession(
       client({ isAuthenticated: vi.fn(async () => true) }),
-      meClient({ human: ME.human, agents: [] }),
+      meClient({ human: ME.human, agents: [], delegations: [] }),
       storage(),
     )
 
     await session.restore()
 
     expect(session.linkedAgents?.value).toEqual([])
+    expect(session.delegatedCitizens?.value).toEqual([])
     expect(session.currentHuman.value).toBeNull()
   })
 
@@ -155,6 +238,8 @@ describe('Auth0 session — live Colony identity', () => {
 
     expect(session.currentHuman.value).toBeNull()
     expect(session.linkedAgents?.value).toBeNull()
+    expect(session.delegatedCitizens?.value).toBeNull()
+    expect(session.activeDelegation?.value).toBeNull()
     expect(saved.clear).toHaveBeenCalled()
     expect(auth0.logout).toHaveBeenCalledTimes(1)
   })
@@ -169,11 +254,14 @@ describe('Auth0 session — live Colony identity', () => {
 
     expect(session.currentHuman.value).toBeNull()
     expect(session.linkedAgents?.value).toEqual(ME.agents)
+    expect(session.delegatedCitizens?.value).toEqual(ME.delegations)
+    expect(session.activeDelegation?.value).toBeNull()
     expect(saved.clear).toHaveBeenCalled()
     expect(auth0.logout).not.toHaveBeenCalled()
 
     session.pickCitizen?.('agent-marlow')
     expect(session.currentHuman.value?.id).toBe('agent-marlow')
+    expect(session.activeDelegation?.value).toBeNull()
     expect(saved.value).toBe('agent-marlow')
   })
 
@@ -198,6 +286,8 @@ describe('Auth0 session — live Colony identity', () => {
     await expect(session.getAccessToken?.()).rejects.toBe(tokenFailure)
     expect(session.currentHuman.value).toBeNull()
     expect(session.linkedAgents?.value).toBeNull()
+    expect(session.delegatedCitizens?.value).toBeNull()
+    expect(session.activeDelegation?.value).toBeNull()
     expect(saved.clear).toHaveBeenCalled()
     expect(session.failure?.value).toBe('unauthorized')
   })
@@ -224,6 +314,8 @@ describe('Auth0 session — live Colony identity', () => {
     expect(statesDuringClear).toEqual([{ human: null, agents: null, failure: 'unauthorized' }])
     expect(session.currentHuman.value).toBeNull()
     expect(session.linkedAgents?.value).toBeNull()
+    expect(session.delegatedCitizens?.value).toBeNull()
+    expect(session.activeDelegation?.value).toBeNull()
     expect(session.failure?.value).toBe('unauthorized')
   })
 })

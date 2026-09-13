@@ -36,6 +36,15 @@ export function createTaskGateway(
     getToken: () => session.getAccessToken!(),
     onUnauthorized: () => session.invalidateAuthentication(),
     getCitizen: () => {
+      const delegation = session.activeDelegation?.value
+      if (delegation !== undefined && delegation !== null) {
+        return {
+          id: delegation.viaAgentId,
+          handle: delegation.viaHandle,
+          delegationId: delegation.delegationId,
+        }
+      }
+
       const selected = session.currentHuman.value
       return selected === null ? null : { id: selected.id, handle: selected.name }
     },
